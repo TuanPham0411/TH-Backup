@@ -2,9 +2,13 @@ import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, sendEmailVerification, updateProfile, reload, getIdToken, signOut } from 'firebase/auth';
 import { getFirestore, doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { configured, friendlyError, validName } from './auth-utils.js';
+import { firebaseConfig } from './firebase-config.js';
 
 const $ = id => document.getElementById(id);
-const config = { apiKey: import.meta.env.VITE_FIREBASE_API_KEY, authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN, projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID, appId: import.meta.env.VITE_FIREBASE_APP_ID };
+const override = { apiKey: import.meta.env.VITE_FIREBASE_API_KEY, authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN, projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID, appId: import.meta.env.VITE_FIREBASE_APP_ID };
+const hasOverride = Object.values(override).some(value => value !== undefined);
+// Use an override only as a complete set, avoiding accidental mixed projects.
+const config = hasOverride ? override : firebaseConfig;
 let auth, db, mode = 'login', busy = false;
 const ready = configured(config);
 const unavailable = 'Đăng nhập đang được chuẩn bị. Bạn vẫn có thể khám phá TH và liên hệ trực tiếp.';

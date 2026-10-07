@@ -18,13 +18,13 @@ Vite lấy nguồn trong `site/`; bản production nằm ở `dist/web/`. Không
 
 ## Kích hoạt Firebase
 
-Mã giao diện đã có đăng nhập Google, email/mật khẩu, đăng ký, đặt lại mật khẩu, xác minh email, đăng xuất và sửa tên hồ sơ. Khi thiếu cấu hình, giao diện thông báo chưa sẵn sàng và khóa thao tác gửi yêu cầu. Build thành công không chứng minh Firebase đang hoạt động.
+Mã giao diện đã có đăng nhập Google, email/mật khẩu, đăng ký, đặt lại mật khẩu, xác minh email, đăng xuất và sửa tên hồ sơ. Cấu hình công khai của project `th-web-d816f` đã được tích hợp trong `site/firebase-config.js`. Không cần nhập biến Netlify để dùng project này. Các biến `VITE_FIREBASE_*` là tùy chọn để đổi project: nếu dùng, phải cung cấp đủ cả bốn biến để tránh trộn project. Khi cấu hình không đầy đủ, giao diện khóa thao tác gửi yêu cầu. Build thành công không chứng minh Firebase đang hoạt động.
 
 1. Tạo project trong Firebase Console. Đăng ký ứng dụng Web và lấy `firebaseConfig`. Đây là cấu hình công khai, không phải service account hoặc private key.
 2. Trong Authentication → Sign-in method bật Email/Password và Google, cấu hình email hỗ trợ cho Google.
 3. Trong Authentication → Settings → Authorized domains thêm `th.io.vn`, `www.th.io.vn`, `q-th.netlify.app`. Thêm `localhost` khi cần phát triển cục bộ; project mới có thể không thêm localhost tự động.
 4. Tạo Cloud Firestore theo chế độ Production. Trong Rules, dán nội dung `firestore.rules` và Publish. Quy tắc chỉ cho tài khoản có email xác minh đọc/ghi hồ sơ `users/{uid}` của chính mình; chỉ lưu `displayName` và `updatedAt`. Không có quy tắc truy cập công khai, trường quyền quản trị hoặc ghi dữ liệu của người khác.
-5. Trong Netlify → Environment variables thêm bốn biến có phạm vi Builds, rồi deploy lại:
+5. Tùy chọn: nếu cần dùng project khác, trong Netlify → Environment variables thêm đủ bốn biến có phạm vi Builds, rồi deploy lại:
 
 | Biến | Trường Firebase |
 |---|---|
@@ -43,7 +43,7 @@ Giữ authDomain được Firebase cấp, thường là `PROJECT.firebaseapp.com
 - Xác nhận người chưa đăng nhập, tài khoản chưa xác minh, và tài khoản khác không đọc/ghi được document của người khác bằng Rules Playground hoặc Firebase Emulator Suite.
 - Kiểm tra HTTPS và chuyển hướng www trên Netlify; DNS được quản lý tại Netlify sau khi đổi nameserver tại Nhân Hòa.
 
-Chưa kiểm chứng các luồng Firebase thật hoặc triển khai rules vì chưa có project/config và quyền quản trị của chủ website. Cần hoàn thành kiểm tra trên trước khi tuyên bố tính năng tài khoản sẵn sàng. Có thể phát sinh phí theo hạn mức dịch vụ; không bật SMS hoặc Storage trong phiên bản này.
+Chưa kiểm chứng các luồng Firebase thật hoặc triển khai rules vì chưa có quyền quản trị Firebase và truy cập mạng tới dịch vụ xác thực bị hạn chế trong phiên làm việc. Cấu hình project đã có; vẫn cần xác nhận providers, Authorized domains và Firestore Rules. Cần hoàn thành kiểm tra trên trước khi tuyên bố tính năng tài khoản sẵn sàng. Có thể phát sinh phí theo hạn mức dịch vụ; không bật SMS hoặc Storage trong phiên bản này.
 
 ## Quyền riêng tư
 
