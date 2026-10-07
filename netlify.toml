@@ -1,5 +1,9 @@
 [build]
-  publish = "site"
+  command = "npm run build"
+  publish = "dist/web"
+
+[build.environment]
+  NODE_VERSION = "24"
 
 [[headers]]
   for = "/*"

@@ -1,0 +1,19 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function ownsVerifiedAccount(uid) {
+      return request.auth != null && request.auth.uid == uid
+        && request.auth.token.email_verified == true;
+    }
+    match /users/{uid} {
+      allow read: if ownsVerifiedAccount(uid);
+      allow create, update: if ownsVerifiedAccount(uid)
+        && request.resource.data.keys().hasOnly(['displayName', 'updatedAt'])
+        && request.resource.data.displayName is string
+        && request.resource.data.displayName.size() > 0
+        && request.resource.data.displayName.size() <= 80
+        && request.resource.data.updatedAt == request.time;
+      allow delete: if ownsVerifiedAccount(uid);
+    }
+  }
+}

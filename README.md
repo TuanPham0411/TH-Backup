@@ -1,35 +1,50 @@
-# TH — th.io.vn
+# TH — website cá nhân
 
-Website cá nhân tĩnh, tiếng Việt, không cần cài dependencies hay bước build. Toàn bộ nội dung xuất bản nằm trong `site/`. Thương hiệu TH; liên hệ email, điện thoại và Zalo đã được chủ website cung cấp.
+Website tiếng Việt dùng Vite và Firebase SDK, triển khai qua GitHub → Netlify. Email, điện thoại và Zalo của chủ website được hiển thị tại mục liên hệ.
 
-## Chạy thử
+## Phát triển và build
 
-Tại `/workspace/Thien-Ha`:
-
-```sh
-python3 -m http.server 8080 --directory site --bind 127.0.0.1
-```
-
-Kiểm tra nội bộ bằng `curl --fail http://127.0.0.1:8080/`. Dừng máy chủ bằng Ctrl+C.
-
-## Gói triển khai
+Yêu cầu Node.js 24, npm. Dùng checkout hiện có; không cần tạo worktree.
 
 ```sh
-mkdir -p dist
-cd site
-zip -r ../dist/th-site.zip index.html styles.css favicon.svg
+npm ci --cache /tmp/th-npm-cache
+npm run dev
+npm test
+npm run build
+npm run preview -- --port 4173
 ```
 
-Gói ZIP có `index.html` ở thư mục gốc. Không đưa `.git` lên hosting.
+Vite lấy nguồn trong `site/`; bản production nằm ở `dist/web/`. Không dùng Python server để chạy trực tiếp nguồn vì mã JavaScript cần Vite xử lý. Netlify tự build theo `netlify.toml`, nhánh triển khai `main`. Nếu dashboard còn ghi đè thiết lập cũ, đặt build command `npm run build`, publish directory `dist/web`, base directory để trống.
 
-## Triển khai miễn phí với Netlify
+## Kích hoạt Firebase
 
-1. Đăng nhập hoặc tạo tài khoản Netlify, kiểm tra điều kiện và giới hạn gói Free hiện hành.
-2. Chọn thêm project bằng triển khai thủ công (Deploy manually), tải thư mục `site` hoặc gói ZIP lên theo định dạng giao diện chấp nhận.
-3. Kiểm tra trang tại địa chỉ Netlify cấp trước khi gắn tên miền.
-4. Vào Domain management, thêm custom domain `th.io.vn` và `www.th.io.vn` nếu muốn dùng cả hai. Chọn tên miền chính.
-5. Chọn dùng DNS bên ngoài. Lấy bản ghi chính xác từ hướng dẫn DNS của project Netlify.
-6. Tại bảng DNS Nhân Hòa, sao lưu hoặc ghi lại bản ghi hiện có. Chỉ cập nhật bản ghi web liên quan tới `@` và `www` theo Netlify. Giữ nguyên MX, TXT và các bản ghi phục vụ email. Không đổi nameserver nếu chưa đánh giá các dịch vụ đang dùng.
-7. Sau khi DNS cập nhật, kiểm tra xác minh domain và chứng chỉ HTTPS trên Netlify; kiểm tra cả tên miền chính và chuyển hướng `www` nếu đã cấu hình.
+Mã giao diện đã có đăng nhập Google, email/mật khẩu, đăng ký, đặt lại mật khẩu, xác minh email, đăng xuất và sửa tên hồ sơ. Khi thiếu cấu hình, giao diện thông báo chưa sẵn sàng và khóa thao tác gửi yêu cầu. Build thành công không chứng minh Firebase đang hoạt động.
 
-Không đoán địa chỉ IP DNS. Không chia sẻ mật khẩu, token hoặc mã khôi phục trong chat. Tài khoản hosting và thay đổi DNS cần chủ tài khoản thực hiện hoặc cấp quyền qua cơ chế hỗ trợ.
+1. Tạo project trong Firebase Console. Đăng ký ứng dụng Web và lấy `firebaseConfig`. Đây là cấu hình công khai, không phải service account hoặc private key.
+2. Trong Authentication → Sign-in method bật Email/Password và Google, cấu hình email hỗ trợ cho Google.
+3. Trong Authentication → Settings → Authorized domains thêm `th.io.vn`, `www.th.io.vn`, `q-th.netlify.app`. Thêm `localhost` khi cần phát triển cục bộ; project mới có thể không thêm localhost tự động.
+4. Tạo Cloud Firestore theo chế độ Production. Trong Rules, dán nội dung `firestore.rules` và Publish. Quy tắc chỉ cho tài khoản có email xác minh đọc/ghi hồ sơ `users/{uid}` của chính mình; chỉ lưu `displayName` và `updatedAt`. Không có quy tắc truy cập công khai, trường quyền quản trị hoặc ghi dữ liệu của người khác.
+5. Trong Netlify → Environment variables thêm bốn biến có phạm vi Builds, rồi deploy lại:
+
+| Biến | Trường Firebase |
+|---|---|
+| `VITE_FIREBASE_API_KEY` | `apiKey` |
+| `VITE_FIREBASE_AUTH_DOMAIN` | `authDomain` |
+| `VITE_FIREBASE_PROJECT_ID` | `projectId` |
+| `VITE_FIREBASE_APP_ID` | `appId` |
+
+Giữ authDomain được Firebase cấp, thường là `PROJECT.firebaseapp.com`. Không tự thay bằng tên miền website. Biến `VITE_*` được nhúng vào bundle công khai; tuyệt đối không dùng cho credential máy chủ. Có thể sao chép `.env.example` thành `.env.local` để phát triển; file này được Git bỏ qua.
+
+## Kiểm tra thực tế sau khi kích hoạt
+
+- Đăng ký một email mới; kiểm tra email xác minh, mở liên kết rồi bấm “Tôi đã xác minh”.
+- Lưu tên hồ sơ, kiểm tra document ở `users/<uid>` trong Firestore; đăng xuất rồi đăng nhập lại.
+- Thử mật khẩu sai, reset mật khẩu qua email và Google popup trên tên miền production.
+- Xác nhận người chưa đăng nhập, tài khoản chưa xác minh, và tài khoản khác không đọc/ghi được document của người khác bằng Rules Playground hoặc Firebase Emulator Suite.
+- Kiểm tra HTTPS và chuyển hướng www trên Netlify; DNS được quản lý tại Netlify sau khi đổi nameserver tại Nhân Hòa.
+
+Chưa kiểm chứng các luồng Firebase thật hoặc triển khai rules vì chưa có project/config và quyền quản trị của chủ website. Cần hoàn thành kiểm tra trên trước khi tuyên bố tính năng tài khoản sẵn sàng. Có thể phát sinh phí theo hạn mức dịch vụ; không bật SMS hoặc Storage trong phiên bản này.
+
+## Quyền riêng tư
+
+Email đăng nhập và tên hiển thị được Firebase xử lý để quản lý tài khoản. Website không lưu mật khẩu vào Firestore hay localStorage; Firebase SDK quản lý phiên đăng nhập. Hồ sơ không hiển thị công khai. Khi vận hành, bổ sung chính sách quyền riêng tư, thời hạn lưu giữ và quy trình xóa tài khoản phù hợp nhu cầu thực tế.
