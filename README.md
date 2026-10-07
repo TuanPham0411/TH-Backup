@@ -48,3 +48,7 @@ Chưa kiểm chứng các luồng Firebase thật hoặc triển khai rules vì 
 ## Quyền riêng tư
 
 Email đăng nhập và tên hiển thị được Firebase xử lý để quản lý tài khoản. Website không lưu mật khẩu vào Firestore hay localStorage; Firebase SDK quản lý phiên đăng nhập. Hồ sơ không hiển thị công khai. Khi vận hành, bổ sung chính sách quyền riêng tư, thời hạn lưu giữ và quy trình xóa tài khoản phù hợp nhu cầu thực tế.
+
+## Màn hình đăng nhập trước trang chính
+
+Khách chưa đăng nhập bắt đầu ở màn hình neon dark mode. Trang chính ẩn sẵn trong HTML để không chớp hiện trong khi Firebase khôi phục phiên. Người có phiên hợp lệ vào trang chính; đăng xuất quay lại màn hình đăng nhập. Đăng ký tạo phiên đăng nhập; email cần xác minh trước khi lưu hồ sơ Firestore. Đây là kiểm soát điều hướng phía trình duyệt: nội dung trang cá nhân tĩnh vẫn có trong bundle công khai. Dữ liệu riêng phải tiếp tục được bảo vệ bằng Firebase Rules, không dựa vào việc ẩn HTML. Animation được tắt theo prefers-reduced-motion.
