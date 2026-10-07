@@ -15,19 +15,22 @@ const unavailable = 'Chưa kết nối được dịch vụ đăng nhập. Vui l
 function status(id, message) { $(id).textContent = message; }
 function setMode(next) {
   mode = next;
+  $('auth-dialog').dataset.mode = next;
   $('auth-form').reset();
   const registering = next === 'register', resetting = next === 'reset';
-  $('auth-title').textContent = registering ? 'Một khởi đầu mới.' : resetting ? 'Lấy lại mật khẩu.' : 'Chào mừng trở lại.';
-  $('auth-description').textContent = resetting ? 'Nhập email để nhận hướng dẫn đặt lại mật khẩu.' : registering ? 'Tạo một hồ sơ riêng trong không gian TH.' : 'Đăng nhập để tiếp tục câu chuyện của bạn.';
+  $('auth-title').textContent = registering ? 'Tạo tài khoản TH' : resetting ? 'Lấy lại mật khẩu.' : 'Đăng nhập TH';
+  $('auth-description').textContent = resetting ? 'Nhập email để nhận hướng dẫn đặt lại mật khẩu.' : registering ? 'Đăng ký bằng Google hoặc email.' : 'Dùng Google hoặc tài khoản email.';
   $('name-field').hidden = !registering;
   $('auth-name').required = registering;
   $('password-field').hidden = resetting;
   $('auth-password').required = !resetting;
+  $('auth-password').minLength = registering ? 6 : 1;
+  $('auth-password').placeholder = registering ? 'Ít nhất 6 ký tự' : 'Nhập mật khẩu';
   $('auth-password').autocomplete = registering ? 'new-password' : 'current-password';
   $('signup-note').hidden = !registering;
   $('google-login').hidden = resetting;
   document.querySelector('.auth-divider').hidden = resetting;
-  $('forgot-password').hidden = resetting;
+  $('forgot-password').hidden = resetting || registering;
   $('auth-submit').textContent = resetting ? 'Gửi hướng dẫn' : registering ? 'Tạo tài khoản' : 'Đăng nhập';
   $('login-tab').setAttribute('aria-pressed', String(next === 'login'));
   $('register-tab').setAttribute('aria-pressed', String(registering));
@@ -70,7 +73,7 @@ async function saveProfile(user, name) {
   await setDoc(doc(db, 'users', user.uid), { displayName: name, updatedAt: serverTimestamp() }, { merge: true });
 }
 $('account-open').onclick = () => open();
-for (const id of ['join-open', 'member-join']) $(id).onclick = () => open('register');
+$('member-join').onclick = () => open('register');
 $('login-tab').onclick = () => setMode('login'); $('register-tab').onclick = () => setMode('register'); $('forgot-password').onclick = () => setMode('reset');
 $('auth-form').onsubmit = event => {
   event.preventDefault();

@@ -52,3 +52,19 @@ Email đăng nhập và tên hiển thị được Firebase xử lý để quả
 ## Màn hình đăng nhập trước trang chính
 
 Khách chưa đăng nhập bắt đầu ở màn hình neon dark mode. Trang chính ẩn sẵn trong HTML để không chớp hiện trong khi Firebase khôi phục phiên. Người có phiên hợp lệ vào trang chính; đăng xuất quay lại màn hình đăng nhập. Đăng ký tạo phiên đăng nhập; email cần xác minh trước khi lưu hồ sơ Firestore. Đây là kiểm soát điều hướng phía trình duyệt: nội dung trang cá nhân tĩnh vẫn có trong bundle công khai. Dữ liệu riêng phải tiếp tục được bảo vệ bằng Firebase Rules, không dựa vào việc ẩn HTML. Animation được tắt theo prefers-reduced-motion.
+
+## Google hiển thị tên ứng dụng và tên miền xác thực
+
+Tên ứng dụng và hostname là hai mục khác nhau. Trong Google Cloud Console của project `th-web-d816f`, vào Google Auth Platform → Branding (hoặc OAuth consent screen), đặt App name là `TH` và cấu hình email hỗ trợ, homepage và thông tin thương hiệu theo yêu cầu Google. Việc hiển thị tên phụ thuộc trạng thái xuất bản/xác minh của Google. Chỉ đổi App name không đảm bảo câu “tiếp tục tới …firebaseapp.com” biến mất.
+
+Để dùng tên miền xác thực `th.io.vn`, cấu hình proxy `/__/auth/*` đã được chuẩn bị trong `netlify.toml` (HTTP 200 rewrite tới domain Firebase được cấp). Chưa đổi `authDomain` để tránh làm hỏng đăng nhập đang hoạt động. Trước khi chuyển:
+
+1. Đảm bảo Netlify deploy có rewrite mới; kiểm tra `https://th.io.vn/__/auth/handler` được phục vụ bởi Firebase qua proxy.
+2. Firebase Authentication → Settings → Authorized domains: thêm `th.io.vn`.
+3. Google Cloud → Google Auth Platform → Clients (hoặc APIs & Services → Credentials), mở OAuth Web client dùng bởi Firebase Google provider. Thêm Authorized redirect URI **`https://th.io.vn/__/auth/handler`**, giữ callback cũ. Kiểm tra provider Google trong Firebase nếu có nhiều client; không tạo một client khác không được provider sử dụng.
+4. Sau khi lưu thành công, đổi `authDomain` trong `site/firebase-config.js` sang `th.io.vn` (hoặc đủ bốn biến override với authDomain mới), build và deploy lại.
+5. Kiểm tra popup Google, đăng nhập, khôi phục phiên và đăng xuất trên tên miền chính. Google sẽ kiểm soát cách hiển thị thương hiệu; hostname mới là th.io.vn, không phải một tên tùy ý.
+
+Nếu chưa có quyền chỉnh Google OAuth client, giữ authDomain Firebase đang hoạt động. Không có thay đổi Google Cloud/Firebase Console nào được thực hiện bởi phiên này. Rewrite proxy cũng chưa được xác minh trên domain production từ phiên này.
+
+Màn hình login/register/reset đã được kiểm tra không cuộn ở 1440×800, 1366×640, 390×844, 360×640 và 320×568. Khi bàn phím mở, phóng to chữ hoặc màn hình nhỏ hơn, vẫn cho phép cuộn để không che các nút và thông báo lỗi.
