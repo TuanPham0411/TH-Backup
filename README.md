@@ -54,3 +54,5 @@ Google display-name configuration: set TH under Google Auth Platform → Brandin
 ## Assets and updates
 
 `site/content.js` holds CV-based career/project data. Generated OT hero: `site/public/images/ot-hero.webp`. Portrait is an editorial version of the supplied neon-lit portrait, generated for the navy/cyan palette. Print-friendly resume: `site/public/resume.html`; `resume.pdf` is a generated export. Review career facts before updating. Motion respects prefers-reduced-motion and navigation/forms remain keyboard accessible.
+
+Portfolio is the primary experience: identity, OT specialization, career and projects. Private workspace and administration open only through My workspace, and Back to portfolio closes them. Contact copy covers career opportunities, technical discussion and collaboration.
