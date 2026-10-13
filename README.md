@@ -1,70 +1,56 @@
-# TH — website cá nhân
+# TH · Pham Hoang Tuan — OT portfolio
 
-Website tiếng Việt dùng Vite và Firebase SDK, triển khai qua GitHub → Netlify. Email, điện thoại và Zalo của chủ website được hiển thị tại mục liên hệ.
+English personal website built from the owner-provided CV. Focus: production networks, MES, software tools, test systems and data analysis. Includes career timeline, education, two in-development projects, printable/downloadable resume, responsive navigation, project search/filter/details, private bookmarks, user profile, verified-email inquiries, request tracking and a verified-owner inbox. No payment processing or invented completed client projects.
 
-## Phát triển và build
+## Development
 
-Yêu cầu Node.js 24, npm. Dùng checkout hiện có; không cần tạo worktree.
+Use existing `/workspace/Thien-Ha`, not a worktree. Node.js 24 and npm:
 
 ```sh
 npm ci --cache /tmp/th-npm-cache
-npm run dev
 npm test
 npm run build
+npm run dev
+# Or, after build:
 npm run preview -- --port 4173
 ```
 
-Vite lấy nguồn trong `site/`; bản production nằm ở `dist/web/`. Không dùng Python server để chạy trực tiếp nguồn vì mã JavaScript cần Vite xử lý. Netlify tự build theo `netlify.toml`, nhánh triển khai `main`. Nếu dashboard còn ghi đè thiết lập cũ, đặt build command `npm run build`, publish directory `dist/web`, base directory để trống.
+Vite root: `site`; static public assets: `site/public`; output: `dist/web`. Firebase public configuration is in `site/firebase-config.js`; optional overrides require all four VITE_FIREBASE fields from `.env.example`. Do not put server credentials in public files or VITE variables. Fonts and images are self-hosted. Main page remains behind the sign-in screen, as requested earlier; static portfolio/resume assets are publicly retrievable, not private documents. Firebase Rules protect user data independently.
 
-## Kích hoạt Firebase
+## Firebase — required production action
 
-Mã giao diện đã có đăng nhập Google, email/mật khẩu, đăng ký, đặt lại mật khẩu, xác minh email, đăng xuất và sửa tên hồ sơ. Cấu hình công khai của project `th-web-d816f` đã được tích hợp trong `site/firebase-config.js`. Không cần nhập biến Netlify để dùng project này. Các biến `VITE_FIREBASE_*` là tùy chọn để đổi project: nếu dùng, phải cung cấp đủ cả bốn biến để tránh trộn project. Khi cấu hình không đầy đủ, giao diện khóa thao tác gửi yêu cầu. Build thành công không chứng minh Firebase đang hoạt động.
+The owner has reported working authentication. Enable Email/Password and Google in Firebase Authentication; authorize th.io.vn, www.th.io.vn and q-th.netlify.app. Keep the existing authDomain until the Google custom-domain callback is configured.
 
-1. Tạo project trong Firebase Console. Đăng ký ứng dụng Web và lấy `firebaseConfig`. Đây là cấu hình công khai, không phải service account hoặc private key.
-2. Trong Authentication → Sign-in method bật Email/Password và Google, cấu hình email hỗ trợ cho Google.
-3. Trong Authentication → Settings → Authorized domains thêm `th.io.vn`, `www.th.io.vn`, `q-th.netlify.app`. Thêm `localhost` khi cần phát triển cục bộ; project mới có thể không thêm localhost tự động.
-4. Tạo Cloud Firestore theo chế độ Production. Trong Rules, dán nội dung `firestore.rules` và Publish. Quy tắc chỉ cho tài khoản có email xác minh đọc/ghi hồ sơ `users/{uid}` của chính mình; chỉ lưu `displayName` và `updatedAt`. Không có quy tắc truy cập công khai, trường quyền quản trị hoặc ghi dữ liệu của người khác.
-5. Tùy chọn: nếu cần dùng project khác, trong Netlify → Environment variables thêm đủ bốn biến có phạm vi Builds, rồi deploy lại:
+**Publish the complete `firestore.rules` in Firebase Console → Firestore Database → Rules.** Older profile-only rules will deny bookmarks, inquiries and the owner inbox. Saving rules in Git does not publish them. `firebase.json` supports a CLI rules-only deployment for an authorized Firebase administrator:
 
-| Biến | Trường Firebase |
-|---|---|
-| `VITE_FIREBASE_API_KEY` | `apiKey` |
-| `VITE_FIREBASE_AUTH_DOMAIN` | `authDomain` |
-| `VITE_FIREBASE_PROJECT_ID` | `projectId` |
-| `VITE_FIREBASE_APP_ID` | `appId` |
+```sh
+firebase deploy --only firestore:rules --project th-web-d816f
+```
 
-Giữ authDomain được Firebase cấp, thường là `PROJECT.firebaseapp.com`. Không tự thay bằng tên miền website. Biến `VITE_*` được nhúng vào bundle công khai; tuyệt đối không dùng cho credential máy chủ. Có thể sao chép `.env.example` thành `.env.local` để phát triển; file này được Git bỏ qua.
+Rules identify admins by Firebase-issued, verified token email: `eric.scorp93@gmail.com` and `tuanpham.x93@gmail.com`. A client checkbox or Firestore role field cannot grant admin access. Both accounts must sign in and have verified email. Other users may read/write only their own profile and bookmarks. They may create inquiries using their own token email and UID, and read only their own inquiries. Only verified owners may read all inquiries, delete them or change status. Status updates cannot alter the sender, original message or timestamps of creation. All unmatched paths deny access.
 
-## Kiểm tra thực tế sau khi kích hoạt
+Owners manage requests through the hidden-unless-owner administration section. Its latest-100 query is ordered by createdAt using Firestore's automatic single-field index. User workspace reads up to 50 requests for the signed-in UID; it does not show all records globally. Data values are rendered as text, never HTML. Inbox email links open the user's mail app; sending an inquiry stores it in Firestore and does not send an email notification automatically.
 
-- Đăng ký một email mới; kiểm tra email xác minh, mở liên kết rồi bấm “Tôi đã xác minh”.
-- Lưu tên hồ sơ, kiểm tra document ở `users/<uid>` trong Firestore; đăng xuất rồi đăng nhập lại.
-- Thử mật khẩu sai, reset mật khẩu qua email và Google popup trên tên miền production.
-- Xác nhận người chưa đăng nhập, tài khoản chưa xác minh, và tài khoản khác không đọc/ghi được document của người khác bằng Rules Playground hoặc Firebase Emulator Suite.
-- Kiểm tra HTTPS và chuyển hướng www trên Netlify; DNS được quản lý tại Netlify sau khi đổi nameserver tại Nhân Hòa.
+Profile remains private; contact submissions explicitly require consent. Resume was recreated from the CV, omitting date of birth, gender and detailed residential address. The original CV is not published. Phone and primary email use the current CV. External project references are taken from that CV and are not independently verified as live products.
 
-Chưa kiểm chứng các luồng Firebase thật hoặc triển khai rules vì chưa có quyền quản trị Firebase và truy cập mạng tới dịch vụ xác thực bị hạn chế trong phiên làm việc. Cấu hình project đã có; vẫn cần xác nhận providers, Authorized domains và Firestore Rules. Cần hoàn thành kiểm tra trên trước khi tuyên bố tính năng tài khoản sẵn sàng. Có thể phát sinh phí theo hạn mức dịch vụ; không bật SMS hoặc Storage trong phiên bản này.
+## Tests
 
-## Quyền riêng tư
+`npm test` runs six unit checks covering configuration, safe auth errors, name bounds, exact verified owner UI identity, inquiry bounds and project references. Browser checks with mocked Firebase responses exercised five viewport sizes (1440×900, 1366×640, 390×844, 360×640, 320×568), login/register/reset, session gating, visitor-versus-owner UI, project filtering, details dialogs, privacy, mobile navigation and sign-out. These do not prove live database authorization.
 
-Email đăng nhập và tên hiển thị được Firebase xử lý để quản lý tài khoản. Website không lưu mật khẩu vào Firestore hay localStorage; Firebase SDK quản lý phiên đăng nhập. Hồ sơ không hiển thị công khai. Khi vận hành, bổ sung chính sách quyền riêng tư, thời hạn lưu giữ và quy trình xóa tài khoản phù hợp nhu cầu thực tế.
+Security assertions are saved in `tests/firestore.security.cjs`. To run them with Node.js 24 and Java 21, install Firebase CLI 15.33.0 and run:
 
-## Màn hình đăng nhập trước trang chính
+```sh
+FIREBASE_EMULATORS_PATH=/tmp/th-firebase-emulators XDG_CONFIG_HOME=/tmp/th-firebase-config firebase emulators:exec --project demo-th-security --only firestore 'node tests/firestore.security.cjs'
+```
 
-Khách chưa đăng nhập bắt đầu ở màn hình neon dark mode. Trang chính ẩn sẵn trong HTML để không chớp hiện trong khi Firebase khôi phục phiên. Người có phiên hợp lệ vào trang chính; đăng xuất quay lại màn hình đăng nhập. Đăng ký tạo phiên đăng nhập; email cần xác minh trước khi lưu hồ sơ Firestore. Đây là kiểm soát điều hướng phía trình duyệt: nội dung trang cá nhân tĩnh vẫn có trong bundle công khai. Dữ liệu riêng phải tiếp tục được bảo vệ bằng Firebase Rules, không dựa vào việc ẩn HTML. Animation được tắt theo prefers-reduced-motion.
+This targets a **demo project**, not production. Emulator validation was attempted but could not run because downloading the emulator JAR from storage.googleapis.com was blocked. Security tests are unrun; publishing and live validation remain required. They cover outsider/anonymous reads, unverified admin identities, forged UID/email, role injection, bookmark boundaries and status-only updates by each verified owner.
 
-## Google hiển thị tên ứng dụng và tên miền xác thực
+## Deployment
 
-Tên ứng dụng và hostname là hai mục khác nhau. Trong Google Cloud Console của project `th-web-d816f`, vào Google Auth Platform → Branding (hoặc OAuth consent screen), đặt App name là `TH` và cấu hình email hỗ trợ, homepage và thông tin thương hiệu theo yêu cầu Google. Việc hiển thị tên phụ thuộc trạng thái xuất bản/xác minh của Google. Chỉ đổi App name không đảm bảo câu “tiếp tục tới …firebaseapp.com” biến mất.
+GitHub `main` triggers the existing Netlify project. `netlify.toml`: Node 24, `npm run build`, publish `dist/web`. Check Netlify Published and live HTTPS separately; Git push is not proof a deploy succeeded. Do not change existing DNS.
 
-Để dùng tên miền xác thực `th.io.vn`, cấu hình proxy `/__/auth/*` đã được chuẩn bị trong `netlify.toml` (HTTP 200 rewrite tới domain Firebase được cấp). Chưa đổi `authDomain` để tránh làm hỏng đăng nhập đang hoạt động. Trước khi chuyển:
+Google display-name configuration: set TH under Google Auth Platform → Branding. To remove the Firebase hostname from the Google flow, authorize `https://th.io.vn/__/auth/handler` in the OAuth Web client used by Firebase. The Netlify `/__/auth/*` proxy is already prepared; verify it on production before changing authDomain to th.io.vn. Google controls branding display and may require verification. No Google admin configuration was changed by this task.
 
-1. Đảm bảo Netlify deploy có rewrite mới; kiểm tra `https://th.io.vn/__/auth/handler` được phục vụ bởi Firebase qua proxy.
-2. Firebase Authentication → Settings → Authorized domains: thêm `th.io.vn`.
-3. Google Cloud → Google Auth Platform → Clients (hoặc APIs & Services → Credentials), mở OAuth Web client dùng bởi Firebase Google provider. Thêm Authorized redirect URI **`https://th.io.vn/__/auth/handler`**, giữ callback cũ. Kiểm tra provider Google trong Firebase nếu có nhiều client; không tạo một client khác không được provider sử dụng.
-4. Sau khi lưu thành công, đổi `authDomain` trong `site/firebase-config.js` sang `th.io.vn` (hoặc đủ bốn biến override với authDomain mới), build và deploy lại.
-5. Kiểm tra popup Google, đăng nhập, khôi phục phiên và đăng xuất trên tên miền chính. Google sẽ kiểm soát cách hiển thị thương hiệu; hostname mới là th.io.vn, không phải một tên tùy ý.
+## Assets and updates
 
-Nếu chưa có quyền chỉnh Google OAuth client, giữ authDomain Firebase đang hoạt động. Không có thay đổi Google Cloud/Firebase Console nào được thực hiện bởi phiên này. Rewrite proxy cũng chưa được xác minh trên domain production từ phiên này.
-
-Màn hình login/register/reset đã được kiểm tra không cuộn ở 1440×800, 1366×640, 390×844, 360×640 và 320×568. Khi bàn phím mở, phóng to chữ hoặc màn hình nhỏ hơn, vẫn cho phép cuộn để không che các nút và thông báo lỗi.
+`site/content.js` holds CV-based career/project data. Generated OT hero: `site/public/images/ot-hero.webp`. Portrait is an editorial version of the supplied neon-lit portrait, generated for the navy/cyan palette. Print-friendly resume: `site/public/resume.html`; `resume.pdf` is a generated export. Review career facts before updating. Motion respects prefers-reduced-motion and navigation/forms remain keyboard accessible.

@@ -1,114 +1,47 @@
+import '@fontsource/dm-sans/400.css';
+import '@fontsource/dm-sans/500.css';
+import '@fontsource/dm-sans/600.css';
+import '@fontsource/space-grotesk/400.css';
+import '@fontsource/space-grotesk/500.css';
+import '@fontsource/space-grotesk/600.css';
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, sendEmailVerification, updateProfile, reload, getIdToken, signOut } from 'firebase/auth';
-import { getFirestore, doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { getFirestore, doc, setDoc, getDoc, getDocs, collection, addDoc, deleteDoc, updateDoc, query, where, limit, orderBy, serverTimestamp } from 'firebase/firestore';
 import { configured, friendlyError, validName } from './auth-utils.js';
 import { firebaseConfig } from './firebase-config.js';
-
-const $ = id => document.getElementById(id);
-const override = { apiKey: import.meta.env.VITE_FIREBASE_API_KEY, authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN, projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID, appId: import.meta.env.VITE_FIREBASE_APP_ID };
-const hasOverride = Object.values(override).some(value => value !== undefined);
-// Use an override only as a complete set, avoiding accidental mixed projects.
-const config = hasOverride ? override : firebaseConfig;
-let auth, db, mode = 'login', busy = false;
-const ready = configured(config);
-const unavailable = 'Chưa kết nối được dịch vụ đăng nhập. Vui lòng thử lại hoặc liên hệ TH.';
-function status(id, message) { $(id).textContent = message; }
-function setMode(next) {
-  mode = next;
-  $('auth-dialog').dataset.mode = next;
-  $('auth-form').reset();
-  const registering = next === 'register', resetting = next === 'reset';
-  $('auth-title').textContent = registering ? 'Tạo tài khoản TH' : resetting ? 'Lấy lại mật khẩu.' : 'Đăng nhập TH';
-  $('auth-description').textContent = resetting ? 'Nhập email để nhận hướng dẫn đặt lại mật khẩu.' : registering ? 'Đăng ký bằng Google hoặc email.' : 'Dùng Google hoặc tài khoản email.';
-  $('name-field').hidden = !registering;
-  $('auth-name').required = registering;
-  $('password-field').hidden = resetting;
-  $('auth-password').required = !resetting;
-  $('auth-password').minLength = registering ? 6 : 1;
-  $('auth-password').placeholder = registering ? 'Ít nhất 6 ký tự' : 'Nhập mật khẩu';
-  $('auth-password').autocomplete = registering ? 'new-password' : 'current-password';
-  $('signup-note').hidden = !registering;
-  $('google-login').hidden = resetting;
-  document.querySelector('.auth-divider').hidden = resetting;
-  $('forgot-password').hidden = resetting || registering;
-  $('auth-submit').textContent = resetting ? 'Gửi hướng dẫn' : registering ? 'Tạo tài khoản' : 'Đăng nhập';
-  $('login-tab').setAttribute('aria-pressed', String(next === 'login'));
-  $('register-tab').setAttribute('aria-pressed', String(registering));
-  status('auth-status', ready && auth ? '' : unavailable);
-  $('auth-submit').disabled = !auth;
-  $('google-login').disabled = !auth;
-}
-function open(mode = 'login') {
-  if (auth?.currentUser) { $('thanh-vien').scrollIntoView({ behavior: 'smooth' }); return; }
-  setMode(mode); $('auth-gate').hidden = false;
-}
-function renderUser(user) {
-  document.body.classList.remove('auth-pending');
-  $('auth-gate').hidden = !!user;
-  $('main-site').hidden = !user;
-  if (!user) { setMode('login'); window.scrollTo(0, 0); }
-  $('member-guest').hidden = !!user; $('member-profile').hidden = !user;
-  $('account-open').textContent = user ? 'Tài khoản ↗' : 'Đăng nhập ↗';
-  if (!user) return;
-  $('profile-title').textContent = `Xin chào, ${user.displayName || 'bạn'}!`;
-  $('profile-email').textContent = user.email || '';
-  $('profile-name').value = user.displayName || '';
-  $('verification-state').textContent = user.emailVerified ? '✓ Email đã xác minh' : 'Hãy xác minh email để lưu hồ sơ của bạn.';
-  $('verify-send').hidden = user.emailVerified; $('verify-refresh').hidden = user.emailVerified;
-  $('profile-form').querySelector('button').disabled = !user.emailVerified;
-  status('profile-status', '');
-}
-async function run(id, action) {
-  if (busy) return;
-  if (!auth) { status(id, unavailable); return; }
-  busy = true;
-  const controls = [...document.querySelectorAll('#auth-dialog button, #auth-dialog input, #member-profile button, #member-profile input')].filter(el => el.id !== 'auth-close');
-  const states = controls.map(el => el.disabled);
-  controls.forEach(el => { el.disabled = true; });
-  status(id, 'Đang xử lý…');
-  try { await action(); } catch (error) { status(id, friendlyError(error)); }
-  finally { controls.forEach((el, i) => { el.disabled = states[i]; }); busy = false; if (auth.currentUser) $('profile-form').querySelector('button').disabled = !auth.currentUser.emailVerified; }
-}
-async function saveProfile(user, name) {
-  await setDoc(doc(db, 'users', user.uid), { displayName: name, updatedAt: serverTimestamp() }, { merge: true });
-}
-$('account-open').onclick = () => open();
-$('member-join').onclick = () => open('register');
-$('login-tab').onclick = () => setMode('login'); $('register-tab').onclick = () => setMode('register'); $('forgot-password').onclick = () => setMode('reset');
-$('auth-form').onsubmit = event => {
-  event.preventDefault();
-  run('auth-status', async () => {
-    const email = $('auth-email').value.trim(), password = $('auth-password').value;
-    if (mode === 'reset') {
-      await sendPasswordResetEmail(auth, email);
-      status('auth-status', 'Nếu email đủ điều kiện, bạn sẽ nhận được hướng dẫn đặt lại mật khẩu. Hãy kiểm tra cả thư rác.'); return;
-    }
-    if (mode === 'register') {
-      const name = $('auth-name').value.trim();
-      if (!validName(name)) { status('auth-status', 'Tên hiển thị cần từ 1 đến 80 ký tự.'); return; }
-      const { user } = await createUserWithEmailAndPassword(auth, email, password);
-      await updateProfile(user, { displayName: name }); renderUser(user);
-      try { await sendEmailVerification(user); status('profile-status', 'Đã gửi email xác minh. Hãy kiểm tra hộp thư và thư rác.'); }
-      catch (error) { status('profile-status', `Tài khoản đã tạo. Chưa gửi được email xác minh: ${friendlyError(error)} Bạn có thể gửi lại bên dưới.`); }
-    } else { await signInWithEmailAndPassword(auth, email, password); }
-    $('auth-form').reset(); renderUser(auth.currentUser); window.scrollTo(0, 0);
-  });
-};
-$('google-login').onclick = () => run('auth-status', async () => {
-  await signInWithPopup(auth, new GoogleAuthProvider());
-  renderUser(auth.currentUser); window.scrollTo(0, 0);
-});
-$('sign-out').onclick = () => run('profile-status', async () => { await signOut(auth); status('service-state', 'Bạn đã đăng xuất. Hẹn gặp lại!'); });
-$('verify-send').onclick = () => run('profile-status', async () => { await sendEmailVerification(auth.currentUser); status('profile-status', 'Đã gửi email xác minh. Hãy kiểm tra hộp thư và thư rác.'); });
-$('verify-refresh').onclick = () => run('profile-status', async () => { const user = auth.currentUser; await reload(user); await getIdToken(user, true); renderUser(user); if (!user.emailVerified) status('profile-status', 'Email chưa được xác minh. Hãy mở liên kết trong email rồi thử lại.'); });
-$('profile-form').onsubmit = event => { event.preventDefault(); run('profile-status', async () => {
-  const name = $('profile-name').value.trim(), user = auth.currentUser;
-  if (!validName(name)) { status('profile-status', 'Tên hiển thị cần từ 1 đến 80 ký tự.'); return; }
-  if (!user.emailVerified) { status('profile-status', 'Vui lòng xác minh email trước.'); return; }
-  await saveProfile(user, name);
-  await updateProfile(user, { displayName: name }); renderUser(user); status('profile-status', 'Đã lưu hồ sơ của bạn.');
-}); };
-if (ready) {
-  try { const app = initializeApp(config); auth = getAuth(app); auth.languageCode = 'vi'; db = getFirestore(app); onAuthStateChanged(auth, renderUser, () => { document.body.classList.remove('auth-pending'); setMode('login'); status('auth-status', 'Không khôi phục được phiên đăng nhập. Hãy thử đăng nhập lại.'); }); status('service-state', 'Đăng nhập với Google hoặc email của bạn.'); }
-  catch { auth = null; document.body.classList.remove('auth-pending'); setMode('login'); }
-} else { document.body.classList.remove('auth-pending'); setMode('login'); }
+import { projects, experience, isAdmin, validInquiry } from './content.js';
+const $=id=>document.getElementById(id);
+const override={apiKey:import.meta.env.VITE_FIREBASE_API_KEY,authDomain:import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,projectId:import.meta.env.VITE_FIREBASE_PROJECT_ID,appId:import.meta.env.VITE_FIREBASE_APP_ID};
+const config=Object.values(override).some(v=>v!==undefined)?override:firebaseConfig;
+let auth,db,mode='login',filter='All',saved=new Set(),epoch=0,toastTimer;
+const unavailable='Sign-in is temporarily unavailable. Please try again or contact TH.';
+const status=(id,message)=>{$(id).textContent=message;};
+function element(tag,text,cls){const node=document.createElement(tag);if(text!==undefined)node.textContent=text;if(cls)node.className=cls;return node;}
+function toast(message){$('toast').textContent=message;$('toast').hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').hidden=true,4500);}
+async function action(id,control,fn){if(control?.disabled)return;const wasDisabled=control?.disabled;if(control)control.disabled=true;status(id,'Working…');try{await fn();}catch(error){status(id,friendlyError(error));}finally{if(control)control.disabled=wasDisabled||false;}}
+function requireVerified(){if(!auth?.currentUser)throw new Error('not-signed-in');if(!auth.currentUser.emailVerified){toast('Verify your email before saving or sending a request.');return false;}return true;}
+function setMode(next){mode=next;$('auth-dialog').dataset.mode=next;const register=next==='register',reset=next==='reset';$('auth-form').reset();$('auth-title').textContent=register?'Create your account':reset?'Reset your password':'Sign in to TH';$('auth-description').textContent=reset?'Receive a reset link by email.':register?'A private account for projects and conversations.':'Your account, projects and conversations.';$('name-field').hidden=!register;$('auth-name').required=register;$('password-field').hidden=reset;$('auth-password').required=!reset;$('auth-password').minLength=register?6:1;$('auth-password').autocomplete=register?'new-password':'current-password';$('auth-password').placeholder=register?'At least 6 characters':'Enter your password';$('auth-password').type='password';$('password-toggle').textContent='Show';$('password-toggle').setAttribute('aria-label','Show password');$('signup-note').hidden=!register;$('google-login').hidden=reset;document.querySelector('.divider').hidden=reset;$('forgot-password').hidden=reset||register;$('auth-submit').textContent=reset?'Send reset link':register?'Create account':'Sign in';$('login-tab').setAttribute('aria-pressed',String(next==='login'));$('register-tab').setAttribute('aria-pressed',String(register));status('auth-status',auth?'':unavailable);$('auth-submit').disabled=!auth;$('google-login').disabled=!auth;}
+function renderProjects(){const text=$('project-search').value.trim().toLowerCase();const list=projects.filter(p=>(filter==='All'||p.category===filter)&&`${p.name} ${p.description} ${p.tags.join(' ')}`.toLowerCase().includes(text));$('project-list').replaceChildren();$('project-empty').hidden=!!list.length;for(const p of list){const card=element('article',undefined,'project-card');const art=element('div',undefined,`project-art ${p.category.toLowerCase()}`);art.setAttribute('aria-hidden','true');art.append(element('span',p.icon));const body=element('div',undefined,'project-body');const meta=element('div',undefined,'project-meta');meta.append(element('span',p.category.toUpperCase()),element('span',`${p.status} / ${p.year}`));body.append(meta,element('h3',p.name),element('p',p.subtitle));const tags=element('div',undefined,'tags');p.tags.forEach(t=>tags.append(element('span',t)));body.append(tags);const controls=element('div',undefined,'project-actions');const details=element('button','View project ↗','text-button');details.onclick=()=>showProject(p);const save=element('button',saved.has(p.id)?'✓ Saved':'+ Save','save-button');save.setAttribute('aria-pressed',String(saved.has(p.id)));save.setAttribute('aria-label',`${saved.has(p.id)?'Unsave':'Save'} ${p.name}`);save.onclick=()=>action('project-status',save,async()=>{if(!requireVerified()){status('project-status','Verify your email to save projects.');return;}const uid=auth.currentUser.uid;const ref=doc(db,'users',uid,'bookmarks',p.id);const existed=saved.has(p.id);if(existed)await deleteDoc(ref);else await setDoc(ref,{projectId:p.id,createdAt:serverTimestamp()});if(auth.currentUser?.uid!==uid)return;if(existed)saved.delete(p.id);else saved.add(p.id);renderProjects();renderSaved();status('project-status',existed?'Removed from your saved projects.':'Project saved to your workspace.');});controls.append(details,save);body.append(controls);card.append(art,body);$('project-list').append(card);}}
+function showProject(p){$('project-dialog-title').textContent=p.name;$('project-dialog-description').textContent=p.description;$('project-dialog-tags').replaceChildren(...p.tags.map(t=>element('span',t)));$('project-dialog-link').href=p.url;$('project-dialog').showModal();}
+function renderSaved(){$('saved-projects').replaceChildren();const list=projects.filter(p=>saved.has(p.id));if(!list.length){$('saved-projects').append(element('p','Save a project to keep it here.','muted'));return;}for(const p of list){const row=element('div',undefined,'saved-item');const button=element('button',`${p.name} ↗`,'text-button');button.onclick=()=>showProject(p);row.append(button);$('saved-projects').append(row);}}
+async function loadWorkspace(user,version){if(!user.emailVerified)return;try{const [profile,bookmarks]=await Promise.all([getDoc(doc(db,'users',user.uid)),getDocs(collection(db,'users',user.uid,'bookmarks'))]);if(version!==epoch)return;if(profile.exists()&&validName(profile.data().displayName))$('profile-name').value=profile.data().displayName;saved=new Set(bookmarks.docs.map(d=>d.id));renderSaved();renderProjects();}catch(e){if(version===epoch)status('profile-status',friendlyError(e));}await loadInquiries(user,version);if(isAdmin(user))await loadAdmin(user,version);}
+function renderUser(user){epoch++;const version=epoch;document.body.classList.remove('auth-pending');$('auth-gate').hidden=!!user;$('main-site').hidden=!user;$('admin-section').hidden=!isAdmin(user);$('admin-inbox').replaceChildren();saved=new Set();renderSaved();renderProjects();status('profile-status','');status('contact-status','');status('project-status','');$('my-inquiries').replaceChildren(element('p','Your submitted requests will appear here.','muted'));if(!user){setMode('login');window.scrollTo(0,0);return;}$('workspace-title').textContent=`Hello, ${user.displayName||'there'}.`;$('profile-email').textContent=user.email||'';$('profile-name').value=user.displayName||'';$('contact-name').value=user.displayName||'';$('verification-state').textContent=user.emailVerified?'✓ Email verified':'Verify your email before saving data or sending requests.';$('verify-send').hidden=user.emailVerified;$('verify-refresh').hidden=user.emailVerified;$('profile-form').querySelector('button').disabled=!user.emailVerified;loadWorkspace(user,version);requestAnimationFrame(()=>observeReveals());}
+async function loadInquiries(user=auth.currentUser,version=epoch){if(!user?.emailVerified){status('inquiries-status','Verify your email to use inquiries.');return;}try{const snapshot=await getDocs(query(collection(db,'inquiries'),where('uid','==',user.uid),limit(50)));if(version!==epoch)return;$('my-inquiries').replaceChildren();if(!snapshot.size)$('my-inquiries').append(element('p','No requests yet. Use the contact form to start a conversation.','muted'));snapshot.docs.sort((a,b)=>(b.data().createdAt?.seconds||0)-(a.data().createdAt?.seconds||0)).forEach(d=>{const row=element('div',undefined,'inquiry-item');row.append(element('strong',d.data().topic),element('span',d.data().status),element('p',d.data().message));$('my-inquiries').append(row);});status('inquiries-status','');}catch(e){if(version===epoch)status('inquiries-status',friendlyError(e));}}
+async function loadAdmin(user=auth.currentUser,version=epoch){if(!isAdmin(user))return;status('admin-status','Loading requests…');try{const snapshot=await getDocs(query(collection(db,'inquiries'),orderBy('createdAt','desc'),limit(100)));if(version!==epoch||!isAdmin(auth.currentUser))return;$('admin-inbox').replaceChildren();if(!snapshot.size)$('admin-inbox').append(element('p','No inquiries yet.','muted'));snapshot.docs.sort((a,b)=>(b.data().createdAt?.seconds||0)-(a.data().createdAt?.seconds||0)).forEach(d=>{const data=d.data(),card=element('article',undefined,'admin-item');card.append(element('h3',`${data.name} / ${data.topic}`),element('p',data.email,'accent'),element('p',data.message));const row=element('div',undefined,'button-row');const select=element('select');select.setAttribute('aria-label',`Request status for ${data.name}`);['New','In progress','Replied','Closed'].forEach(s=>{const option=element('option',s);option.value=s;select.append(option);});select.value=data.status;const update=element('button','Update status','button');update.onclick=()=>action('admin-status',update,async()=>{if(!isAdmin(auth.currentUser))return;await updateDoc(doc(db,'inquiries',d.id),{status:select.value,updatedAt:serverTimestamp()});status('admin-status','Request status updated.');toast('Status updated.');});const reply=element('a','Reply by email ↗','text-link');reply.href=`mailto:${encodeURIComponent(data.email)}?subject=${encodeURIComponent('TH / '+data.topic)}`;const remove=element('button','Delete request','text-button');remove.onclick=()=>{if(!window.confirm('Permanently delete this request?'))return;action('admin-status',remove,async()=>{if(!isAdmin(auth.currentUser))return;await deleteDoc(doc(db,'inquiries',d.id));card.remove();status('admin-status','Request deleted.');});};row.append(select,update,reply,remove);card.append(row);$('admin-inbox').append(card);});status('admin-status',`${snapshot.size} requests loaded (up to 100).`);}catch(e){if(version===epoch)status('admin-status',friendlyError(e));}}
+$('auth-form').onsubmit=e=>{e.preventDefault();action('auth-status',$('auth-submit'),async()=>{if(!auth){status('auth-status',unavailable);return;}const email=$('auth-email').value.trim(),password=$('auth-password').value;if(mode==='reset'){await sendPasswordResetEmail(auth,email);status('auth-status','If this email is eligible, a reset link will arrive. Check your spam folder too.');return;}if(mode==='register'){const name=$('auth-name').value.trim();if(!validName(name)){status('auth-status','Use a name between 1 and 80 characters.');return;}const {user}=await createUserWithEmailAndPassword(auth,email,password);try{await updateProfile(user,{displayName:name});}catch{toast('Account created. You can update your name in your profile.');}renderUser(user);try{await sendEmailVerification(user);status('profile-status','Verification email sent. Check your inbox and spam folder.');}catch(e){status('profile-status',`Account created. ${friendlyError(e)} Use Send verification email to retry.`);}}else{await signInWithEmailAndPassword(auth,email,password);}window.scrollTo(0,0);});};
+$('google-login').onclick=()=>action('auth-status',$('google-login'),async()=>{if(!auth)return;await signInWithPopup(auth,new GoogleAuthProvider());window.scrollTo(0,0);});
+$('login-tab').onclick=()=>setMode('login');$('register-tab').onclick=()=>setMode('register');$('forgot-password').onclick=()=>setMode('reset');
+$('password-toggle').onclick=()=>{const show=$('auth-password').type==='password';$('auth-password').type=show?'text':'password';$('password-toggle').textContent=show?'Hide':'Show';$('password-toggle').setAttribute('aria-label',show?'Hide password':'Show password');};
+$('sign-out').onclick=()=>action('profile-status',$('sign-out'),async()=>{await signOut(auth);toast('You have signed out.');});
+$('verify-send').onclick=()=>action('profile-status',$('verify-send'),async()=>{await sendEmailVerification(auth.currentUser);status('profile-status','Verification email sent. Check your inbox and spam folder.');});
+$('verify-refresh').onclick=()=>action('profile-status',$('verify-refresh'),async()=>{const user=auth.currentUser;await reload(user);await getIdToken(user,true);renderUser(user);if(!user.emailVerified)status('profile-status','Your email is not verified yet. Open the email link, then try again.');});
+$('profile-form').onsubmit=e=>{e.preventDefault();action('profile-status',$('profile-form').querySelector('button'),async()=>{if(!requireVerified())return;const name=$('profile-name').value.trim(),user=auth.currentUser;if(!validName(name)){status('profile-status','Use a name between 1 and 80 characters.');return;}await setDoc(doc(db,'users',user.uid),{displayName:name,updatedAt:serverTimestamp()},{merge:true});await updateProfile(user,{displayName:name});$('workspace-title').textContent=`Hello, ${name}.`;status('profile-status','Profile saved.');});};
+$('contact-form').onsubmit=e=>{e.preventDefault();action('contact-status',$('contact-form').querySelector('button'),async()=>{if(!requireVerified()){status('contact-status','Verify your email before sending a request, or email TH directly.');return;}const user=auth.currentUser,data={uid:user.uid,email:user.email,name:$('contact-name').value.trim(),topic:$('contact-topic').value,message:$('contact-message').value.trim(),status:'New',createdAt:serverTimestamp(),updatedAt:serverTimestamp()};if(!validInquiry(data)||!$('contact-consent').checked){status('contact-status','Enter your name, a message of at least 20 characters and accept the privacy notice.');return;}await addDoc(collection(db,'inquiries'),data);$('contact-message').value='';$('contact-consent').checked=false;status('contact-status','Request sent. You can follow its status in your workspace.');toast('Your request has been sent.');loadInquiries(user,epoch);if(isAdmin(user))loadAdmin(user,epoch);});};
+$('refresh-inquiries').onclick=()=>loadInquiries();$('admin-refresh').onclick=()=>loadAdmin();$('account-open').onclick=()=>$('workspace').scrollIntoView({behavior:'smooth'});
+$('project-search').oninput=renderProjects;document.querySelectorAll('[data-filter]').forEach(button=>button.onclick=()=>{filter=button.dataset.filter;document.querySelectorAll('[data-filter]').forEach(b=>b.setAttribute('aria-pressed',String(b===button)));renderProjects();});
+$('privacy-open').onclick=()=>$('privacy-dialog').showModal();document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>$(b.dataset.close).close());
+$('menu-toggle').onclick=()=>{const open=$('navigation').classList.toggle('open');$('menu-toggle').setAttribute('aria-expanded',String(open));};$('navigation').querySelectorAll('a').forEach(a=>a.onclick=()=>{$('navigation').classList.remove('open');$('menu-toggle').setAttribute('aria-expanded','false');});
+for(const [date,title,company,description]of experience){const item=element('article',undefined,'timeline-item');const info=element('div');info.append(element('h3',title),element('span',company,'timeline-company'),element('p',description));item.append(element('span',date,'mono muted'),info);$('experience-list').append(item);}
+$('year').textContent=new Date().getFullYear();renderProjects();
+let revealObserver;function observeReveals(){if(!('IntersectionObserver'in window)||matchMedia('(prefers-reduced-motion: reduce)').matches)return;if(!revealObserver)revealObserver=new IntersectionObserver(entries=>entries.forEach(entry=>{if(entry.isIntersecting){entry.target.classList.add('visible');revealObserver.unobserve(entry.target);}}),{threshold:.07});document.querySelectorAll('#main-site .section-heading, #main-site .expertise-card, #main-site .timeline-item, #main-site .about').forEach(el=>{if(el.classList.contains('visible'))return;el.classList.add('reveal');revealObserver.observe(el);});}
+if(configured(config)){try{const app=initializeApp(config);auth=getAuth(app);auth.languageCode='en';db=getFirestore(app);onAuthStateChanged(auth,renderUser,()=>{document.body.classList.remove('auth-pending');setMode('login');status('auth-status','Unable to restore your session. Try signing in again.');});}catch{auth=null;document.body.classList.remove('auth-pending');setMode('login');}}else{document.body.classList.remove('auth-pending');setMode('login');}

@@ -1,19 +1,41 @@
 rules_version = '2';
 service cloud.firestore {
-  match /databases/{database}/documents {
-    function ownsVerifiedAccount(uid) {
-      return request.auth != null && request.auth.uid == uid
-        && request.auth.token.email_verified == true;
-    }
-    match /users/{uid} {
-      allow read: if ownsVerifiedAccount(uid);
-      allow create, update: if ownsVerifiedAccount(uid)
-        && request.resource.data.keys().hasOnly(['displayName', 'updatedAt'])
-        && request.resource.data.displayName is string
-        && request.resource.data.displayName.size() > 0
-        && request.resource.data.displayName.size() <= 80
-        && request.resource.data.updatedAt == request.time;
-      allow delete: if ownsVerifiedAccount(uid);
-    }
+ match /databases/{database}/documents {
+  function verified() { return request.auth != null && request.auth.token.email_verified == true; }
+  function owner(uid) { return verified() && request.auth.uid == uid; }
+  function admin() { return verified() && request.auth.token.email in ['eric.scorp93@gmail.com', 'tuanpham.x93@gmail.com']; }
+  match /users/{uid} {
+   allow read, delete: if owner(uid);
+   allow create, update: if owner(uid)
+    && request.resource.data.keys().hasOnly(['displayName','updatedAt'])
+    && request.resource.data.displayName is string
+    && request.resource.data.displayName.size() > 0 && request.resource.data.displayName.size() <= 80
+    && request.resource.data.updatedAt == request.time;
+   match /bookmarks/{projectId} {
+    allow read, delete: if owner(uid);
+    allow create: if owner(uid) && projectId in ['esp32','learning']
+     && request.resource.data.keys().hasOnly(['projectId','createdAt'])
+     && request.resource.data.projectId == projectId
+     && request.resource.data.createdAt == request.time;
+   }
   }
+  match /inquiries/{id} {
+   allow read: if verified() && (resource.data.uid == request.auth.uid || admin());
+   allow create: if verified()
+    && request.resource.data.keys().hasAll(['uid','email','name','topic','message','status','createdAt','updatedAt'])
+    && request.resource.data.keys().hasOnly(['uid','email','name','topic','message','status','createdAt','updatedAt'])
+    && request.resource.data.uid == request.auth.uid
+    && request.resource.data.email == request.auth.token.email
+    && request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 80
+    && request.resource.data.topic in ['OT / MES','Software / data','Project collaboration','Other']
+    && request.resource.data.message is string && request.resource.data.message.size() >= 20 && request.resource.data.message.size() <= 2000
+    && request.resource.data.status == 'New'
+    && request.resource.data.createdAt == request.time && request.resource.data.updatedAt == request.time;
+   allow update: if admin()
+    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','updatedAt'])
+    && request.resource.data.status in ['New','In progress','Replied','Closed']
+    && request.resource.data.updatedAt == request.time;
+   allow delete: if admin();
+  }
+ }
 }
