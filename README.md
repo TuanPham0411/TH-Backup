@@ -15,7 +15,7 @@ npm run dev
 npm run preview -- --port 4173
 ```
 
-Vite root: `site`; static public assets: `site/public`; output: `dist/web`. Firebase public configuration is in `site/firebase-config.js`; optional overrides require all four VITE_FIREBASE fields from `.env.example`. Do not put server credentials in public files or VITE variables. Fonts and images are self-hosted. Main page remains behind the sign-in screen, as requested earlier; static portfolio/resume assets are publicly retrievable, not private documents. Firebase Rules protect user data independently.
+Vite root: `site`; static public assets: `site/public`; output: `dist/web`. Firebase public configuration is in `site/firebase-config.js`; optional overrides require all four VITE_FIREBASE fields from `.env.example`. Do not put server credentials in public files or VITE variables. Fonts and images are self-hosted. Public viewer is the default on first load, including portfolio, project search/details and resume. Workspace and admin sections stay hidden until an appropriate account signs in. Saving projects or submitting an inquiry prompts sign-in. Continue as viewer returns to browsing; sign-out leaves the public site accessible. Contact drafts are retained while signing in and are cleared on sign-out. Firebase Rules continue to protect user data independently.
 
 ## Firebase — required production action
 
@@ -35,7 +35,7 @@ Profile remains private; contact submissions explicitly require consent. Resume 
 
 ## Tests
 
-`npm test` runs six unit checks covering configuration, safe auth errors, name bounds, exact verified owner UI identity, inquiry bounds and project references. Browser checks with mocked Firebase responses exercised five viewport sizes (1440×900, 1366×640, 390×844, 360×640, 320×568), login/register/reset, session gating, visitor-versus-owner UI, project filtering, details dialogs, privacy, mobile navigation and sign-out. These do not prove live database authorization.
+`npm test` runs six unit checks covering configuration, safe auth errors, name bounds, exact verified owner UI identity, inquiry bounds and project references. Browser checks with mocked Firebase responses exercised five viewport sizes (1440×900, 1366×640, 390×844, 360×640, 320×568), login/register/reset, public viewer access, interaction-triggered sign-in, visitor-versus-owner UI, project filtering, details dialogs, privacy, mobile navigation and sign-out. These do not prove live database authorization.
 
 Security assertions are saved in `tests/firestore.security.cjs`. To run them with Node.js 24 and Java 21, install Firebase CLI 15.33.0 and run:
 
