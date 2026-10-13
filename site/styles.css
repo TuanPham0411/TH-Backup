@@ -8,3 +8,28 @@
 @media(max-height:720px){.auth-panel{padding:18px 24px 13px}.panel-label{margin-bottom:10px}.auth-panel h2{font-size:25px}.auth-tabs{margin:11px 0 10px}.auth-tabs button{padding:6px 9px}.google-button{padding:8px}.auth-panel label{margin-top:5px}.auth-panel input{min-height:32px;padding-block:6px}.auth-panel .primary{padding-block:8px;margin-top:10px}.divider{margin-block:8px}.access-layout{padding-block:12px}.access-story .eyebrow{margin-bottom:15px}.access-story h1{margin-bottom:18px}.access-terminal{margin-block:18px}}
 @media(max-width:360px){.auth-panel{padding-inline:18px}.google-button{font-size:12px;gap:9px;white-space:nowrap}.access-header>.mono{font-size:6px}.auth-panel .small{font-size:9px}}
 @media(max-height:600px){.auth-panel[data-mode=register]{padding-block:12px 10px}.auth-panel[data-mode=register] h2{font-size:23px;margin-bottom:3px}.auth-panel[data-mode=register] .auth-tabs{margin-block:8px}.auth-panel[data-mode=register] .small{line-height:1.25;margin-block:6px}.auth-panel[data-mode=register] .primary{margin-top:8px;padding-block:7px}.auth-panel[data-mode=register] .divider{margin-block:6px}.auth-panel[data-mode=register] .google-button{padding-block:6px}}
+
+/* Fluid horizontal layout on desktop and wide displays. */
+@media(min-width:761px){
+ :root{--page-gutter:clamp(28px,3.2vw,88px)}
+ .container{width:calc(100% - var(--page-gutter)*2);max-width:none}
+ .site-header{padding-inline:var(--page-gutter)}
+ .auth-gate{padding-inline:var(--page-gutter)}
+ .access-layout{grid-template-columns:minmax(0,1.2fr) minmax(360px,.8fr);gap:clamp(40px,7vw,160px)}
+ .auth-panel{width:100%;max-width:560px;justify-self:end}
+ .about{grid-template-columns:minmax(280px,.85fr) minmax(0,1.3fr);gap:clamp(40px,6vw,150px)}
+ .portrait-frame{width:100%;max-width:480px;justify-self:start}
+ .about>div:last-child{max-width:900px}
+ .contact-layout{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:clamp(35px,5vw,120px)}
+ .expertise-grid,.workspace-grid{gap:clamp(20px,2vw,45px)}
+ .project-grid{gap:clamp(25px,2.5vw,60px)}
+ .project-art{height:clamp(205px,16vw,320px)}
+ .timeline-item{grid-template-columns:minmax(180px,18%) minmax(0,1fr)}
+ .timeline-item p{max-width:1000px}
+ .hero h1{max-width:1200px}
+}
+@media(min-width:1600px){
+ .expertise-card,.project-body,.panel{padding:34px}
+ .hero{min-height:710px}
+ .hero h1{font-size:clamp(76px,4.7vw,102px)}
+}
