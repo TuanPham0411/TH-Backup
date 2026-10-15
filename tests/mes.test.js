@@ -10,28 +10,12 @@ import {
   csvCell,
 } from "../mes/site/model.js";
 import {
-  isOwner,
   verifyProof,
   canonicalProof,
   activeSession,
   challengeMatches,
-} from "../mes/functions/policy.js";
+} from "../mes/proof.js";
 import { createHmac, createHash } from "node:crypto";
-test("MES owner requires exact verified Google identity", () => {
-  const owner = {
-    email: "eric.scorp93@gmail.com",
-    email_verified: true,
-    firebase: { sign_in_provider: "google.com" },
-  };
-  assert.equal(isOwner(owner), true);
-  assert.equal(isOwner({ ...owner, email: "tuanpham.x93@gmail.com" }), false);
-  assert.equal(isOwner({ ...owner, email_verified: false }), false);
-  assert.equal(
-    isOwner({ ...owner, firebase: { sign_in_provider: "password" } }),
-    false,
-  );
-  assert.equal(isOwner(undefined), false);
-});
 test("Windows proof is bound to challenge, nonce, username and device", () => {
   const secret = Buffer.alloc(32, 7).toString("base64");
   const proof = {

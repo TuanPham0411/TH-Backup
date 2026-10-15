@@ -59,4 +59,4 @@ Portfolio is the primary experience: identity, OT specialization, career and pro
 
 ## Separate MES application
 
-`mes/` contains the independent TH MES feedback application for `mes.th.io.vn`, Firebase project `th-mes-web`. See [MES setup and deployment](mes/README.md). Root `npm run build` continues to build only the portfolio; `npm run build:mes` builds MES to `mes/dist`. The MES Netlify project must use base directory `mes`; do not change the existing portfolio deployment settings.
+`mes/` contains the independent TH MES feedback application for `mes.th.io.vn`, Supabase project `aaosgmphvhjcygldocyi`. See [MES setup and deployment](mes/README.md). Root `npm run build` continues to build only the portfolio; `npm run build:mes` builds MES to `mes/dist`. The MES Netlify project must use base directory `mes`; do not change the existing portfolio deployment settings.

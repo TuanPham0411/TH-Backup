@@ -1,0 +1,8 @@
+{
+  "nodeModulesDir": "none",
+  "lock": false,
+  "tasks": {
+    "check": "deno check supabase/functions/mes-api/index.ts",
+    "test:edge": "deno test --allow-env tests/edge_test.ts"
+  }
+}

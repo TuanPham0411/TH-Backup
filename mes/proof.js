@@ -18,14 +18,6 @@ export const TYPES = [
   "text/csv",
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 ];
-export function isOwner(token) {
-  return (
-    !!token &&
-    token.email_verified === true &&
-    token.email?.toLowerCase() === OWNER_EMAIL &&
-    token.firebase?.sign_in_provider === "google.com"
-  );
-}
 export function validUsername(v) {
   return (
     typeof v === "string" &&

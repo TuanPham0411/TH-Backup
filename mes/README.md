@@ -1,150 +1,195 @@
-# TH MES — mes.th.io.vn
+# TH MES — Supabase / Netlify Free
 
-A separate full-width MES feedback application in the existing repository. It does not replace the TH portfolio. Production Firebase project: **th-mes-web**. The sole owner is **eric.scorp93@gmail.com**, signed in through **Google**. `hpham` is the owner label, not a password account; no `1111` password is embedded anywhere.
+The independent MES feedback workspace for **mes.th.io.vn** uses Supabase project
+**aaosgmphvhjcygldocyi** for Google owner authentication, PostgreSQL, a private
+attachment bucket and the mes-api Edge Function. There is no Firebase dependency,
+Cloud Functions or Blaze requirement in MES. The portfolio in ../site keeps its
+existing Firebase project and Netlify settings.
 
-## Implemented workflow
+Only **eric.scorp93@gmail.com**, confirmed through Supabase Google OAuth, is the MES
+owner. `hpham` is an owner label, not a password login. Managed operators use the
+signed Windows verification flow and receive opaque, server-revocable 12-hour
+sessions. Their tokens are hashed in the database and held in sessionStorage in
+the browser; signing keys stay out of the frontend and source control.
 
-- Registered users select their display name, verify the Windows computer, then select an owner-managed Team Leader and Department, enter Process/Station, title and feedback, and attach evidence.
-- Shared Dashboard: totals, open/in-progress/resolved/critical counts, 7-day activity, status donut, department bars and recent updates.
-- Issue list: search, combined filters, pagination and CSV export. Details include original feedback, authenticated attachment downloads, owner assessment and a timestamped timeline.
-- Only the owner may edit/delete issues, set priority/status, assess feedback and post comments. Edits retain before/after fields in timeline audit records. Resubmitting the same attachment metadata does not duplicate the audit event.
-- Administration: create/edit/deactivate users and catalog entries, change submission policy, register/revoke Windows agents. Deactivation replaces destructive directory removal so historical issues keep their original labels. Issue deletion is permanent and removes its files and timeline after confirmation.
-- All writes go through authenticated Cloud Functions with server-side authorization and validation. Firestore clients, including the owner browser, cannot directly mutate issues or timeline records. The owner can manage through Functions, not a client-side role flag.
+## Features and boundaries
 
-## Important access boundaries
+- Full-width dashboard, status and department charts, activity, issue filters,
+  pagination and safe CSV export. Catalogs, users and issues refresh every 15
+  seconds, with refresh requests after writes. Reads are batched into one Edge request per
+  refresh, and polling pauses in hidden tabs. No production sample data.
+- Feedback: display name, owner-managed Team Leader/Department, process, subject,
+  detailed description and up to five nonempty files, each at most 10 MB.
+- Owner: edit/delete, assess, change priority/status, add comments, inspect complete
+  timeline with before/after audit; manage catalogs, users and Windows devices.
+- Issues/files require an active verified operator or the sole owner. They are not
+  public. Active display names/usernames are exposed before sign-in by design.
+- All database operations go through one transactional, service-only dispatcher.
+  Tables live in mes_private with RLS, no browser grants and no browser policies.
+  Anonymous/authenticated roles cannot invoke the dispatcher. The Edge Function
+  validates Google access tokens with Supabase Auth, or passes opaque sessions for
+  database verification. It never trusts client-supplied roles or actor identities.
+- Storage bucket is private, with no browser object policies. Scoped signed upload
+  URLs are issued only for five reserved slots in the first 15 minutes. Supabase
+  upload URLs remain valid for two hours once issued, cannot overwrite, and enforce
+  bucket size/MIME limits. Attachments are finalized using actual object metadata.
+  Downloads are signed for 60 seconds; an issued link can be used until it expires.
+- Upload failures leave the already-created issue saved. Do not resubmit it.
+  Owner deletion tombstones the issue, removes objects then removes issue/timeline;
+  retry deletion if storage cleanup failed. Unfinalized uploads need owner follow-up.
+- Supported files: JPG, PNG, WEBP, PDF, TXT, CSV, XLSX. This is not malware scanning.
+- Windows proof checks the presence of a matching profile folder under C:\Users,
+  not the currently logged-on identity. A protected local agent signs a one-time
+  five-minute nonce. User rename/deactivation, device revocation, expiry and logout
+  invalidate access. Keep Windows verification enabled; turning it off deliberately
+  allows account selection without machine proof. Device keys are software secrets,
+  not hardware attestation. See windows-agent/README.txt for installation.
 
-Issue data and attachments are **not public**: all active workspace users can read all issues, but they must authenticate. The pre-login selector obtains active display names and usernames from getDirectory; that directory is available before sign-in by design. Do not put confidential information in directory labels.
+## 1. Apply database migration
 
-Windows verification checks **presence of the selected username as a folder under C:\Users**, as requested. It does not prove that this is the currently logged-on Windows account. The browser cannot enumerate the directory. A trusted local agent performs that check and signs a nonce using its protected device key. The backend checks the active device, matching username, challenge expiry and one-time consumption, then issues a Firebase custom token. Verification lasts 12 hours. User/device revocation is also checked by data rules and Functions, not only at sign-in. A person who can extract/copy a device key can impersonate that device; this is software verification, not hardware-backed attestation or corporate SSO.
+Free plan is sufficient for this implementation within its quotas. Do not enable
+paid plans if you want no service charges. Free resources can pause or hit limits;
+there is no promise of unlimited storage, requests or availability. Review current
+Supabase and Netlify plan limits in your accounts. Domain renewal is separate.
 
-The policy defaults to requiring Windows verification. The owner may disable it after an explicit warning; doing so intentionally allows account selection without machine proof. Leave it enabled for the requested workflow.
+Open your project's **SQL Editor**, create a new query and run the complete file:
 
-## Build and run
+**supabase/migrations/202610150001_mes.sql**
 
-From the repository root (Node 24):
+This creates private tables, the transactional dispatcher, service-role-only grants
+and the private mes-attachments bucket. Run it once on a fresh project. Do not open
+mes_private as an exposed API schema and do not add permissive public policies.
+If the project already has MES Firebase data, it has NOT been imported by this
+change. Preserve Firebase until a separate reviewed export/import is complete.
+Existing Firebase sessions and old issued challenges do not migrate.
 
-```sh
-npm ci --cache /tmp/th-npm-cache
-npm test
-npm run dev:mes
-npm run build:mes
-npm run preview:mes
+## 2. Enable Google owner login
+
+In Supabase **Authentication → Sign In / Providers → Google**, enable Google and
+configure your Google OAuth Client ID/secret directly in the dashboard. Never paste
+OAuth secrets into chat, source code or VITE variables.
+
+In Google Cloud Console create/use a Web OAuth client and add this exact authorized
+redirect URI (you can add it to an existing client without removing Firebase URIs):
+
+```
+https://aaosgmphvhjcygldocyi.supabase.co/auth/v1/callback
 ```
 
-Or `cd mes`, `npm ci`, `npm run build` for the independent package used by Netlify. The build output is **mes/dist**. Portfolio output remains dist/web. Functions use **Node 22**, independently of the frontend runtime.
+If Google consent is in Testing mode, add eric.scorp93@gmail.com as a test user.
+Google OAuth setup does not require Firebase Blaze.
 
-Preview is explicit and isolated from production:
+In Supabase **Authentication → URL Configuration** set Site URL to
+`https://mes.th.io.vn` and allow that exact URL plus the exact new Netlify hostname
+once it exists. Do not use broad wildcard redirect URLs. Keep Google signup enabled
+for the owner's first login; the Edge API rejects every other Google email. Managed
+operators do not need Supabase Auth accounts, emails or passwords.
+
+## 3. Deploy the Edge Function
+
+The browser publishable key is already in site/config.js. It does NOT authorize
+schema changes or API deployment. Use Supabase CLI in your own trusted terminal
+with Node 22+ (or Google Cloud Shell):
+
+```sh
+npx --yes supabase@2.121.0 login
+cd mes
+npx --yes supabase@2.121.0 functions deploy mes-api --project-ref aaosgmphvhjcygldocyi
+```
+
+Log in through the CLI's secure flow, never by sharing a token in chat. The included
+supabase/config.toml sets verify_jwt=false because operators use opaque Windows
+sessions, not Supabase JWTs. **The function performs authorization itself**; turning
+off gateway verification does not make data public. Supabase supplies SUPABASE_URL
+and SUPABASE_SERVICE_ROLE_KEY to Edge Functions. Never copy the latter to Netlify,
+VITE variables, the Windows agent or chat.
+
+For a new Netlify hostname add it to the exact CORS allowlist in the Function's
+secrets/settings, for example set MES_ALLOWED_ORIGINS to:
+
+```
+https://mes.th.io.vn,https://YOUR-NEW-MES-SITE.netlify.app
+```
+
+Default is only https://mes.th.io.vn. For local development explicitly add the exact
+local origin in a local functions environment file. Do not use `*` with sessions.
+No Firebase Storage CORS command or Google service-account IAM setup is needed.
+
+Alternatively, to deploy migration plus function via CLI instead of SQL Editor:
+
+```sh
+npx --yes supabase@2.121.0 login
+bash mes/scripts/deploy.sh
+```
+
+This links the project and asks for the database password in your terminal; do not
+send it in chat. Do not separately run db push after manually running the same SQL
+unless you first reconcile migration history with Supabase CLI migration repair.
+
+## 4. Create a separate Netlify site
+
+Import TuanPham0411/Thien-Ha, branch main, as a **new** Netlify project:
+
+| Setting | Value |
+|---|---|
+| Base directory | mes |
+| Build command | npm run build |
+| Publish directory | dist, relative to base |
+| Config file | mes/netlify.toml |
+| Node | 24 |
+
+Optional public overrides: VITE_MES_SUPABASE_URL and
+VITE_MES_SUPABASE_PUBLISHABLE_KEY. Do not set VITE_MES_PREVIEW in production.
+Add mes.th.io.vn to this new project and follow its DNS instructions for the mes
+record. Keep portfolio project settings, th.io.vn/www records and nameservers.
+Complete HTTPS, Supabase redirect URLs and the exact Edge CORS allowlist above.
+
+## 5. Initialize and test live
+
+1. Owner → Continue with Google → eric.scorp93@gmail.com.
+2. Create Team Leaders and Departments; create users with the real normalized
+   Windows profile folder username and display name. Names must be unique.
+3. Register a Windows computer and download its unique device.json immediately.
+   The secret is returned once; it cannot be read back from listDevices.
+4. Download /downloads/th-mes-agent.zip. Review/install on Windows with trusted
+   Python 3.11+; follow its README. Installer uses an interactive scheduled task
+   for the installing account, not a SYSTEM service. Shared workstations require
+   IT to deploy per account or package a managed service. Allow browser local-network
+   access when prompted. Never distribute device keys publicly.
+5. Verify a matching user; submit feedback plus an attachment, download it, check
+   dashboard and timeline. Owner changes status/assessment/comments; verify the
+   operator cannot perform those actions. Revoke the device and confirm denial.
+6. Test absent/mismatched Windows folders and another Google account (denied),
+   inactive users, expired/replayed proofs, and sign-out clearing private views.
+
+## Local development and verification
+
+```sh
+# From repository root, Node 24
+npm ci --cache /tmp/th-npm-cache
+npm ci --prefix mes --cache /tmp/th-npm-cache
+npm test
+python3 -m unittest discover -s mes/tests -v
+npm run build
+npm run build:mes
+npm run dev:mes
+```
+
+In-memory preview, disconnected from all production services:
 
 ```sh
 VITE_MES_PREVIEW=true npm run build:mes -- --outDir /tmp/th-mes-preview
 ```
 
-It displays a permanent sample-data banner, never connects to the live database, and uses only in-memory state. Refresh discards preview changes. Production builds must not set VITE_MES_PREVIEW. No live production data was used to populate charts.
+It has a permanent sample banner and discards changes on refresh. It cannot prove
+live authorization. SQL integration checks are in tests/supabase.sql and the
+isolated PostgreSQL runner scripts/test-database.sh. The runner stubs only the
+Supabase storage.buckets schema/roles needed for migration; it does not emulate
+Supabase Auth, Storage HTTP or Google's OAuth service. No production data is used.
+Deno type check: `deno task check`; Edge HTTP tests: `deno task test:edge` (from mes).
 
-## Required Firebase setup — owner action
-
-This code is built and tested locally; it is **not deployed to Firebase by committing it**. The execution environment has no authenticated Firebase management session. Do not send tokens, service-account keys or device keys in chat.
-
-1. In Firebase Console select **th-mes-web**, not the portfolio project th-web-d816f.
-2. Enable **Blaze billing** for Cloud Functions and Firebase Storage. This is a prerequisite for deployment, not an action performed by this task. Review quotas/budgets in your own account.
-3. Authentication → Sign-in method: enable **Google**, using the owner support email. No managed-user passwords or Google sign-in for operators are needed; they receive custom tokens after Windows verification.
-4. Authentication → Settings → Authorized domains: add **mes.th.io.vn** and the exact Netlify hostname for the new MES site.
-5. Create **Firestore Database** in Production mode if it does not exist (prefer a suitable nearby location such as Singapore). Enable **Storage** and confirm the bucket `th-mes-web.firebasestorage.app`.
-6. In an authenticated owner terminal or Google Cloud Shell, obtain this repository and use Node 22. Run `firebase login` if needed, then the reviewed script:
-
-```sh
-bash mes/scripts/deploy.sh
-```
-
-Equivalent manual deployment from `mes/`:
-
-```sh
-npm ci
-npm run build
-cd functions
-npm ci
-cd ..
-npx --yes firebase-tools@15.33.0 deploy --project th-mes-web --only functions:mes,firestore:rules,storage
-```
-
-The Functions region is **asia-southeast1**. Firebase CLI may ask to enable required Google APIs and the Storage service agent's Firestore access for cross-service security rules. That access is necessary for attachment authorization.
-
-7. Authenticated attachment downloads use Storage SDK getBlob rather than public download links. Configure bucket CORS from a Google Cloud terminal:
-
-```sh
-gcloud storage buckets update gs://th-mes-web.firebasestorage.app --cors-file=mes/storage-cors.json --project=th-mes-web
-```
-
-Run that command at repository root (or use `--cors-file=storage-cors.json` from mes).
-
-8. If custom-token issuance reports `iam.serviceAccounts.signBlob` permission denied: enable the IAM Service Account Credentials API, identify the actual runtime service account in the deployed Function details, and give it **Service Account Token Creator on itself only**. Do not grant that role broadly to users. Runtime identity also needs Firestore read/write, Firebase Authentication user management and bucket object access. Do not solve IAM errors by weakening data rules.
-
-No Firebase management deployment has been executed by the agent. A read-only management access check returned authentication required. Billing/API/resource activation, real Rules enforcement and actual custom-token issuance remain unverified until this setup is complete.
-
-## Second Netlify project and DNS
-
-Create a **new** Netlify project from `TuanPham0411/Thien-Ha`, branch main:
-
-| Setting | Value |
-|---|---|
-| Base directory | `mes` |
-| Build command | `npm run build` |
-| Publish directory | `dist` (relative to base) |
-| Config file | `mes/netlify.toml`, discovered from base |
-
-Do not change the existing portfolio Netlify project's base/build/publish settings. The public Firebase web config supplied by the owner is in mes/site/config.js; no additional public variables are required. Overrides use VITE_MES_FIREBASE_*.
-
-After a successful new Netlify deployment, add **mes.th.io.vn to the new MES project**, not as an alias of the portfolio project. In the existing Netlify DNS zone for th.io.vn, add the mes CNAME/record exactly as instructed by the new project. Keep existing apex/www records and nameservers unchanged. Verify HTTPS and Firebase authorized domains.
-
-## Owner initialization
-
-1. Visit the MES site → account button → Owner → Continue with Google.
-2. Use **eric.scorp93@gmail.com**. The server verifies this exact email, email verification and Google's sign-in provider; no other portfolio admin automatically gets MES permissions.
-3. Add Team Leaders and Departments in Administration.
-4. Create users with the real Windows **profile folder name**, normalized to lowercase, and their display names. Duplicate usernames are rejected. Renaming a username invalidates its previous Windows proof and requires reverification; display-name changes preserve historical reporter labels.
-5. Register a device. Download its unique **device.json** immediately; the key is shown once. The server never returns signing keys from listDevices or Firestore client reads.
-6. Download the Windows agent bundle from the User sign-in panel or `/downloads/th-mes-agent.zip`. Follow its README and reviewed install.ps1 on the Windows computer. A trusted Python 3.11+ installation is required.
-7. The installer creates an interactive scheduled task for the account running installation, not a SYSTEM service. For shared workstations with different login accounts, IT must deploy the task per account or package a managed service. Allow Chrome/Edge local-network access when prompted. Locked-down company browsers may require an IT policy change; this cannot be bypassed by website JavaScript.
-
-## Attachments and failure behavior
-
-Maximum 5 attachments, each nonempty and no larger than 10 MB. Types: JPG/PNG/WEBP, PDF, TXT, CSV, XLSX. CSV/empty MIME values from Windows file pickers are normalized for known extensions. These format limits are not malware scanning.
-
-The server allocates exactly five random upload slots. Storage allows create-only writes by the submitter/owner for 15 minutes after issue creation. Arbitrary paths, overwrites and client deletions are denied. Completed files are attached by a server call that checks actual Storage metadata. Access uses authenticated blob downloads; no public permanent URLs are stored in issue data.
-
-If uploading fails, the already-created feedback remains saved and the UI reports its ID; **do not submit a duplicate issue**. Successfully uploaded files are finalized when possible. Unfinished attachments require owner follow-up; no automatic email notifications or offline delivery guarantees are provided. CSV export protects spreadsheet formula prefixes and escapes cell delimiters.
-
-## API reference (Firebase callable protocol)
-
-All endpoints are deployed in asia-southeast1 for th-mes-web. The web SDK supplies Firebase ID tokens on calls requiring authentication.
-
-| Endpoint | Access / purpose |
-|---|---|
-| getDirectory | Pre-login active display names/usernames and policy |
-| getSession | Validate current managed Windows session or the Google owner |
-| startWindowsChallenge | Issue a 5-minute challenge for an active username |
-| completeWindowsChallenge | Consume one valid signed proof and issue a custom token |
-| loginManagedUser | Allowed only when owner explicitly disables Windows policy |
-| manageDirectory / manageUser | Owner-managed catalogs and accounts |
-| setPolicy | Owner-only submission verification policy |
-| registerDevice / listDevices / revokeDevice | Owner-only device lifecycle; secret returned once on registration |
-| createIssue / attachFiles | Validated member submission and attachment finalization |
-| updateIssue / addComment / deleteIssue | Owner-only edits, handling, audit and removal |
-
-createIssue is rate-limited to ten submissions per ten minutes per account. Challenges have a short cooldown; expired challenge records are cleaned daily by the scheduled cleanExpiredChallenges Function. Dashboard and issue list load all available feedback, with client-side filtering and display pagination. Timeline is complete for the selected issue. Larger deployments can later move aggregations and search to the server without changing these access rules.
-
-## Validation and remaining limits
-
-- Root `npm test`: 15 passing unit tests, including owner identity, proof tampering, expiry/replay conditions, feedback validation, attachment bounds, chart statistics and CSV injection protection.
-- `python3 -m unittest discover -s mes/tests -v`: 4 passing local-agent core/protocol tests. This is not a Windows installation test.
-- Functions module loads and passes syntax checks under Node 22.
-- Browser preview checks passed at 1920, 1440, 1024 and 390 pixels: charts, filters, owner updates, comments, edit audit, sample attachments, creation/deletion, directories, users and CSV. These use sample in-memory data, not live Firebase.
-- Security emulator assertions are saved in mes/tests/security.cjs. Firestore emulator download is blocked by the environment proxy (HTTP 403 from storage.googleapis.com), so these tests have **not run**. Do not claim production authorization has been verified.
-
-With Firebase CLI, Java 21 and emulator download access, from mes run:
-
-```sh
-FIREBASE_EMULATORS_PATH=/tmp/th-firebase-emulators XDG_CONFIG_HOME=/tmp/th-firebase-config firebase emulators:exec --project demo-th-mes --only firestore,storage 'node tests/security.cjs'
-```
-
-The root dev dependency @firebase/rules-unit-testing is used by that test. Never run tests against th-mes-web production data. After deployment validate real owner Google sign-in; an actual Windows proof; missing/mismatched profiles; inactive/revoked users/devices; expired/replayed proofs; file upload/download; viewer read-only restrictions; owner-only status changes and timeline audit. The current machine is Linux and cannot verify Windows installation, scheduled tasks or company browser networking.
+Current validation: Node tests, Python agent core/protocol tests, SQL migration and
+transactional authorization/workflow tests run locally. Browser preview is tested
+at desktop/tablet/mobile sizes; production browser checks use mocked API responses.
+Live Supabase deployment, Google login, actual Storage requests and real Windows
+installation remain unverified until the account setup above is complete.

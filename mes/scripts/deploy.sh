@@ -2,9 +2,10 @@
 set -euo pipefail
 mes_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$mes_root"
-# Execute only from a terminal authenticated as the owner of th-mes-web.
-# Requires Blaze, Firestore, Storage and Google Authentication to be enabled.
+# Authenticate with `npx supabase login` first. Never put access tokens in source.
+# `supabase link` asks for the database password securely in your terminal.
 npm ci
 npm run build
-(cd functions && npm ci)
-npx --yes firebase-tools@15.33.0 deploy --project th-mes-web --only functions:mes,firestore:rules,storage
+npx --yes supabase@2.121.0 link --project-ref aaosgmphvhjcygldocyi
+npx --yes supabase@2.121.0 db push
+npx --yes supabase@2.121.0 functions deploy mes-api --project-ref aaosgmphvhjcygldocyi

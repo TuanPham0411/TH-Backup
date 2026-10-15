@@ -1,36 +1,8 @@
 import "@fontsource/dm-sans/latin-400.css";
 import "@fontsource/dm-sans/latin-500.css";
 import "@fontsource/dm-sans/latin-600.css";
-import { initializeApp } from "firebase/app";
-import {
-  getAuth,
-  GoogleAuthProvider,
-  signInWithPopup,
-  signInWithCustomToken,
-  onAuthStateChanged,
-  signOut,
-} from "firebase/auth";
-import {
-  getFirestore,
-  collection,
-  doc,
-  query,
-  orderBy,
-  onSnapshot,
-} from "firebase/firestore";
-import { getFunctions, httpsCallable } from "firebase/functions";
-import {
-  getStorage,
-  ref,
-  uploadBytesResumable,
-  getBlob,
-} from "firebase/storage";
-import {
-  firebaseConfig,
-  functionsRegion,
-  configured,
-  previewMode,
-} from "./config.js";
+import { initializeBackend, api, watchAuth, ownerLogin, managedLogin, logout, watchRecords, uploadAttachment, downloadAttachment as fetchAttachment } from "./backend.js";
+import { configured, previewMode } from "./config.js";
 import {
   statuses,
   priorities,
@@ -75,16 +47,8 @@ const state = {
   files: [],
   timeline: [],
 };
-let auth,
-  db,
-  fn,
-  storage,
-  unsubscribers = [],
-  timelineUnsubscribe,
-  sessionGeneration = 0,
-  toastTimer;
-const callable = async (name, data = {}) =>
-  (await httpsCallable(fn, name)(data)).data;
+let unsubscribers = [], timelineUnsubscribe, sessionGeneration = 0, toastTimer;
+const callable = api;
 const stamp = (v) =>
   typeof v === "number" ? v : v?.toMillis ? v.toMillis() : 0;
 const date = (v) =>
@@ -116,16 +80,16 @@ function errorMessage(e) {
   if (c.includes("permission-denied"))
     return e.message?.includes("Windows")
       ? "Your verification has expired or the device was revoked. Verify this computer again."
-      : "Access denied. Confirm this user or owner is authorized and the MES rules are deployed.";
+      : "Access denied. Confirm this user or owner is authorized and the MES access policies are deployed.";
   if (
     c.includes("unavailable") ||
     c.includes("not-found") ||
     c.includes("internal")
   )
-    return "MES backend is not reachable or not deployed yet. Ask the owner to deploy the th-mes-web Functions and rules.";
+    return "MES backend is not reachable or not deployed yet. Ask the owner to deploy the Supabase MES API and database migration.";
   if (c.includes("popup-closed")) return "Google sign-in was cancelled.";
   if (c.includes("unauthorized-domain"))
-    return "Add this site domain to Firebase Authentication authorized domains.";
+    return "Add this site domain to Supabase Authentication redirect URLs.";
   if (
     c.includes("failed-precondition") ||
     c.includes("invalid-argument") ||
@@ -533,18 +497,11 @@ function openIssue(id) {
   } else {
     state.timeline = [];
     renderTimeline();
-    timelineUnsubscribe = onSnapshot(
-      query(
-        collection(db, "issues", id, "timeline"),
-        orderBy("createdAt", "asc"),
-      ),
-      (snapshot) => {
-        if (state.selected !== id) return;
-        state.timeline = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
-        renderTimeline();
-      },
-      (e) => showStatus("comment-status", errorMessage(e)),
-    );
+    timelineUnsubscribe = watchRecords(`issues/${id}/timeline`, (rows) => {
+      if (state.selected !== id) return;
+      state.timeline = rows;
+      renderTimeline();
+    }, (e) => showStatus("comment-status", errorMessage(e)), "asc");
   }
 }
 function renderDetail(issue) {
@@ -657,7 +614,7 @@ async function downloadAttachment(file) {
     return;
   }
   try {
-    const blob = await getBlob(ref(storage, file.path), 10 * 1024 * 1024);
+    const blob = await fetchAttachment(file.path);
     const url = URL.createObjectURL(blob),
       a = el("a");
     a.href = url;
@@ -851,50 +808,30 @@ function stopLive() {
 }
 function onDataError(error) {
   message(errorMessage(error));
-  if (String(error.code).includes("permission-denied") && auth?.currentUser) {
+  if (String(error.code).includes("permission-denied") && state.user) {
     stopLive();
     toast(
-      "Workspace access was denied. Verify your account or ask the owner to check the deployed MES rules.",
+      "Workspace access was denied. Verify your account or ask the owner to check the deployed MES access policies.",
     );
-    signOut(auth).catch(() => handleAuth(null));
+    logout().catch(() => handleAuth(null));
   }
 }
 function subscribeLive() {
   stopLive();
-  const add = (path, field, order) => {
-    const q = order
-      ? query(collection(db, path), orderBy(order, "desc"))
-      : collection(db, path);
-    unsubscribers.push(
-      onSnapshot(
-        q,
-        (snap) => {
-          state[field] = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-          if (field === "issues") {
-            state.ready = true;
-            renderAll();
-            updateIdentity();
-          } else renderDirectories();
-        },
-        onDataError,
-      ),
-    );
-  };
+  const add = (path, field, order) => unsubscribers.push(watchRecords(path, (rows) => {
+    state[field] = rows;
+    if (field === "issues") { state.ready = true; renderAll(); updateIdentity(); }
+    else renderDirectories();
+  }, onDataError, order));
   add("teamLeaders", "leaders");
   add("departments", "departments");
   if (state.isOwner) add("users", "users");
-  add("issues", "issues", "createdAt");
-  unsubscribers.push(
-    onSnapshot(
-      doc(db, "settings", "policy"),
-      (snap) => {
-        state.requiresWindows = snap.data()?.requiresWindows !== false;
-        renderForm();
-      },
-      onDataError,
-    ),
-  );
-  $("data-scope").textContent = "All workspace feedback · real-time updates.";
+  add("issues", "issues", "desc");
+  unsubscribers.push(watchRecords("settings/policy", (rows) => {
+    state.requiresWindows = rows[0]?.requiresWindows !== false;
+    renderForm();
+  }, onDataError));
+  $("data-scope").textContent = "All workspace feedback · updates every 15 seconds.";
 }
 function demoEvent(issue, kind, text, extra = {}) {
   issue.timeline ??= [];
@@ -979,26 +916,7 @@ $("feedback-form").onsubmit = (e) => {
             "create-status",
             `Feedback saved. Uploading attachment ${index + 1} of ${state.files.length}…`,
           );
-          const upload = uploadBytesResumable(
-            ref(storage, `issues/${createdId}/${result.uploadSlots[index]}`),
-            file,
-            {
-              contentType: attachmentType(file),
-              contentDisposition: "attachment",
-            },
-          );
-          await new Promise((resolve, reject) =>
-            upload.on(
-              "state_changed",
-              (snapshot) =>
-                showStatus(
-                  "create-status",
-                  `Feedback saved. File ${index + 1}: ${Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100)}%`,
-                ),
-              reject,
-              resolve,
-            ),
-          );
+          await uploadAttachment(`issues/${createdId}/${result.uploadSlots[index]}`, file, attachmentType(file));
           uploaded.push({ slot: result.uploadSlots[index], name: file.name });
         }
         if (uploaded.length)
@@ -1347,11 +1265,11 @@ $("windows-login-form").onsubmit = (e) => {
           );
           return;
         }
-        token = (await callable("completeWindowsChallenge", proof)).customToken;
+        token = (await callable("completeWindowsChallenge", proof)).sessionToken;
       } else
         token = (await callable("loginManagedUser", { uid: selected.id }))
-          .customToken;
-      await signInWithCustomToken(auth, token);
+          .sessionToken;
+      await managedLogin(token);
     },
   );
 };
@@ -1369,9 +1287,7 @@ $("owner-google-login").onclick = () =>
       $("account-dialog").close();
       return;
     }
-    const provider = new GoogleAuthProvider();
-    provider.setCustomParameters({ prompt: "select_account" });
-    await signInWithPopup(auth, provider);
+    await ownerLogin();
   });
 $("sign-out").onclick = () =>
   run("account-status", $("sign-out"), async () => {
@@ -1379,7 +1295,7 @@ $("sign-out").onclick = () =>
       state.user = null;
       state.isOwner = false;
       updateIdentity();
-    } else await signOut(auth);
+    } else await logout();
     $("account-dialog").close();
   });
 $("user-login-tab").onclick = () => {
@@ -1587,19 +1503,14 @@ if (state.preview) {
   renderAll();
   updateIdentity();
 } else if (configured) {
-  const app = initializeApp(firebaseConfig);
-  auth = getAuth(app);
-  auth.languageCode = "en";
-  db = getFirestore(app);
-  fn = getFunctions(app, functionsRegion);
-  storage = getStorage(app);
-  onAuthStateChanged(auth, handleAuth);
+  initializeBackend();
+  watchAuth(handleAuth);
   renderDirectories();
   renderAll();
   updateIdentity();
 } else {
   message(
-    "Firebase web configuration is incomplete. The production backend is not connected.",
+    "Supabase publishable key is missing. The production backend is not connected.",
   );
   renderAll();
   updateIdentity();
