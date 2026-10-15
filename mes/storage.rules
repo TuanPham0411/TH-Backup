@@ -1,0 +1,27 @@
+rules_version = '2';
+service firebase.storage {
+ match /b/{bucket}/o {
+  function owner(){return request.auth != null && 'email_verified' in request.auth.token && request.auth.token.email_verified == true && 'email' in request.auth.token && request.auth.token.email == 'eric.scorp93@gmail.com' && request.auth.token.firebase.sign_in_provider == 'google.com';}
+  function member(){return owner() || (request.auth != null
+   && firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.active == true
+   && (!firestore.exists(/databases/(default)/documents/settings/policy) || firestore.get(/databases/(default)/documents/settings/policy).data.requiresWindows != false)
+   && request.auth.token.windowsUsername == firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.username
+   && request.auth.token.windowsVerifiedAt <= request.time.toMillis()
+   && request.time.toMillis() - request.auth.token.windowsVerifiedAt < 43200000
+   && firestore.get(/databases/(default)/documents/devices/$(request.auth.token.mesDevice)).data.active == true)
+   || (request.auth != null && firestore.exists(/databases/(default)/documents/settings/policy)
+    && firestore.get(/databases/(default)/documents/settings/policy).data.requiresWindows == false
+    && firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.active == true);}
+  match /issues/{issueId}/{slotId} {
+   function issue(){return firestore.get(/databases/(default)/documents/issues/$(issueId)).data;}
+   allow read: if member() && firestore.exists(/databases/(default)/documents/issues/$(issueId));
+   allow create: if member() && issue().deleting != true
+    && (owner() || issue().createdBy == request.auth.uid)
+    && slotId in issue().uploadSlots
+    && request.time < issue().createdAt + duration.value(15,'m')
+    && request.resource.size > 0 && request.resource.size <= 10*1024*1024
+    && request.resource.contentType in ['image/jpeg','image/png','image/webp','application/pdf','text/plain','text/csv','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'];
+   allow update,delete: if false;
+  }
+ }
+}

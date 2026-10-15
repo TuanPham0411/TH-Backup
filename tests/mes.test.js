@@ -1,0 +1,190 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import {
+  validateFiles,
+  validateIssue,
+  filterIssues,
+  stats,
+  safeUsername,
+  makeDemo,
+  csvCell,
+} from "../mes/site/model.js";
+import {
+  isOwner,
+  verifyProof,
+  canonicalProof,
+  activeSession,
+  challengeMatches,
+} from "../mes/functions/policy.js";
+import { createHmac, createHash } from "node:crypto";
+test("MES owner requires exact verified Google identity", () => {
+  const owner = {
+    email: "eric.scorp93@gmail.com",
+    email_verified: true,
+    firebase: { sign_in_provider: "google.com" },
+  };
+  assert.equal(isOwner(owner), true);
+  assert.equal(isOwner({ ...owner, email: "tuanpham.x93@gmail.com" }), false);
+  assert.equal(isOwner({ ...owner, email_verified: false }), false);
+  assert.equal(
+    isOwner({ ...owner, firebase: { sign_in_provider: "password" } }),
+    false,
+  );
+  assert.equal(isOwner(undefined), false);
+});
+test("Windows proof is bound to challenge, nonce, username and device", () => {
+  const secret = Buffer.alloc(32, 7).toString("base64");
+  const proof = {
+    challengeId: "abc123",
+    nonce: "a".repeat(64),
+    username: "phtuan",
+    deviceId: "device123",
+  };
+  proof.signature = createHmac("sha256", Buffer.from(secret, "base64"))
+    .update(canonicalProof(proof))
+    .digest("hex");
+  assert.equal(verifyProof(proof, secret), true);
+  for (const key of ["challengeId", "nonce", "username", "deviceId"])
+    assert.equal(verifyProof({ ...proof, [key]: "changed" }, secret), false);
+  assert.equal(verifyProof({ ...proof, signature: "bad" }, secret), false);
+  assert.equal(
+    verifyProof(proof, Buffer.alloc(32, 8).toString("base64")),
+    false,
+  );
+});
+test("managed sessions reject inactive, future, expired and mismatched Windows proofs", () => {
+  const now = 1000000000000,
+    u = { active: true, username: "phtuan" },
+    token = { windowsUsername: "phtuan", windowsVerifiedAt: now - 100 };
+  assert.equal(activeSession(token, u, true, now), true);
+  assert.equal(activeSession({}, u, true, now), false);
+  assert.equal(
+    activeSession({ ...token, windowsUsername: "other" }, u, true, now),
+    false,
+  );
+  assert.equal(
+    activeSession({ ...token, windowsVerifiedAt: now + 1 }, u, true, now),
+    false,
+  );
+  assert.equal(
+    activeSession(
+      { ...token, windowsVerifiedAt: now - 43200001 },
+      u,
+      true,
+      now,
+    ),
+    false,
+  );
+  assert.equal(
+    activeSession(token, { ...u, active: false }, false, now),
+    false,
+  );
+  assert.equal(activeSession({}, u, false, now), true);
+});
+test("feedback requires catalogs, bounded text and a meaningful description", () => {
+  const d = {
+    teamLeaderId: "a",
+    departmentId: "b",
+    process: "Station 1",
+    subject: "Report issue",
+    description: "Production report cannot be opened.",
+  };
+  assert.equal(validateIssue(d), "");
+  for (const v of [
+    { ...d, teamLeaderId: "" },
+    { ...d, departmentId: "" },
+    { ...d, process: " " },
+    { ...d, subject: "x".repeat(161) },
+    { ...d, description: "short" },
+    { ...d, description: "x".repeat(5001) },
+  ])
+    assert.notEqual(validateIssue(v), "");
+});
+test("attachments enforce count, type and size", () => {
+  const file = { name: "screen.png", type: "image/png", size: 1024 };
+  assert.equal(validateFiles([file]), "");
+  assert.equal(
+    validateFiles([
+      { name: "report.csv", type: "application/vnd.ms-excel", size: 100 },
+    ]),
+    "",
+  );
+  assert.equal(
+    validateFiles([{ name: "report.txt", type: "", size: 100 }]),
+    "",
+  );
+  assert.notEqual(validateFiles([{ ...file, size: 0 }]), "");
+  assert.notEqual(validateFiles(Array(6).fill(file)), "");
+  assert.notEqual(validateFiles([{ ...file, size: 11 * 1024 * 1024 }]), "");
+  assert.notEqual(
+    validateFiles([
+      { ...file, type: "application/x-msdownload", name: "program.exe" },
+    ]),
+    "",
+  );
+});
+test("dashboard statistics and combined filters reflect only matching data", () => {
+  const { issues } = makeDemo();
+  assert.deepEqual(stats(issues), {
+    total: 6,
+    open: 4,
+    progress: 1,
+    resolved: 2,
+    critical: 1,
+  });
+  assert.equal(
+    filterIssues(issues, { status: "New", priority: "Critical" }).length,
+    1,
+  );
+  assert.equal(filterIssues(issues, { search: "scanner" }).length, 1);
+  assert.equal(filterIssues(issues, { department: "unknown" }).length, 0);
+  assert.equal(issues.filter((i) => i.resolvedAt).length, 2);
+});
+test("CSV export escapes formulas, delimiters and control-prefixed payloads", () => {
+  for (const input of [
+    "=1+1",
+    "+cmd",
+    "-1+2",
+    "@SUM(A1)",
+    "\t=1",
+    "  =1",
+    "\r=1",
+  ])
+    assert.ok(csvCell(input).startsWith("\"'"));
+  assert.equal(csvCell('a"b,c'), '"a""b,c"');
+});
+test("managed usernames reject traversal and unsafe Windows names", () => {
+  assert.equal(safeUsername("phtuan"), true);
+  assert.equal(safeUsername("john.doe-01"), true);
+  for (const x of [
+    "../admin",
+    "C:\\Users\\admin",
+    "a..b",
+    "john doe",
+    "a/b",
+    "",
+    "x".repeat(65),
+  ])
+    assert.equal(safeUsername(x), false);
+});
+
+test("Windows challenges expire, bind the nonce, and cannot be reused", () => {
+  const proof = { username: "phtuan", nonce: "a".repeat(64) };
+  const c = {
+    username: "phtuan",
+    nonceHash: createHash("sha256").update(proof.nonce).digest("hex"),
+    expiresAt: 2000,
+    used: false,
+  };
+  assert.equal(challengeMatches(c, proof, 1000), true);
+  assert.equal(challengeMatches({ ...c, used: true }, proof, 1000), false);
+  assert.equal(challengeMatches(c, proof, 2000), false);
+  assert.equal(
+    challengeMatches(c, { ...proof, username: "other" }, 1000),
+    false,
+  );
+  assert.equal(
+    challengeMatches(c, { ...proof, nonce: "b".repeat(64) }, 1000),
+    false,
+  );
+});

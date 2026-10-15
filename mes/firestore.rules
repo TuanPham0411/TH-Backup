@@ -1,0 +1,25 @@
+rules_version = '2';
+service cloud.firestore {
+ match /databases/{database}/documents {
+  function owner(){return request.auth != null && 'email_verified' in request.auth.token && request.auth.token.email_verified == true && 'email' in request.auth.token && request.auth.token.email == 'eric.scorp93@gmail.com' && request.auth.token.firebase.sign_in_provider == 'google.com';}
+  function windowsRequired(){return !exists(/databases/$(database)/documents/settings/policy) || get(/databases/$(database)/documents/settings/policy).data.requiresWindows != false;}
+  function member(){return owner() || (request.auth != null
+   && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+   && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.active == true
+   && (!windowsRequired() || (
+    request.auth.token.windowsUsername == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.username
+    && request.auth.token.windowsVerifiedAt <= request.time.toMillis()
+    && request.time.toMillis() - request.auth.token.windowsVerifiedAt < 43200000
+    && get(/databases/$(database)/documents/devices/$(request.auth.token.mesDevice)).data.active == true))));}
+  match /issues/{issueId} {
+   allow read: if member();
+   allow write: if false;
+   match /timeline/{eventId} {allow read: if member();allow write: if false;}
+  }
+  match /teamLeaders/{id} {allow read: if member();allow write: if false;}
+  match /departments/{id} {allow read: if member();allow write: if false;}
+  match /users/{uid} {allow read: if owner() || (member() && request.auth.uid == uid);allow write: if false;}
+  match /settings/policy {allow read: if member();allow write: if false;}
+  // Devices, signing keys, challenges, username indexes and rate limits are server-only.
+ }
+}

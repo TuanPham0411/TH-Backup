@@ -1,0 +1,596 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="theme-color" content="#f3f6fb" />
+    <title>TH MES · Feedback & Issue Management</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <aside class="sidebar">
+      <a class="brand" href="#dashboard"
+        ><span class="brand-icon">M</span>
+        <div>TH MES<small>FEEDBACK WORKSPACE</small></div></a
+      >
+      <p class="nav-label">WORKSPACE</p>
+      <nav aria-label="Main navigation">
+        <button data-page="dashboard" class="active">
+          <span>◫</span>Dashboard</button
+        ><button data-page="issues">
+          <span>☷</span>Issue list <b id="nav-count">0</b></button
+        ><button data-page="create"><span>⊕</span>Submit feedback</button
+        ><button data-page="settings" id="admin-nav" hidden>
+          <span>⚙</span>Administration
+        </button>
+      </nav>
+      <div class="sidebar-bottom">
+        <div class="connection">
+          <span></span>
+          <div id="connection-state">Connecting…</div>
+        </div>
+        <button id="account-button" class="account-button">
+          <span class="avatar" id="avatar">V</span>
+          <div>
+            <strong id="account-name">Viewer</strong
+            ><small id="account-role">Read-only access</small>
+          </div>
+          <span>↗</span>
+        </button>
+      </div>
+    </aside>
+    <div class="app-shell">
+      <header class="topbar">
+        <button
+          id="mobile-nav"
+          aria-label="Toggle navigation"
+          aria-expanded="false"
+        >
+          ☰
+        </button>
+        <div class="breadcrumb">
+          Workspace <span>/</span> <strong id="page-crumb">Dashboard</strong>
+        </div>
+        <div class="topbar-actions">
+          <span class="environment">MES · VIETNAM</span
+          ><button
+            id="refresh-button"
+            class="icon-button"
+            aria-label="Refresh data"
+          >
+            ↻</button
+          ><button id="new-feedback" class="button primary">
+            ＋ New feedback
+          </button>
+        </div>
+      </header>
+      <div id="preview-banner" class="preview-banner" hidden>
+        <div>
+          <strong>Interface preview · sample data</strong
+          ><span
+            >This preview is disconnected from production. Changes stay in this
+            browser session and are not submitted.</span
+          >
+        </div>
+        <button id="preview-admin" class="button small">
+          Explore admin preview
+        </button>
+      </div>
+      <div id="global-message" role="status" aria-live="polite" hidden></div>
+      <main>
+        <section id="dashboard-page" class="page">
+          <div class="page-heading">
+            <div>
+              <p class="eyebrow">MES FEEDBACK MANAGEMENT</p>
+              <h1>Dashboard</h1>
+              <p class="subtitle">
+                A clear view of feedback, priorities and resolution progress.
+              </p>
+            </div>
+            <div class="heading-actions">
+              <label class="date-range"
+                >Reporting period<select id="dashboard-period">
+                  <option value="all">All time</option>
+                  <option value="7">Last 7 days</option>
+                  <option value="30">Last 30 days</option>
+                  <option value="90">Last 90 days</option>
+                </select></label
+              >
+            </div>
+          </div>
+          <div id="metrics" class="metrics"></div>
+          <div class="chart-grid">
+            <article class="card chart-card wide-chart">
+              <div class="card-heading">
+                <div>
+                  <h2>Feedback activity</h2>
+                  <p>New submissions and resolutions · last 7 days</p>
+                </div>
+                <span class="legend"
+                  ><i></i> Submitted <i class="green"></i> Resolved</span
+                >
+              </div>
+              <div
+                id="activity-chart"
+                class="activity-chart"
+                role="img"
+                aria-label="Feedback activity chart"
+              ></div>
+            </article>
+            <article class="card">
+              <div class="card-heading">
+                <div>
+                  <h2>Status overview</h2>
+                  <p>Distribution of current feedback</p>
+                </div>
+              </div>
+              <div id="status-chart" class="status-chart"></div>
+            </article>
+          </div>
+          <div class="chart-grid second-grid">
+            <article class="card">
+              <div class="card-heading">
+                <div>
+                  <h2>By department</h2>
+                  <p>Where feedback is coming from</p>
+                </div>
+              </div>
+              <div id="department-chart" class="department-chart"></div>
+            </article>
+            <article class="card">
+              <div class="card-heading">
+                <div>
+                  <h2>Recent feedback</h2>
+                  <p>Latest updates across the workspace</p>
+                </div>
+                <button class="text-button" id="view-all">View all →</button>
+              </div>
+              <div id="recent-issues"></div>
+            </article>
+          </div>
+        </section>
+        <section id="issues-page" class="page" hidden>
+          <div class="page-heading">
+            <div>
+              <p class="eyebrow">TRACK & FOLLOW UP</p>
+              <h1>Issue list</h1>
+              <p class="subtitle">
+                View feedback details, handling progress and the complete
+                timeline.
+              </p>
+            </div>
+            <button id="export-issues" class="button">↓ Export CSV</button>
+          </div>
+          <div class="card">
+            <div class="filter-toolbar">
+              <label class="search-field"
+                ><span class="sr-only">Search issues</span
+                ><input
+                  id="issue-search"
+                  type="search"
+                  placeholder="Search ID, feedback, process, reporter…" /></label
+              ><select id="issue-status" aria-label="Filter by status"></select
+              ><select
+                id="issue-department"
+                aria-label="Filter by department"
+              ></select
+              ><select
+                id="issue-priority"
+                aria-label="Filter by priority"
+              ></select
+              ><button id="clear-filters" class="text-button">Reset</button>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Issue / Feedback</th>
+                    <th>Department / Process</th>
+                    <th>Reporter</th>
+                    <th>Priority</th>
+                    <th>Status</th>
+                    <th>Updated</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody id="issue-rows"></tbody>
+              </table>
+            </div>
+            <div id="issue-pagination" class="table-footer"></div>
+          </div>
+        </section>
+        <section id="create-page" class="page" hidden>
+          <div class="page-heading">
+            <div>
+              <p class="eyebrow">CONTINUOUS IMPROVEMENT</p>
+              <h1>Submit feedback</h1>
+              <p class="subtitle">
+                Describe the MES issue and attach relevant evidence.
+              </p>
+            </div>
+          </div>
+          <div id="identity-notice" class="notice"></div>
+          <div class="form-layout">
+            <form id="feedback-form" class="card form-card">
+              <h2>Feedback information</h2>
+              <div class="form-grid">
+                <div>
+                  <label for="reporter-select"
+                    >Your display name <span>*</span></label
+                  ><select id="reporter-select" required></select>
+                </div>
+                <div>
+                  <label for="leader-select">Team Leader <span>*</span></label
+                  ><select id="leader-select" required></select>
+                </div>
+                <div>
+                  <label for="department-select"
+                    >Department <span>*</span></label
+                  ><select id="department-select" required></select>
+                </div>
+                <div>
+                  <label for="process-input"
+                    >Process / Station <span>*</span></label
+                  ><input
+                    id="process-input"
+                    required
+                    maxlength="120"
+                    placeholder="e.g. Assembly line 2 / Station 04"
+                  />
+                </div>
+              </div>
+              <label for="subject-input">Feedback title <span>*</span></label
+              ><input
+                id="subject-input"
+                required
+                maxlength="160"
+                placeholder="Summarize the issue in one sentence"
+              /><label for="description-input"
+                >Feedback details <span>*</span></label
+              ><textarea
+                id="description-input"
+                rows="6"
+                required
+                minlength="10"
+                maxlength="5000"
+                placeholder="What happened? What did you expect? Include the time, station and steps to reproduce."
+              ></textarea
+              ><label for="attachment-input">Attachments</label
+              ><label class="upload-zone" for="attachment-input"
+                ><span>↥</span><strong>Choose files from your computer</strong
+                ><small
+                  >Up to 5 files · 10 MB each · JPG, PNG, WEBP, PDF, TXT, CSV,
+                  XLSX</small
+                ><input
+                  id="attachment-input"
+                  type="file"
+                  multiple
+                  accept=".jpg,.jpeg,.png,.webp,.pdf,.txt,.csv,.xlsx"
+              /></label>
+              <div id="selected-files"></div>
+              <div class="form-footer">
+                <p>
+                  Feedback is visible to workspace members.<br />Do not attach
+                  passwords or sensitive production data.
+                </p>
+                <button
+                  class="button primary"
+                  id="submit-feedback"
+                  type="submit"
+                >
+                  Submit feedback →
+                </button>
+              </div>
+              <p id="create-status" role="status" aria-live="polite"></p>
+            </form>
+            <aside class="card guidance">
+              <span class="guidance-icon">i</span>
+              <h2>Make feedback actionable</h2>
+              <ol>
+                <li>
+                  <strong>Be specific</strong>
+                  <p>Identify the process and the exact symptom.</p>
+                </li>
+                <li>
+                  <strong>Include context</strong>
+                  <p>Add the time, error message and relevant screenshots.</p>
+                </li>
+                <li>
+                  <strong>Track the response</strong>
+                  <p>Open the issue timeline to follow the owner's updates.</p>
+                </li>
+              </ol>
+              <div class="notice">
+                Only the MES owner can change priorities, handling status and
+                assessments.
+              </div>
+            </aside>
+          </div>
+        </section>
+        <section id="detail-page" class="page" hidden>
+          <button id="back-to-issues" class="text-button">
+            ← Back to issue list
+          </button>
+          <div id="detail-heading" class="page-heading"></div>
+          <div class="detail-layout">
+            <div>
+              <article
+                id="detail-content"
+                class="card detail-content"
+              ></article>
+              <article class="card timeline-card">
+                <div class="card-heading">
+                  <div>
+                    <h2>Activity & handling timeline</h2>
+                    <p>Every recorded update in chronological order.</p>
+                  </div>
+                </div>
+                <div id="issue-timeline" class="timeline"></div>
+                <form id="comment-form" hidden>
+                  <label for="comment-input"
+                    >Owner response / handling note</label
+                  ><textarea
+                    id="comment-input"
+                    rows="4"
+                    maxlength="3000"
+                    required
+                    placeholder="Describe the action taken, request information or add an assessment."
+                  ></textarea>
+                  <div class="form-footer">
+                    <span></span
+                    ><button class="button primary" type="submit">
+                      Post update
+                    </button>
+                  </div>
+                </form>
+                <p id="comment-status" role="status"></p>
+              </article>
+            </div>
+            <aside>
+              <form id="handling-form" class="card handling-card">
+                <h2>Issue handling</h2>
+                <label for="handling-status">Status</label
+                ><select id="handling-status"></select
+                ><label for="handling-priority">Priority</label
+                ><select id="handling-priority"></select
+                ><label for="handling-assessment">Owner assessment</label
+                ><textarea
+                  id="handling-assessment"
+                  rows="4"
+                  maxlength="3000"
+                  placeholder="Analysis, root cause or conclusion"
+                ></textarea
+                ><label for="handling-note">Reason for this update</label
+                ><input
+                  id="handling-note"
+                  maxlength="500"
+                  placeholder="Optional context for the timeline"
+                /><button
+                  class="button primary full"
+                  type="submit"
+                  id="save-handling"
+                >
+                  Save changes
+                </button>
+                <p id="handling-status-message" role="status"></p>
+              </form>
+              <div class="card detail-meta" id="detail-meta"></div>
+              <div id="admin-issue-actions" class="card" hidden>
+                <h2>Owner controls</h2>
+                <button id="edit-issue" class="button full">
+                  Edit feedback</button
+                ><button id="delete-issue" class="button danger full">
+                  Delete issue
+                </button>
+              </div>
+            </aside>
+          </div>
+        </section>
+        <section id="settings-page" class="page" hidden>
+          <div class="page-heading">
+            <div>
+              <p class="eyebrow">OWNER CONTROLS</p>
+              <h1>Administration</h1>
+              <p class="subtitle">
+                Maintain the directories used by feedback submitters.
+              </p>
+            </div>
+          </div>
+          <div class="settings-grid">
+            <article class="card">
+              <h2>Team Leaders</h2>
+              <form id="leader-form" class="inline-form">
+                <input
+                  id="leader-name"
+                  required
+                  maxlength="80"
+                  placeholder="Team Leader name"
+                  aria-label="Team Leader name"
+                /><button class="button primary">Add</button>
+              </form>
+              <div id="leader-list"></div>
+            </article>
+            <article class="card">
+              <h2>Departments</h2>
+              <form id="department-form" class="inline-form">
+                <input
+                  id="department-name"
+                  required
+                  maxlength="80"
+                  placeholder="Department name"
+                  aria-label="Department name"
+                /><button class="button primary">Add</button>
+              </form>
+              <div id="department-list"></div>
+            </article>
+          </div>
+          <article class="card users-card">
+            <div class="card-heading">
+              <div>
+                <h2>User directory</h2>
+                <p>
+                  Managed usernames and display names. Deactivated users cannot
+                  submit.
+                </p>
+              </div>
+            </div>
+            <form id="user-form" class="form-grid user-form">
+              <div>
+                <label for="new-username">Windows username</label
+                ><input
+                  id="new-username"
+                  required
+                  maxlength="64"
+                  pattern="[a-z0-9][a-z0-9._-]*"
+                  placeholder="e.g. phtuan"
+                />
+              </div>
+              <div>
+                <label for="new-display-name">Display name</label
+                ><input
+                  id="new-display-name"
+                  required
+                  maxlength="80"
+                  placeholder="e.g. Pham Hoang Tuan"
+                />
+              </div>
+              <div class="user-submit">
+                <button class="button primary">Create user</button>
+              </div>
+            </form>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Display name</th>
+                    <th>Username</th>
+                    <th>State</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="user-rows"></tbody>
+              </table>
+            </div>
+          </article>
+          <div class="settings-grid">
+            <article class="card">
+              <h2>Submission policy</h2>
+              <label class="checkbox"
+                ><input id="require-windows" type="checkbox" checked /> Require
+                a signed Windows profile verification before submission</label
+              >
+              <p class="helper">
+                A browser cannot inspect C:\Users. The local agent signs a
+                challenge only when the selected username matches a profile
+                folder.
+              </p>
+              <button id="save-policy" class="button primary">
+                Save policy
+              </button>
+            </article>
+            <article class="card">
+              <h2>Registered Windows devices</h2>
+              <form id="device-form" class="inline-form">
+                <input
+                  id="device-label"
+                  maxlength="80"
+                  required
+                  placeholder="Device label"
+                  aria-label="Device label"
+                /><button class="button primary">Register device</button>
+              </form>
+              <p class="helper">
+                A one-time device key is issued for the local agent. Treat it as
+                a credential; never paste it in chat.
+              </p>
+              <div id="device-result" class="device-result" hidden></div>
+              <div id="device-list"></div>
+            </article>
+          </div>
+          <p id="settings-status" role="status"></p>
+        </section>
+      </main>
+      <footer class="app-footer">
+        <span>TH MES · Feedback & Issue Management</span
+        ><span id="data-scope"
+          >Workspace access is controlled by the owner.</span
+        >
+      </footer>
+    </div>
+    <dialog id="account-dialog" aria-labelledby="account-title">
+      <button
+        class="dialog-close"
+        data-close="account-dialog"
+        aria-label="Close"
+      >
+        ×
+      </button>
+      <p class="eyebrow">TH MES ACCESS</p>
+      <h2 id="account-title">Identify yourself</h2>
+      <div class="auth-tabs">
+        <button id="user-login-tab" aria-pressed="true">User</button
+        ><button id="admin-login-tab" aria-pressed="false">Owner</button>
+      </div>
+      <form id="windows-login-form">
+        <label for="login-user">Your display name</label
+        ><select id="login-user" required></select>
+        <p class="helper">
+          With Windows verification enabled, the installed agent checks C:\Users
+          and signs a short-lived challenge. A typed username alone is not
+          proof.
+        </p>
+        <button class="button primary full">Verify this Windows computer</button
+        ><a
+          class="text-button agent-download"
+          href="/downloads/th-mes-agent.zip"
+          download
+          >Download Windows agent & setup guide ↓</a
+        >
+      </form>
+      <div id="admin-login-form" hidden>
+        <p class="helper">
+          Only the single Google account registered as the MES owner can manage
+          the workspace.
+        </p>
+        <button
+          id="owner-google-login"
+          class="button primary full"
+          type="button"
+        >
+          Continue with Google
+        </button>
+      </div>
+      <div id="signed-in-account" hidden>
+        <p id="signed-in-summary"></p>
+        <button id="sign-out" class="button full">Sign out</button>
+      </div>
+      <p id="account-status" role="status" aria-live="polite"></p>
+    </dialog>
+    <dialog id="edit-dialog" aria-labelledby="edit-title">
+      <button class="dialog-close" data-close="edit-dialog" aria-label="Close">
+        ×
+      </button>
+      <h2 id="edit-title">Edit feedback</h2>
+      <form id="edit-form">
+        <label for="edit-subject">Title</label
+        ><input id="edit-subject" maxlength="160" required /><label
+          for="edit-process"
+          >Process</label
+        ><input id="edit-process" maxlength="120" required /><label
+          for="edit-description"
+          >Description</label
+        ><textarea
+          id="edit-description"
+          maxlength="5000"
+          minlength="10"
+          required
+          rows="6"
+        ></textarea
+        ><button class="button primary full">Save feedback changes</button>
+        <p id="edit-status" role="status"></p>
+      </form>
+    </dialog>
+    <div id="toast" class="toast" role="status" hidden></div>
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>

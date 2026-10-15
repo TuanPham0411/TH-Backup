@@ -1,0 +1,14 @@
+{
+  "functions": [
+    { "source": "functions", "codebase": "mes", "runtime": "nodejs22" }
+  ],
+  "firestore": { "rules": "firestore.rules" },
+  "storage": { "rules": "storage.rules" },
+  "emulators": {
+    "firestore": { "host": "127.0.0.1", "port": 8086 },
+    "storage": { "host": "127.0.0.1", "port": 9198 },
+    "functions": { "host": "127.0.0.1", "port": 5002 },
+    "auth": { "host": "127.0.0.1", "port": 9098 },
+    "ui": { "enabled": false }
+  }
+}
