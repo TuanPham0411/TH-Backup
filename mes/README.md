@@ -81,7 +81,7 @@ Google OAuth setup does not require Firebase Blaze.
 
 In Supabase **Authentication → URL Configuration** set Site URL to
 `https://mes.th.io.vn` and allow that exact URL plus the exact new Netlify hostname
-once it exists. Do not use broad wildcard redirect URLs. Keep Google signup enabled
+(https://mes-th.netlify.app). Do not use broad wildcard redirect URLs. Keep Google signup enabled
 for the owner's first login; the Edge API rejects every other Google email. Managed
 operators do not need Supabase Auth accounts, emails or passwords.
 
@@ -108,10 +108,10 @@ For a new Netlify hostname add it to the exact CORS allowlist in the Function's
 secrets/settings, for example set MES_ALLOWED_ORIGINS to:
 
 ```
-https://mes.th.io.vn,https://YOUR-NEW-MES-SITE.netlify.app
+https://mes.th.io.vn,https://mes-th.netlify.app
 ```
 
-Default is only https://mes.th.io.vn. For local development explicitly add the exact
+Defaults allow https://mes.th.io.vn and https://mes-th.netlify.app. For local development explicitly add the exact
 local origin in a local functions environment file. Do not use `*` with sessions.
 No Firebase Storage CORS command or Google service-account IAM setup is needed.
 

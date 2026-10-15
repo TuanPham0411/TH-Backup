@@ -3,7 +3,7 @@ import { isGoogleOwner, validPath, publicAction } from './policy.ts';
 const url = Deno.env.get('SUPABASE_URL')!;
 const service = createClient(url, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, { auth: { persistSession: false, autoRefreshToken: false } });
 const bucket = service.storage.from('mes-attachments');
-const origins = new Set((Deno.env.get('MES_ALLOWED_ORIGINS') || 'https://mes.th.io.vn').split(',').map(v => v.trim()));
+const origins = new Set((Deno.env.get('MES_ALLOWED_ORIGINS') || 'https://mes.th.io.vn,https://mes-th.netlify.app').split(',').map(v => v.trim()));
 Deno.serve(async (request) => {
   const origin = request.headers.get('origin');
   const headers = { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'Vary': 'Origin',
@@ -72,7 +72,9 @@ Deno.serve(async (request) => {
       }
       return reply(await dispatch('finishDelete'));
     }
-    return reply(await dispatch(name));
+    const result = await dispatch(name);
+    if (name === 'registerDevice') result.allowedOrigins = [...origins];
+    return reply(result);
   } catch (error) {
     const e = error as { code?: string; message?: string };
     // Do not send SQL details, tokens, device secrets or platform internals to callers.

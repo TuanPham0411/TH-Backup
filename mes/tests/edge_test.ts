@@ -29,6 +29,8 @@ Deno.test('MES Edge authorization and request routing', async (t) => {
   await t.step('exact CORS and preflight', async () => {
     assert((await handler(request('getDirectory', {}, { origin: 'https://evil.example' }))).status === 403, 'foreign origin allowed');
     const preflight = await handler(new Request('https://test', { method: 'OPTIONS', headers: { origin } }));
+    const staging = await handler(new Request('https://test', { method: 'OPTIONS', headers: { origin: 'https://mes-th.netlify.app' } }));
+    assert(staging.headers.get('access-control-allow-origin') === 'https://mes-th.netlify.app', 'MES Netlify origin denied');
     assert(preflight.status === 204 && preflight.headers.get('access-control-allow-origin') === origin, 'CORS preflight failed');
   });
   await t.step('anonymous directory cannot forge actor', async () => {
