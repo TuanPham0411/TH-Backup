@@ -67,8 +67,6 @@ jobs:
             work/release.sha256
           retention-days: 7
   deploy:
-    env:
-      SUDO_BOOTSTRAP_CIPHERTEXT: w15koQT3jD2aPTzBJ41rfKBzWv/+M11OPphJnW0Xkew7I6J5za9rZAxthxZl9zGczGco2/yAT2CfBSeyW/PxTFOs0Ot7oZEfVzXKUa9MI7tGyf6IKepHk7YPOh5VtIt0OAcj9/X0/AvGrn+eOrVQ1e737jMNDOwe5Ci9eu6HM7Ns/N6xi9hFm4ePEfVOmziIubAi82K72xyWIZPD7yReRlN3f8gKzGRZ7/6gRgQP9UdmxJpnaX1E+3aYNllSX7/jijgQoLtYv1VDRBtUn7A5XFpA6fclDwI+hYHmP2d02SwJNXoOyeaVl+vuJE68i1Q1kElQBuPe/kzcOzi5X0VAgRDZNEVgT+odVNJbo3TNRQFstlWe0I7gZ8raLAfVcxHwfa8sNXkAqrXYjGSsh7muLB3XOlScixWhu+/9EFm9LwLcicoL4e/OTyAyMFBCr2KCFaxRtpP1aWV+ttlVKTT4Gh608YgdhEKpDcUsTF2tLsd+0T/aNjwD6YZ7PbwOvUjv
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     needs: build
     runs-on: [self-hosted, Linux, ARM64]
@@ -78,24 +76,8 @@ jobs:
         env:
           SELECTED_RUNNER: ${{ runner.name }}
         run: test "$SELECTED_RUNNER" = th-server
-      - name: Check deployment sudo permissions
-        shell: bash
-        run: |
-          sudo -n -l || true
-          if sudo -n /usr/local/sbin/th-deploy --check 2>/dev/null; then
-            echo 'Root-owned deployment entrypoint is available.'
-          elif [[ -n ${SUDO_BOOTSTRAP_CIPHERTEXT:-} && -f /var/tmp/th-pi-deploy-auth/key.pem ]]; then
-            echo 'Encrypted one-time bootstrap is available.'
-          elif ! sudo -n bash -c true; then
-            auth_dir=/var/tmp/th-pi-deploy-auth
-            install -d -m 700 "$auth_dir"
-            test "$(stat -c %u "$auth_dir")" = "$(id -u)"
-            umask 077
-            test -f "$auth_dir/key.pem" || openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:3072 -out "$auth_dir/key.pem" 2>/dev/null
-            openssl pkey -in "$auth_dir/key.pem" -pubout
-            echo 'Installer requires password transport; public key above is safe to disclose.'
-            exit 1
-          fi
+      - name: Check deployment sudo permission
+        run: sudo -n /usr/local/sbin/th-deploy --check
       # No checkout/build/package installation on the Pi. Never run PR code here.
       - uses: actions/download-artifact@v4
         with:
@@ -112,17 +94,7 @@ jobs:
           sha256sum -c release.sha256
           mkdir unpacked
           tar -xzf release.tar.gz -C unpacked
-          if sudo -n /usr/local/sbin/th-deploy --check 2>/dev/null; then
-            sudo -n /usr/local/sbin/th-deploy "$PWD/unpacked" "$RELEASE_ID"
-          elif [[ -n ${SUDO_BOOTSTRAP_CIPHERTEXT:-} ]]; then
-            trap 'rm -rf /var/tmp/th-pi-deploy-auth' EXIT
-            printf '%s' "$SUDO_BOOTSTRAP_CIPHERTEXT" | base64 -d | \
-              openssl pkeyutl -decrypt -inkey /var/tmp/th-pi-deploy-auth/key.pem \
-                -pkeyopt rsa_padding_mode:oaep -pkeyopt rsa_oaep_md:sha256 | \
-              sudo -S -k -p '' bash unpacked/deploy/install.sh "$PWD/unpacked" "$RELEASE_ID"
-          else
-            sudo -n bash unpacked/deploy/install.sh "$PWD/unpacked" "$RELEASE_ID"
-          fi
+          sudo -n /usr/local/sbin/th-deploy "$PWD/unpacked" "$RELEASE_ID"
       - name: Remove downloaded artifact
         if: always()
         shell: bash

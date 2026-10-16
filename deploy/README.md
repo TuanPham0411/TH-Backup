@@ -8,6 +8,8 @@ The installer has no Cloudflare or SSH mutation commands. Live deployment still 
 
 ## First installation
 
+`th-server` has now been initialized with the root-owned deployment entrypoint. The normal workflow uses only that command. For a different fresh Pi, download/extract a built artifact and run `sudo bash ARTIFACT/deploy/install.sh ARTIFACT RELEASE_ID` once from an administrative shell before enabling automatic deployment. The installer creates the dedicated sudo rule after a healthy rollout.
+
 1. Push reviewed source to `main` (or manually run **Build and deploy Pi** on `main`). GitHub builds both static sites, the dependency-bundled API/migration runner, and downloads/checksums the official Node.js 22 Linux ARM64 runtime. No Node/npm preinstallation or compilation on Pi is needed. Deployment receives only the artifact and verifies its SHA-256 checksum.
 2. Installer checks ARM64, existing Nginx/PostgreSQL services and overlapping host blocks. If an enabled Nginx site already owns either hostname, deployment stops **before changes** with a specific conflict message. Review `sudo nginx -T` on Pi and consolidate only those two host blocks. Preserve all other hosts and the Tunnel's existing local origin/port. The supplied configuration listens on port 80; if the existing Tunnel uses another port, adjust `deploy/nginx.conf` to that existing origin before deploying. The installer never edits the Tunnel.
 3. On first successful installation, the installer creates system user `thapp`, database `th_app`, database login `th_api` with a random password, `/var/lib/th-app/files`, and root-only `/etc/th-app/runtime.env`. Existing database/role name collisions stop provisioning; it does not drop existing databases. Runtime DB role cannot read MES credential tables or invoke bootstrap activation directly.
@@ -25,7 +27,7 @@ The installer has no Cloudflare or SSH mutation commands. Live deployment still 
 
 ## Sudo bootstrap
 
-The runner initially required a sudo password despite the earlier cached `sudo -n true` check. One-time password transport uses RSA-OAEP-SHA256 with a private key generated on Pi under `/var/tmp/th-pi-deploy-auth` (mode 700). Only the public key and encrypted ciphertext pass through GitHub; the password is piped directly into `sudo -S` and never logged or written as plaintext. The key is deleted after the bootstrap attempt. The temporary ciphertext is removed from the workflow after successful bootstrap.
+The runner initially required a sudo password despite the earlier cached `sudo -n true` check. One-time password transport uses RSA-OAEP-SHA256 with a private key generated on Pi under `/var/tmp/th-pi-deploy-auth` (mode 700). Only the public key and encrypted ciphertext pass through GitHub; the password is piped directly into `sudo -S` and never logged or written as plaintext. The key is deleted after the bootstrap attempt. The temporary ciphertext has been removed from the current workflow after successful bootstrap. The bootstrap transport is not needed by the normal workflow.
 
 A successful install creates the root-owned `/usr/local/sbin/th-deploy` entrypoint and `/etc/sudoers.d/th-app-deploy`, allowing only that deployment command without a password for `thadmin`. Subsequent releases invoke this entrypoint; the runner has no need for passwordless arbitrary shell commands. Keep repository workflow write access restricted to trusted maintainers, since deployment artifacts include service configuration and migrations.
 
