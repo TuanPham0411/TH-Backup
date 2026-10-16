@@ -3,16 +3,42 @@
 set -euo pipefail
 [[ $(id -u) == 0 ]] || { echo 'Run using sudo'; exit 1; }
 if [[ ${1:-} == --check ]]; then exit 0; fi
+if [[ ${1:-} == --inspect-routing ]]; then
+  nginx -T 2>&1 | awk '/^# configuration file / || /^[[:space:]]*(listen|server_name|root)[[:space:]]/ {print}'
+  python3 - <<'ROUTING'
+from pathlib import Path
+import re
+from urllib.parse import urlparse
+found=False
+for path in [Path('/etc/cloudflared/config.yml'),Path('/etc/cloudflared/config.yaml'),Path('/home/thadmin/.cloudflared/config.yml')]:
+ if not path.is_file(): continue
+ found=True
+ print('Tunnel config:',path)
+ for line in path.read_text().splitlines():
+  match=re.match(r'\s*(?:-\s*)?(hostname|service):\s*[\"\']?([^\"\'#]+)',line)
+  if not match: continue
+  key,value=match.groups();value=value.strip()
+  if key=='hostname' and re.fullmatch(r'[a-zA-Z0-9.*_-]+',value): print('hostname:',value)
+  elif key=='service':
+   if re.fullmatch(r'http_status:[0-9]+',value): print('service:',value)
+   else:
+    parsed=urlparse(value)
+    if parsed.scheme in ('http','https','ssh','tcp'): print('service:',parsed.scheme,parsed.hostname,parsed.port)
+if not found: print('No local tunnel ingress file found at standard paths; dashboard-managed routing may be in use.')
+ROUTING
+  systemctl is-active ssh cloudflared nginx postgresql th-app
+  exit 0
+fi
 release_source=$(realpath "${1:?Pass the extracted artifact directory}")
 release_id=${2:?Pass a release ID}
 [[ $release_id =~ ^[a-zA-Z0-9_-]+$ ]] || exit 1
 [[ $(uname -m) == aarch64 ]] || { echo 'ARM64 is required'; exit 1; }
 systemctl is-active --quiet postgresql nginx
-for required in runtime/bin/node server/app.cjs server/migrate.cjs web/index.html mes/index.html deploy/th-app.service deploy/nginx.conf; do
+for required in runtime/bin/node server/app.cjs server/migrate.cjs web/index.html mes/index.html deploy/th-app.service deploy/nginx.conf deploy/entrypoint.sh deploy/check-nginx.py; do
  [[ -f "$release_source/$required" ]] || { echo "Missing $required"; exit 1; }
 done
 # Refuse overlapping host configuration; leave the existing sites untouched.
-if nginx -T 2>&1 | awk '/^# configuration file / {file=$4} /server_name.*(mes\.)?th\.io\.vn/ {if(file!="\/etc\/nginx\/sites-enabled\/th-app:") found=1} END {exit !found}'; then
+if ! nginx -T 2>&1 | python3 "$release_source/deploy/check-nginx.py"; then
  echo 'Existing Nginx configuration owns th.io.vn/mes.th.io.vn. Consolidate those host blocks before deploying.' >&2
  exit 1
 fi
@@ -77,7 +103,7 @@ curl -fsS -H 'Host: mes.th.io.vn' http://127.0.0.1/ >/dev/null
 curl -fsS -H 'Host: mes.th.io.vn' -H 'Content-Type: application/json' --data '{"name":"getDirectory"}' http://127.0.0.1/api/mes >/dev/null
 systemctl is-active ssh cloudflared nginx postgresql th-app
 # Future releases use this root-owned entrypoint with a dedicated sudo rule.
-install -m 755 "$target/deploy/install.sh" /usr/local/sbin/th-deploy
+install -m 755 "$target/deploy/entrypoint.sh" /usr/local/sbin/th-deploy
 printf '%s\n' 'thadmin ALL=(root) NOPASSWD: /usr/local/sbin/th-deploy *' > "$backup/sudoers"
 visudo -cf "$backup/sudoers"
 install -m 440 "$backup/sudoers" /etc/sudoers.d/th-app-deploy

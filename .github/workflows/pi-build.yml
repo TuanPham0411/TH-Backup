@@ -1,20 +1,129 @@
-name: Prepare Pi deployment repair
+name: Build and deploy Pi
 on:
   push:
     branches: [main]
-permissions: {}
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: pi-${{ github.ref }}
+  cancel-in-progress: false
 jobs:
-  prepare:
-    runs-on: [self-hosted, Linux, ARM64]
-    timeout-minutes: 3
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: test-only
+          POSTGRES_DB: th_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
     steps:
-      - name: Create one-time encrypted transport key
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run test:pi
+        env:
+          TEST_DATABASE_URL: postgresql://postgres:test-only@127.0.0.1:5432/th_test
+      - run: npm run build && npm run build:mes && npm run build:server
+      - name: Include verified Node.js ARM64 runtime
         shell: bash
         run: |
           set -euo pipefail
-          auth_dir=/var/tmp/th-pi-deploy-auth
-          install -d -m 700 "$auth_dir"
-          test "$(stat -c %u "$auth_dir")" = "$(id -u)"
-          umask 077
-          test -f "$auth_dir/key.pem" || openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:3072 -out "$auth_dir/key.pem" 2>/dev/null
-          openssl pkey -in "$auth_dir/key.pem" -pubout
+          mkdir -p work/node dist/runtime
+          cd work/node
+          curl --fail --silent --show-error --location https://nodejs.org/dist/latest-v22.x/SHASUMS256.txt -o SHASUMS256.txt
+          archive=$(awk '$2 ~ /^node-v22\..*-linux-arm64.tar.xz$/ {print $2}' SHASUMS256.txt)
+          test -n "$archive"
+          curl --fail --silent --show-error --location "https://nodejs.org/dist/latest-v22.x/$archive" -o "$archive"
+          awk -v file="$archive" '$2 == file' SHASUMS256.txt | sha256sum -c -
+          tar -xJf "$archive" --strip-components=1 -C ../../dist/runtime
+          rm -rf ../../dist/runtime/lib/node_modules ../../dist/runtime/include ../../dist/runtime/share
+      - name: Package release
+        run: |
+          mkdir -p work/release
+          cp -a dist/web dist/server dist/runtime work/release/
+          cp -a mes/dist work/release/mes
+          cp -a deploy work/release/deploy
+          tar -C work/release -czf work/release.tar.gz .
+          cd work
+          sha256sum release.tar.gz > release.sha256
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pi-release
+          path: |
+            work/release.tar.gz
+            work/release.sha256
+          retention-days: 7
+  deploy:
+    env:
+      SUDO_BOOTSTRAP_CIPHERTEXT: P8ZTjySLWRlp4+YeTU120GLxvm9MZ59tSWw6dpt29q76cyATk5k9TpCM7aMBZErjoYFAMpoHKA+gynJdUvhWtfL1eNSdnTBW5vPuZC8N3yLfC1Q03XqPiIOOnpZCwFTaphD82BNhM/NHSfAPIe2FVPyAG0ngNjl4mMFFLFNUmE/pjfz8E8vcxKtEkJH/PklgUkY9shpaev3SkjDWIEtH3W+xvRFIaiv8j7r+/8R/Ozx8wn/9laYRs2UhjM9Qxn00EYg3EWKW0nl9HXA2Ae7KVn7Ik2NWWJrjjdAK3NL5sdZ7lsvhkeXeXEqzEPDYuC8/cwq4dTtSiKlJICXEwDR2uGWMV5iPLEwt1L6gW4hgQkQZ3X7QjnpyTx2UUZFQeAgUmJKmbwbQenFRXkp7mGAJwyj3S4f/LjaxT6fkbx8zvhefZmgaXeA5OArLPRgmjYkcKTwBMU+JDLMfXllpiUZYiPC7JvzN6UD2HHrk+Hr9178kgHskh3q2cAGcRYN6W79R
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    needs: build
+    runs-on: [self-hosted, Linux, ARM64]
+    timeout-minutes: 10
+    steps:
+      - name: Verify selected runner
+        env:
+          SELECTED_RUNNER: ${{ runner.name }}
+        run: test "$SELECTED_RUNNER" = th-server
+      - name: Check deployment sudo permission
+        run: sudo -n /usr/local/sbin/th-deploy --check
+      # No checkout/build/package installation on the Pi. Never run PR code here.
+      - uses: actions/download-artifact@v4
+        with:
+          name: pi-release
+          path: ${{ runner.temp }}/th-release-${{ github.run_id }}-${{ github.run_attempt }}
+      - name: Install release
+        shell: bash
+        env:
+          RELEASE_DIR: ${{ runner.temp }}/th-release-${{ github.run_id }}-${{ github.run_attempt }}
+          RELEASE_ID: ${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          set -euo pipefail
+          cd "$RELEASE_DIR"
+          sha256sum -c release.sha256
+          mkdir unpacked
+          tar -xzf release.tar.gz -C unpacked
+          trap 'rm -rf /var/tmp/th-pi-deploy-auth' EXIT
+          printf '%s' "$SUDO_BOOTSTRAP_CIPHERTEXT" | base64 -d | \
+            openssl pkeyutl -decrypt -inkey /var/tmp/th-pi-deploy-auth/key.pem \
+              -pkeyopt rsa_padding_mode:oaep -pkeyopt rsa_oaep_md:sha256 | \
+            sudo -S -k -p '' bash unpacked/deploy/install.sh "$PWD/unpacked" "$RELEASE_ID"
+      - name: Inspect routing without credentials
+        run: sudo -n /usr/local/sbin/th-deploy --inspect-routing
+      - name: Remove downloaded artifact
+        if: always()
+        shell: bash
+        env:
+          RELEASE_DIR: ${{ runner.temp }}/th-release-${{ github.run_id }}-${{ github.run_attempt }}
+        run: rm -rf -- "$RELEASE_DIR"
+  verify-public:
+    needs: deploy
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - name: Check HTTPS sites through Cloudflare from outside the Pi
+        shell: bash
+        run: |
+          set -euo pipefail
+          for host in th.io.vn mes.th.io.vn; do
+            echo "Checking https://$host"
+            curl --silent --show-error --head --max-time 20 "https://$host/"
+            curl --fail --silent --show-error --retry 3 --retry-delay 5 --max-time 20 "https://$host/" -o /dev/null
+            curl --fail --silent --show-error --retry 3 --retry-delay 5 --max-time 20 "https://$host/api/health" | python3 -c 'import json,sys; assert json.load(sys.stdin).get("ok") is True'
+          done
+          curl --fail --silent --show-error --max-time 20 \
+            -H 'Content-Type: application/json' --data '{"name":"getDirectory"}' \
+            https://mes.th.io.vn/api/mes | python3 -c 'import json,sys; assert json.load(sys.stdin).get("apiVersion") == "accounts-v1"'
