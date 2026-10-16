@@ -104,5 +104,18 @@ test('Google OAuth validates state and verified identity, sets local owner sessi
   identity={email:'eric.scorp93@gmail.com',email_verified:false};assert.equal((await callback()).status,401);
   identity={email:'eric.scorp93@gmail.com',email_verified:true};const success=await callback();assert.equal(success.status,302);assert.match(success.headers.get('set-cookie'),/th_mes=.*HttpOnly/);
   assert.equal((await api('getSession',{},success.headers.getSetCookie().find(v=>v.startsWith('th_mes=')).split(';')[0])).body.isOwner,true);
+  await pool.query("insert into portfolio.users(email,password,verified) values('eric.scorp93@gmail.com',extensions.crypt('attacker-password',extensions.gen_salt('bf',4)),false)");
+  const attackerLogin=await api('login',{email:'eric.scorp93@gmail.com',password:'attacker-password'},'','th.io.vn');
+  assert.equal(attackerLogin.status,200);
+  const portfolioStart=await fetch(base+'/api/oauth/start',{redirect:'manual',headers:{'x-forwarded-host':'th.io.vn'}});
+  const portfolioState=new URL(portfolioStart.headers.get('location')).searchParams.get('state');
+  const portfolioCookies=portfolioStart.headers.getSetCookie().map(v=>v.split(';')[0]).join('; ');
+  const portfolioGoogle=await fetch(base+`/api/oauth/callback?state=${portfolioState}&code=test`,{redirect:'manual',headers:{'x-forwarded-host':'th.io.vn',cookie:portfolioCookies}});
+  assert.equal(portfolioGoogle.status,302);
+  assert.equal((await api('session',{},attackerLogin.cookie,'th.io.vn')).body.user,null);
+  assert.equal((await api('login',{email:'eric.scorp93@gmail.com',password:'attacker-password'},'','th.io.vn')).status,401);
+  const ownerCookie=portfolioGoogle.headers.getSetCookie().find(v=>v.startsWith('th_portfolio=')).split(';')[0];
+  assert.equal((await api('session',{},ownerCookie,'th.io.vn')).body.user.isAdmin,true);
+
  }finally{globalThis.fetch=originalFetch;delete process.env.GOOGLE_CLIENT_ID;delete process.env.GOOGLE_CLIENT_SECRET;}
 });

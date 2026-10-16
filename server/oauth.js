@@ -24,7 +24,7 @@ export function oauthRouter(pool) {
    const {rows:[row]}=await pool.query('select public.mes_google_owner_session() as result');
    res.cookie('th_mes',row.result.sessionToken,{httpOnly:true,secure:true,sameSite:'lax',path:'/',maxAge:12*3600*1000});
   } else {
-   const {rows:[u]}=await pool.query("insert into portfolio.users(email,password,name,verified,admin) values($1,extensions.crypt($2,extensions.gen_salt('bf',10)),$3,true,$4) on conflict(email) do update set verified=true,admin=excluded.admin returning *",[user.email.toLowerCase(),token(),String(user.name||'').slice(0,80),user.email.toLowerCase()===(process.env.OWNER_EMAIL||'eric.scorp93@gmail.com').toLowerCase()]);
+   const {rows:[u]}=await pool.query("insert into portfolio.users(email,password,name,verified,admin) values($1,extensions.crypt($2,extensions.gen_salt('bf',10)),$3,true,$4) on conflict(email) do update set password=case when portfolio.users.verified then portfolio.users.password else excluded.password end,verified=true,admin=excluded.admin returning *",[user.email.toLowerCase(),token(),String(user.name||'').slice(0,80),user.email.toLowerCase()===(process.env.OWNER_EMAIL||'eric.scorp93@gmail.com').toLowerCase()]);
    await pool.query('delete from portfolio.sessions where uid=$1',[u.id]);
    const value=token();await pool.query('insert into portfolio.sessions(hash,uid) values($1,$2)',[hash(value),u.id]);setPortfolioCookie(res,value);
   }
