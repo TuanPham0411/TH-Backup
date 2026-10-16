@@ -47,12 +47,21 @@ if(true){try{const app=initializeApp();auth=getAuth(app);auth.languageCode='en';
 
 const accountParams=new URLSearchParams(location.hash.slice(1));
 if(accountParams.has('accountAction')) {
- (async ()=>{
-  const purpose=accountParams.get('accountAction'),token=accountParams.get('token');
-  history.replaceState(null,'','/');
-  let password;
-  if(purpose==='reset') password=window.prompt('Enter a new password (10–72 bytes):');
-  try { await consumeToken({purpose,token,password}); toast(purpose==='verify'?'Email verified. Sign in to continue.':'Password updated. Sign in again.'); }
-  catch { toast('Link expired or password invalid. Request a new email.'); }
- })();
+ const purpose=accountParams.get('accountAction'),token=accountParams.get('token');
+ history.replaceState(null,'','/');
+ if(purpose==='reset') {
+  const dialog=document.createElement('dialog');
+  dialog.innerHTML='<form><h2>Choose a new password</h2><label>New password<input type="password" name="password" minlength="10" maxlength="72" autocomplete="new-password" required></label><p role="status"></p><div class="button-row"><button class="button" type="submit">Save password</button><button class="text-button" type="button">Cancel</button></div></form>';
+  document.body.append(dialog);
+  dialog.querySelector('[type="button"]').onclick=()=>dialog.close();
+  dialog.querySelector('form').onsubmit=async e=>{
+   e.preventDefault(); const button=dialog.querySelector('[type="submit"]');button.disabled=true;
+   try { await consumeToken({purpose,token,password:dialog.querySelector('input').value});dialog.close();toast('Password updated. Sign in again.'); }
+   catch { dialog.querySelector('[role="status"]').textContent='Link expired or password invalid. Use 10 or more characters, up to 72 UTF-8 bytes, or request a new link.'; }
+   finally { button.disabled=false; }
+  };
+  dialog.showModal();
+ } else if(purpose==='verify') {
+  consumeToken({purpose,token}).then(()=>toast('Email verified. Sign in to continue.')).catch(()=>toast('Link expired. Request a new verification email.'));
+ }
 }

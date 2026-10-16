@@ -70,7 +70,7 @@ export function portfolioRouter(pool) {
   if(action==='set'&&ownProfile){if(typeof data.data?.displayName!=='string'||!data.data.displayName.trim()||data.data.displayName.length>80)return fail();await q('update portfolio.users set name=$2 where id=$1',[u.id,data.data.displayName.trim()]);return res.json({ok:true});}
   if(action==='list'&&(ownBookmarks||path==='inquiries')) {
    const all=path==='inquiries'&&u.admin&&!data.filters?.some(f=>f.field==='uid');
-   const {rows}=await q('select path,data from portfolio.records where path like $1 and ($2::boolean or uid=$3) order by path limit 100',[ownBookmarks?path+'/%':'inquiries/%',all,u.id]);
+   const {rows}=await q(`select path,data from portfolio.records where path like $1 and ($2::boolean or uid=$3) order by (data->'createdAt'->>'seconds')::bigint desc nulls last,path limit 100`,[ownBookmarks?path+'/%':'inquiries/%',all,u.id]);
    return res.json({rows:rows.map(r=>({id:r.path.split('/').pop(),data:r.data}))});
   }
   if(action==='add'&&path==='inquiries') {
