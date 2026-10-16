@@ -25,6 +25,21 @@ The installer has no Cloudflare or SSH mutation commands. Live deployment still 
 
    Open `https://mes.th.io.vn/#activate=CODE&username=hpham`, then choose a password. Activation is single-use, expires in 72 hours, and returns `already-activated` once the owner password is set. Google owner login can be used instead. The old Windows-agent sign-in is disabled by the existing account migration.
 
+## Cloudflare routes
+
+The Pi application is installed and its local HTTP/API checks pass. Public checks initially returned Cloudflare HTTP 404; the owner confirmed that the portfolio route had not yet been created.
+
+In Cloudflare Zero Trust, open the **existing** tunnel under Networks → Tunnels/Connectors, then Published application routes (also called Public Hostnames). Add these entries with no path restriction:
+
+| Public hostname | Service type | Service URL |
+| --- | --- | --- |
+| `th.io.vn` | HTTP | `localhost:80` |
+| `mes.th.io.vn` | HTTP | `localhost:80` |
+
+For the root hostname, leave Subdomain empty and select domain `th.io.vn`; for MES, set Subdomain to `mes`. Leave HTTP Host Header override unset so Nginx receives the original hostname. Preserve the existing SSH route. The dashboard normally creates the DNS record for a new route; resolve any conflicting DNS record for that same hostname deliberately. No tunnel token, SSH unit or tunnel service command is changed by the application deployment.
+
+After saving the routes, rerun the **verify-public** job in the latest Actions run. It tests the two public HTTPS roots, both `/api/health` endpoints and the MES API version. OAuth and email need the runtime settings described above as separate integration checks.
+
 ## Sudo bootstrap
 
 The runner initially required a sudo password despite the earlier cached `sudo -n true` check. One-time password transport uses RSA-OAEP-SHA256 with a private key generated on Pi under `/var/tmp/th-pi-deploy-auth` (mode 700). Only the public key and encrypted ciphertext pass through GitHub; the password is piped directly into `sudo -S` and never logged or written as plaintext. The key is deleted after the bootstrap attempt. The temporary ciphertext has been removed from the current workflow after successful bootstrap. The bootstrap transport is not needed by the normal workflow.
