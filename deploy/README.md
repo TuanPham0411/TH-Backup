@@ -38,7 +38,9 @@ In Cloudflare Zero Trust, open the **existing** tunnel under Networks → Tunnel
 
 For the root hostname, leave Subdomain empty and select domain `th.io.vn`; for MES, set Subdomain to `mes`. Leave HTTP Host Header override unset so Nginx receives the original hostname. Preserve the existing SSH route. The dashboard normally creates the DNS record for a new route; resolve any conflicting DNS record for that same hostname deliberately. No tunnel token, SSH unit or tunnel service command is changed by the application deployment.
 
-After saving the routes, rerun the **verify-public** job in the latest Actions run. It tests the two public HTTPS roots, both `/api/health` endpoints and the MES API version. OAuth and email need the runtime settings described above as separate integration checks.
+If `mes.th.io.vn` does not resolve, create/check a proxied DNS CNAME named `mes` in the `th.io.vn` zone, pointing to the same `TUNNEL_ID.cfargotunnel.com` target as the root domain. Editing a route hostname does not always synchronize an existing DNS record.
+
+After saving the routes and DNS, rerun the **verify-public** job in the latest Actions run. It tests the two public HTTPS roots, both `/api/health` endpoints and the MES API version. OAuth and email need the runtime settings described above as separate integration checks.
 
 ## Sudo bootstrap
 
