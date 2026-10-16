@@ -1,6 +1,10 @@
+import { t, initializeLanguage, getLanguage } from "./i18n.js";
 import "@fontsource/dm-sans/latin-400.css";
 import "@fontsource/dm-sans/latin-500.css";
 import "@fontsource/dm-sans/latin-600.css";
+import "@fontsource/dm-sans/latin-ext-400.css";
+import "@fontsource/dm-sans/latin-ext-500.css";
+import "@fontsource/dm-sans/latin-ext-600.css";
 import { initializeBackend, setTesterMode, api, watchAuth, ownerLogin, managedLogin, logout, watchRecords, uploadAttachment, downloadAttachment as fetchAttachment } from "./backend.js";
 import { configured, previewMode } from "./config.js";
 import {
@@ -53,7 +57,8 @@ const stamp = (v) =>
   typeof v === "number" ? v : v?.toMillis ? v.toMillis() : 0;
 const date = (v) =>
   stamp(v)
-    ? new Date(stamp(v)).toLocaleString("en-GB", {
+    ? new Date(stamp(v)).toLocaleString(getLanguage() === "vi" ? "vi-VN" : "en-GB", {
+        year: "numeric",
         day: "2-digit",
         month: "short",
         hour: "2-digit",
@@ -130,6 +135,7 @@ function selectOptions(node, items, { placeholder, selected } = {}) {
   for (const item of items) {
     const option = el("option", item.name || item.displayName || item);
     option.value = item.id || item;
+    if (typeof item === "object" && !["All", ...statuses, ...priorities].includes(item.id)) option.dataset.userContent = "";
     node.append(option);
   }
   if ([...node.options].some((o) => o.value === previous))
@@ -187,9 +193,6 @@ function navigate(page) {
 }
 function renderDirectories() {
   const active = (items) => items.filter((x) => x.active !== false);
-  selectOptions($("leader-select"), active(state.leaders), {
-    placeholder: "Select Team Leader",
-  });
   selectOptions($("department-select"), active(state.departments), {
     placeholder: "Select department",
   });
@@ -204,26 +207,12 @@ function renderDirectories() {
   if (state.isOwner) renderSettings();
 }
 function renderForm() {
-  const people = state.isOwner
-    ? [
-        {
-          id: state.user?.uid || "preview-owner",
-          displayName: "MES Owner (hpham)",
-        },
-        ...state.users.filter((u) => u.active !== false),
-      ]
-    : state.user
-      ? [{ id: state.user.uid, displayName: state.user.displayName }]
-      : [];
-  selectOptions($("reporter-select"), people, {
-    placeholder: "Select your display name",
-  });
-  if (people.length === 1) $("reporter-select").value = people[0].id;
+  $("reporter-select").value = state.user?.displayName || "";
   $("require-windows").checked = state.requiresWindows;
   $("identity-notice").textContent = state.preview
     ? "Preview mode. Submitting creates sample feedback only in this browser session."
     : state.user
-      ? `${state.user.displayName} · ${state.isOwner ? "Owner access" : state.requiresWindows ? "Signed Windows verification active" : "Managed user access"}. Your selected identity is validated by the server.`
+      ? `${state.user.displayName} · ${t(state.isOwner ? "Owner access" : state.user.isTester ? "Tester access" : state.requiresWindows ? "Signed Windows verification active" : "Managed user access")}. ${t("Your identity is validated by the server.")}`
       : "Verify this Windows computer before submitting feedback.";
   $("submit-feedback").textContent = state.preview
     ? "Create preview feedback →"
@@ -269,7 +258,7 @@ function renderDashboard() {
     row.type = "button";
     const content = el("div");
     content.append(
-      el("h3", issue.subject),
+      userEl("h3", issue.subject),
       el("p", `${issue.departmentName} · ${issue.process}`),
     );
     row.append(el("span", "▤", "recent-icon"), content, badge(issue.status));
@@ -324,7 +313,7 @@ function renderActivity(issues) {
     ]) {
       const bar = el("span");
       bar.style.height = `${(count / max) * 100}%`;
-      bar.title = `${d.day.toLocaleDateString("en-GB")}: ${count} ${name.toLowerCase()}`;
+      bar.title = `${d.day.toLocaleDateString(getLanguage() === "vi" ? "vi-VN" : "en-GB")}: ${count} ${name.toLowerCase()}`;
       bar.setAttribute("aria-label", bar.title);
       bars.append(bar);
     }
@@ -332,7 +321,7 @@ function renderActivity(issues) {
       bars,
       el(
         "small",
-        d.day.toLocaleDateString("en-GB", { day: "2-digit", month: "short" }),
+        d.day.toLocaleDateString(getLanguage() === "vi" ? "vi-VN" : "en-GB", { day: "2-digit", month: "short" }),
       ),
     );
     grid.append(day);
@@ -389,7 +378,7 @@ function renderDepartments(issues) {
   for (const d of values) {
     const row = el("div", undefined, "department-row"),
       head = el("div");
-    head.append(el("span", d.name), el("span", String(d.count)));
+    head.append(userEl("span", d.name), el("span", String(d.count)));
     const track = el("div", undefined, "bar-track"),
       bar = el("div");
     bar.style.width = `${(d.count / max) * 100}%`;
@@ -423,12 +412,12 @@ function renderIssues() {
     const row = el("tr");
     row.dataset.id = i.id;
     const title = el("td");
-    const link = el("button", i.subject, "issue-title-button");
+    const link = userEl("button", i.subject, "issue-title-button");
     link.onclick = () => openIssue(i.id);
     title.append(link, el("small", i.id.slice(0, 12).toUpperCase()));
     const department = el("td");
-    department.append(el("strong", i.departmentName), el("small", i.process));
-    const reporter = el("td", i.reporterName),
+    department.append(userEl("strong", i.departmentName), userEl("small", i.process));
+    const reporter = userEl("td", i.reporterName),
       priority = el("td"),
       status = el("td");
     priority.append(badge(i.priority, "priority"));
@@ -510,46 +499,54 @@ function renderDetail(issue) {
   const heading = el("div");
   heading.append(
     el("p", issue.id.toUpperCase(), "eyebrow"),
-    el("h1", issue.subject),
+    userEl("h1", issue.subject),
     el(
       "p",
-      `Submitted ${date(issue.createdAt)} · ${issue.reporterName}`,
+      `${t("Submitted")} ${date(issue.createdAt)} · ${issue.reporterName}`,
       "subtitle",
     ),
   );
   $("detail-heading").replaceChildren(heading, badge(issue.status));
   const data = el("div", undefined, "detail-data");
   for (const [label, value] of [
-    ["Team Leader", issue.teamLeaderName],
+    ["Requester", issue.reporterName],
     ["Department", issue.departmentName],
     ["Process / Station", issue.process],
   ]) {
     const d = el("div");
-    d.append(el("small", label), el("span", value));
+    d.append(el("small", label), userEl("span", value));
     data.append(d);
   }
   const attachments = el("div");
   attachments.append(el("h3", "Attachments"));
+  const gallery = el("div", undefined, "attachment-gallery");
   for (const f of issue.attachments || []) {
-    const row = el("div", undefined, "file-row"),
-      button = el(
-        "button",
-        state.preview ? "Preview file" : "Download",
-        "text-button",
-      );
+    const card = el("article", undefined, "attachment-card");
+    if (["image/jpeg", "image/png", "image/webp"].includes(f.type)) {
+      const button = el("button", undefined, "image-thumbnail");
+      button.type = "button";
+      button.setAttribute("aria-label", `${t("View image")}: ${f.name}`);
+      const image = document.createElement("img");
+      image.alt = f.name; image.loading = "lazy";
+      const hint = el("span", "Loading image…", "image-hint");
+      button.append(image, hint);
+      imageUrl(f).then(url => { if (button.isConnected) { image.src = url; hint.textContent = t("Click to enlarge"); } }).catch(() => { hint.textContent = t("Image unavailable. Click to retry."); });
+      button.onclick = () => openImage(f);
+      card.append(button);
+    }
+    const row = el("div", undefined, "file-row"), button = el("button", state.preview ? "Preview file" : "Download", "text-button");
     button.onclick = () => downloadAttachment(f);
-    row.append(
-      el("span", `${f.name} · ${(f.size / 1024).toFixed(0)} KB`),
-      button,
-    );
-    attachments.append(row);
+    row.append(userEl("span", `${f.name} · ${(f.size / 1024).toFixed(0)} KB`), button);
+    card.append(row); gallery.append(card);
   }
+  attachments.append(gallery);
   if (!issue.attachments?.length)
     attachments.append(el("p", "No attachments.", "helper"));
   $("detail-content").replaceChildren(
     el("h2", "Feedback details"),
     data,
-    el("p", issue.description),
+    userEl("p", issue.description, "feedback-body"),
+    renderOccurrences(issue.occurrences || []),
     attachments,
   );
   if (!$("handling-form").contains(document.activeElement)) {
@@ -579,6 +576,13 @@ function renderDetail(issue) {
     el("p", issue.assessment || "No assessment recorded yet."),
   );
 }
+function timelineText(event) {
+  if (getLanguage() === "en") return event.text;
+  if (["created", "edit"].includes(event.kind) && ["Feedback submitted.", "Owner edited the feedback details."].includes(event.text)) return t(event.text);
+  if (event.kind === "attachments" && /^\d+ attachment\(s\) added\.$/.test(event.text)) return `${event.text.match(/^\d+/)[0]} tệp đính kèm được thêm.`;
+  if (event.kind === "handling") return event.text.replace(/^Status: (.+?) → (.+?)\. Priority: (.+?) → (.+?)\./, (_text,a,b,c,d) => `${t("Status")}: ${t(a)} → ${t(b)}. ${t("Priority")}: ${t(c)} → ${t(d)}.`);
+  return event.text;
+}
 function renderTimeline() {
   $("issue-timeline").replaceChildren();
   for (const event of [...state.timeline].sort(
@@ -586,9 +590,9 @@ function renderTimeline() {
   )) {
     const row = el("div", undefined, "timeline-event");
     row.append(
-      el("strong", event.author),
+      userEl("strong", event.author),
       el("small", date(event.createdAt)),
-      el("p", event.text),
+      userEl("p", timelineText(event)),
     );
     if (event.before && event.after) {
       const details = el("details", undefined, "audit-details");
@@ -596,9 +600,9 @@ function renderTimeline() {
       for (const key of ["subject", "process", "description"]) {
         if (event.before[key] === event.after[key]) continue;
         details.append(
-          el("strong", key),
-          el("p", `Before: ${event.before[key]}`),
-          el("p", `After: ${event.after[key]}`),
+          el("strong", { subject: "Subject", process: "Process", description: "Description" }[key]),
+          userEl("p", `${t("Before")}: ${event.before[key]}`),
+          userEl("p", `${t("After")}: ${event.after[key]}`),
         );
       }
       row.append(details);
@@ -700,10 +704,10 @@ function renderSettings() {
       edit = el("button", "Edit", "text-button"),
       toggle = el("button", u.active ? "Deactivate" : "Restore", "text-button");
     edit.onclick = () => {
-      const name = window.prompt("Display name", u.displayName);
+      const name = window.prompt(t("Display name"), u.displayName);
       if (!name?.trim()) return;
       const username = window
-        .prompt("Windows username", u.username)
+        .prompt(t("Windows username"), u.username)
         ?.trim()
         .toLowerCase();
       if (!username) return;
@@ -764,9 +768,7 @@ function renderDevices() {
     revoke.disabled = !device.active;
     revoke.onclick = () => {
       if (
-        !window.confirm(
-          "Revoke this device? Its Windows verification will no longer be accepted.",
-        )
+        !window.confirm(t("Revoke this device? Its Windows verification will no longer be accepted."))
       )
         return;
       run("settings-status", revoke, async () => {
@@ -859,13 +861,13 @@ $("feedback-form").onsubmit = (e) => {
   if (!requireMember()) return;
   run("create-status", $("submit-feedback"), async () => {
     const data = {
-      reporterUid: $("reporter-select").value,
-      teamLeaderId: $("leader-select").value,
+      reporterUid: state.user.uid,
       departmentId: $("department-select").value,
       process: $("process-input").value.trim(),
-      subject: $("subject-input").value.trim(),
+      occurrences: readOccurrences(),
       description: $("description-input").value.trim(),
     };
+    data.subject = data.description.split(/\r?\n/)[0].slice(0, 100);
     const invalid = validateIssue(data) || validateFiles(state.files);
     if (invalid) {
       showStatus("create-status", invalid);
@@ -877,17 +879,16 @@ $("feedback-form").onsubmit = (e) => {
     }
     let createdId;
     if (state.preview) {
-      const leader = state.leaders.find((x) => x.id === data.teamLeaderId),
-        department = state.departments.find((x) => x.id === data.departmentId),
+      const department = state.departments.find((x) => x.id === data.departmentId),
         reporter = state.users.find((x) => x.id === data.reporterUid) || {
-          displayName: "Demo Owner",
+          displayName: state.user.displayName || "Demo Owner",
           username: "hpham",
         };
       createdId = "DEMO-" + crypto.randomUUID().slice(0, 6).toUpperCase();
       const issue = {
         ...data,
         id: createdId,
-        teamLeaderName: leader.name,
+
         departmentName: department.name,
         reporterName: reporter.displayName,
         reporterUsername: reporter.username,
@@ -901,6 +902,7 @@ $("feedback-form").onsubmit = (e) => {
           size: f.size,
           type: attachmentType(f),
           preview: true,
+          previewUrl: previewFileUrl(f),
         })),
         timeline: [],
       };
@@ -947,6 +949,7 @@ $("feedback-form").onsubmit = (e) => {
       }
     }
     $("feedback-form").reset();
+    $("occurrence-rows").replaceChildren();
     state.files = [];
     renderFiles();
     renderAll();
@@ -1085,9 +1088,7 @@ $("edit-form").onsubmit = (e) => {
 $("delete-issue").onclick = () => {
   if (
     !ownerOnly() ||
-    !window.confirm(
-      "Permanently delete this issue, all its attachments and its timeline?",
-    )
+    !window.confirm(t("Permanently delete this issue, all its attachments and its timeline?"))
   )
     return;
   run("handling-status-message", $("delete-issue"), async () => {
@@ -1159,9 +1160,7 @@ $("save-policy").onclick = () => {
   const requiresWindows = $("require-windows").checked;
   if (
     !requiresWindows &&
-    !window.confirm(
-      "Disable Windows verification? Anyone who selects an active display name will then be able to sign in as that managed user.",
-    )
+    !window.confirm(t("Disable Windows verification? Anyone who selects an active display name will then be able to sign in as that managed user."))
   ) {
     $("require-windows").checked = state.requiresWindows;
     return;
@@ -1379,24 +1378,24 @@ $("export-issues").onclick = () => {
     [
       "ID",
       "Subject",
-      "Team Leader",
       "Department",
       "Process",
       "Reporter",
       "Priority",
       "Status",
       "Updated",
-    ],
+      "Incident times",
+    ].map(t),
     ...filtered().map((i) => [
       i.id,
       i.subject,
-      i.teamLeaderName,
       i.departmentName,
       i.process,
       i.reporterName,
       i.priority,
       i.status,
       date(i.updatedAt),
+      (i.occurrences || []).map(time => time.start + (time.kind === "range" ? " → " + time.end : "")).join("; "),
     ]),
   ];
   const blob = new Blob(
@@ -1453,6 +1452,8 @@ async function handleAuth(user) {
   $("device-result").hidden = true;
   renderDevices();
   $("feedback-form").reset();
+  $("occurrence-rows").replaceChildren();
+  clearImages();
   renderFiles();
   $("detail-content").replaceChildren();
   $("issue-timeline").replaceChildren();
@@ -1485,6 +1486,80 @@ async function handleAuth(user) {
     }
   }
 }
+function userEl(tag, text, cls) { const node = el(tag, text, cls); node.dataset.userContent = ""; return node; }
+function readOccurrences() {
+  return [...$("occurrence-rows").children].map(row => {
+    const start = row.querySelector('[name="start"]').value;
+    const end = row.querySelector('[name="end"]')?.value;
+    return { kind: row.dataset.kind, start: start ? new Date(start).toISOString() : "", ...(row.dataset.kind === "range" ? { end: end ? new Date(end).toISOString() : "" } : {}) };
+  });
+}
+function addOccurrence(kind) {
+  if ($("occurrence-rows").children.length >= 20) { toast("Add no more than 20 incident times."); return; }
+  const row = el("div", undefined, "occurrence-row"); row.dataset.kind = kind;
+  row.append(el("span", kind === "range" ? "Time range" : "Moment", "occurrence-kind"));
+  for (const name of kind === "range" ? ["start", "end"] : ["start"]) {
+    const label = el("label", name === "end" ? "End time" : kind === "range" ? "Start time" : "Incident time");
+    const input = document.createElement("input"); input.type = "datetime-local"; input.name = name; input.required = true;
+    input.min = "2000-01-01T00:00"; input.max = "2100-12-31T23:59";
+    input.addEventListener("change", () => {
+      const end = row.querySelector('[name="end"]'), start = row.querySelector('[name="start"]');
+      if (end) { end.min = start.value || "2000-01-01T00:00"; end.setCustomValidity(end.value && start.value && end.value < start.value ? t("The end time must be on or after the start time.") : ""); }
+    });
+    label.append(input); row.append(label);
+  }
+  const remove = el("button", "Remove", "text-button"); remove.type = "button"; remove.onclick = () => row.remove(); row.append(remove);
+  $("occurrence-rows").append(row); row.querySelector("input").focus();
+}
+function renderOccurrences(items) {
+  const section = el("section", undefined, "incident-summary"); section.append(el("h3", "Incident times"));
+  if (!items.length) section.append(el("p", "Not specified", "helper"));
+  for (const item of items) {
+    const label = item.kind === "range" ? "Time range" : "Moment";
+    const text = date(Date.parse(item.start)) + (item.kind === "range" ? ` → ${date(Date.parse(item.end))}` : "");
+    const row = el("div", undefined, "incident-chip"); row.append(el("span", label), userEl("time", text)); section.append(row);
+  }
+  return section;
+}
+const imageCache = new Map(), previewImages = new Set();
+function previewFileUrl(file) { const url = URL.createObjectURL(file); previewImages.add(url); return url; }
+function clearImages() {
+  for (const entry of imageCache.values()) if (entry.url) URL.revokeObjectURL(entry.url);
+  imageCache.clear(); for (const url of previewImages) URL.revokeObjectURL(url); previewImages.clear();
+  $("image-viewer").close(); $("image-full").removeAttribute("src");
+}
+async function imageUrl(file) {
+  if (file.previewUrl) return file.previewUrl;
+  if (state.preview) throw new Error("No preview image");
+  if (imageCache.has(file.path)) return imageCache.get(file.path).promise;
+  if (imageCache.size >= 12) { const [key, entry] = imageCache.entries().next().value; if (entry.url) URL.revokeObjectURL(entry.url); imageCache.delete(key); }
+  const entry = {}; imageCache.set(file.path, entry);
+  entry.promise = fetchAttachment(file.path).then(blob => {
+    if (imageCache.get(file.path) !== entry) throw new Error("Session changed");
+    entry.url = URL.createObjectURL(blob); return entry.url;
+  }).catch(error => { if (imageCache.get(file.path) === entry) imageCache.delete(file.path); throw error; });
+  return entry.promise;
+}
+async function openImage(file) {
+  const generation = sessionGeneration;
+  try {
+    const url = await imageUrl(file);
+    if (generation !== sessionGeneration) return;
+    $("image-name").textContent = file.name; $("image-full").src = url; $("image-full").alt = file.name;
+    $("image-stage").classList.remove("natural-size");
+    if (!$("image-viewer").open) $("image-viewer").showModal();
+  } catch (error) { toast("Unable to load image. Try again."); }
+}
+$("add-moment").onclick = () => addOccurrence("point");
+$("add-range").onclick = () => addOccurrence("range");
+$("image-close").onclick = () => $("image-viewer").close();
+$("image-fit").onclick = () => $("image-stage").classList.remove("natural-size");
+$("image-zoom").onclick = () => $("image-stage").classList.add("natural-size");
+$("image-full").ondblclick = () => $("image-stage").classList.toggle("natural-size");
+$("image-viewer").addEventListener("click", event => { if (event.target === $("image-viewer")) $("image-viewer").close(); });
+window.addEventListener("beforeunload", clearImages);
+
+initializeLanguage(() => { renderAll(); renderTimeline(); updateIdentity(); if (state.selected) { const issue = state.issues.find(i => i.id === state.selected); if (issue) renderDetail(issue); } });
 selectOptions($("issue-status"), [
   { id: "All", name: "All statuses" },
   ...statuses.map((s) => ({ id: s, name: s })),

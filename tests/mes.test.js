@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   validateFiles,
   validateIssue,
+  validateOccurrences,
   filterIssues,
   stats,
   safeUsername,
@@ -75,11 +76,9 @@ test("feedback requires catalogs, bounded text and a meaningful description", ()
   };
   assert.equal(validateIssue(d), "");
   for (const v of [
-    { ...d, teamLeaderId: "" },
     { ...d, departmentId: "" },
     { ...d, process: " " },
-    { ...d, subject: "x".repeat(161) },
-    { ...d, description: "short" },
+    { ...d, description: " " },
     { ...d, description: "x".repeat(5001) },
   ])
     assert.notEqual(validateIssue(v), "");
@@ -171,4 +170,13 @@ test("Windows challenges expire, bind the nonce, and cannot be reused", () => {
     challengeMatches(c, { ...proof, nonce: "b".repeat(64) }, 1000),
     false,
   );
+});
+
+test("incident times allow multiple moments/ranges and reject invalid limits", () => {
+  const point = {kind:'point',start:'2026-10-16T01:00:00Z'};
+  const range = {kind:'range',start:'2026-10-16T02:00:00Z',end:'2026-10-16T03:00:00Z'};
+  assert.equal(validateOccurrences([point,range,point]),'');
+  assert.equal(validateOccurrences([]),'');
+  for (const bad of [[{...point,start:'bad'}],[{...range,end:point.start}],[{...range,end:null}],Array(21).fill(point),[{...point,start:'1990-01-01T00:00:00Z'}]]) assert.notEqual(validateOccurrences(bad),'');
+  assert.equal(validateIssue({departmentId:'a',process:'Station',description:'Lỗi'}),'');
 });

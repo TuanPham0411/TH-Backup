@@ -218,3 +218,42 @@ and linked Google identity, not that historical primary-provider value. A passwo
 session remains rejected even when the account has a Google identity. Accounts
 with another linked OAuth provider fail closed until their provider handling is
 reviewed; the configured MES provider is Google only.
+
+## Bilingual feedback, incident times and image gallery update
+
+Existing installations: run only **supabase/migrations/202610160002_feedback_experience.sql**
+after the Tester upgrade above. This upgrade changes the database dispatcher and
+preserves existing reports. New installations apply all migration files in order.
+The generic mes-api endpoint already forwards the new fields; frontend updates
+are delivered through the independent MES Netlify build.
+
+The form automatically uses the signed-in requester, then asks for Department,
+Process/Station and feedback content. It no longer asks for a Team Leader or a
+separate title; the server derives the internal summary from the first 100
+characters of the first content line. Existing Team Leader data is retained for
+historical reports. Feedback content is 1–5,000 characters.
+
+Incident times are optional: up to 20 mixed point/range entries, with explicit
+start/end datetimes. Local form values convert to ISO UTC for storage; report
+views format them in the browser's local timezone. Invalid/reversed ranges and
+dates outside 2000–2100 are rejected by both client and database. CSV export
+includes the incident times as ISO values.
+
+The VI/EN selector persists in localStorage, defaults to Vietnamese and updates
+labels, states and dates. It does not translate or rewrite user names, feedback,
+filenames or comments. Switching language preserves the feedback draft and time
+rows. Vietnamese font glyphs are self-hosted alongside the Latin font subset.
+
+JPG/PNG/WEBP attachments appear in a report gallery. Clicking opens an accessible
+native dialog with Fit/100% controls, double-click zoom toggle, Escape to close
+and scroll/pan at natural size. Non-image files retain download controls. Images
+are fetched through authenticated, 60-second signed downloads, then rendered as
+session-local blob URLs; no public bucket or permanent links are introduced.
+A bounded cache avoids repeated image downloads during dashboard refreshes and
+is cleared/revoked on auth changes/sign-out. Preview images stay in memory only.
+
+Validation includes the PostgreSQL upgrade and invalid-time/identity assertions,
+Node model tests, and mocked browser workflows at 1440, 1024 and 390 pixels for
+language persistence, draft preservation, simplified submission, multiple times,
+user content preservation, image viewing and layout. Actual live signed image
+transfer and upgraded production schema still need deployment/account validation.

@@ -32,7 +32,7 @@
         <button id="account-button" class="account-button">
           <span class="avatar" id="avatar">V</span>
           <div>
-            <strong id="account-name">Viewer</strong
+            <strong id="account-name" data-user-content>Viewer</strong
             ><small id="account-role">Read-only access</small>
           </div>
           <span>↗</span>
@@ -52,6 +52,7 @@
           Workspace <span>/</span> <strong id="page-crumb">Dashboard</strong>
         </div>
         <div class="topbar-actions">
+          <select id="language-select" class="language-select" aria-label="Language"><option value="vi">Tiếng Việt</option><option value="en">English</option></select>
           <span class="environment">MES · VIETNAM</span
           ><button
             id="refresh-button"
@@ -59,7 +60,7 @@
             aria-label="Refresh data"
           >
             ↻</button
-          ><button id="new-feedback" class="button primary">
+          ><button id="new-feedback" class="button primary" aria-label="New feedback">
             ＋ New feedback
           </button>
         </div>
@@ -218,14 +219,9 @@
             <form id="feedback-form" class="card form-card">
               <h2>Feedback information</h2>
               <div class="form-grid">
-                <div>
-                  <label for="reporter-select"
-                    >Your display name <span>*</span></label
-                  ><select id="reporter-select" required></select>
-                </div>
-                <div>
-                  <label for="leader-select">Team Leader <span>*</span></label
-                  ><select id="leader-select" required></select>
+                <div class="reporter-field">
+                  <label for="reporter-select">Requester</label>
+                  <input id="reporter-select" readonly aria-readonly="true" data-user-content />
                 </div>
                 <div>
                   <label for="department-select"
@@ -243,21 +239,18 @@
                   />
                 </div>
               </div>
-              <label for="subject-input">Feedback title <span>*</span></label
-              ><input
-                id="subject-input"
-                required
-                maxlength="160"
-                placeholder="Summarize the issue in one sentence"
-              /><label for="description-input"
-                >Feedback details <span>*</span></label
-              ><textarea
+              <section class="occurrence-section" aria-labelledby="occurrence-title">
+                <div class="section-heading"><div><h3 id="occurrence-title">When did it happen?</h3><p class="helper">Optional · add multiple moments or time ranges.</p></div></div>
+                <div id="occurrence-rows"></div>
+                <div class="occurrence-actions"><button type="button" id="add-moment" class="button small">＋ Add moment</button><button type="button" id="add-range" class="button small">＋ Add time range</button></div>
+              </section>
+              <label for="description-input">Feedback <span>*</span></label><textarea
                 id="description-input"
                 rows="6"
                 required
-                minlength="10"
+                minlength="1"
                 maxlength="5000"
-                placeholder="What happened? What did you expect? Include the time, station and steps to reproduce."
+                placeholder="Describe the issue or suggestion. Attach a screenshot if helpful."
               ></textarea
               ><label for="attachment-input">Attachments</label
               ><label class="upload-zone" for="attachment-input"
@@ -565,7 +558,7 @@
         </button>
       </div>
       <div id="signed-in-account" hidden>
-        <p id="signed-in-summary"></p>
+        <p id="signed-in-summary" data-user-content></p>
         <button id="start-tester" class="button full" hidden>Test as user (Tester)</button>
         <button id="sign-out" class="button full">Sign out</button>
       </div>
@@ -588,13 +581,17 @@
         ><textarea
           id="edit-description"
           maxlength="5000"
-          minlength="10"
+          minlength="1"
           required
           rows="6"
         ></textarea
         ><button class="button primary full">Save feedback changes</button>
         <p id="edit-status" role="status"></p>
       </form>
+    </dialog>
+    <dialog id="image-viewer" class="image-viewer" aria-label="Image viewer">
+      <div class="image-toolbar"><strong id="image-name" data-user-content></strong><div><button id="image-fit" class="button small">Fit</button><button id="image-zoom" class="button small">100%</button><button id="image-close" class="button small" aria-label="Close image">✕</button></div></div>
+      <div id="image-stage" class="image-stage"><img id="image-full" alt="" /></div>
     </dialog>
     <div id="toast" class="toast" role="status" hidden></div>
     <script type="module" src="/app.js"></script>

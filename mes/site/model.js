@@ -49,18 +49,24 @@ export function validateFiles(files) {
   return "";
 }
 export function validateIssue(value) {
-  if (!value.teamLeaderId || !value.departmentId)
-    return "Select a team leader and department.";
+  if (!value.departmentId) return "Select a department.";
   if (!value.process?.trim() || value.process.trim().length > 120)
     return "Enter a process or station (up to 120 characters).";
-  if (!value.subject?.trim() || value.subject.trim().length > 160)
-    return "Enter an issue title (up to 160 characters).";
+
   if (
     !value.description?.trim() ||
-    value.description.trim().length < 10 ||
+    value.description.trim().length < 1 ||
     value.description.trim().length > 5000
   )
-    return "Describe the feedback in 10–5,000 characters.";
+    return "Enter feedback (1–5,000 characters).";
+  return validateOccurrences(value.occurrences || []);
+}
+export function validateOccurrences(items) {
+  if (!Array.isArray(items) || items.length > 20) return "Add no more than 20 incident times.";
+  for (const item of items) {
+    if (!["point", "range"].includes(item.kind) || typeof item.start !== "string" || !Number.isFinite(Date.parse(item.start)) || new Date(item.start).getUTCFullYear() < 2000 || new Date(item.start).getUTCFullYear() > 2100) return "Choose a valid incident time.";
+    if (item.kind === "range" && (typeof item.end !== "string" || !Number.isFinite(Date.parse(item.end)) || Date.parse(item.end) < Date.parse(item.start) || new Date(item.end).getUTCFullYear() > 2100)) return "The end time must be on or after the start time.";
+  }
   return "";
 }
 export function filterIssues(
