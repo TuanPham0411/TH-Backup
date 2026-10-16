@@ -10,17 +10,22 @@
     "test": "node --test tests/*.test.js",
     "dev:mes": "vite --config vite.mes.config.js --host 127.0.0.1",
     "build:mes": "vite build --config vite.mes.config.js",
-    "preview:mes": "vite preview --config vite.mes.config.js --host 127.0.0.1 --port 4174"
+    "preview:mes": "vite preview --config vite.mes.config.js --host 127.0.0.1 --port 4174",
+    "build:server": "node server/build.js",
+    "test:pi": "NODE_ENV=test node --test server/tests/*.test.js"
   },
   "dependencies": {
     "@fontsource/dm-sans": "^5.3.0",
     "@fontsource/space-grotesk": "^5.3.0",
-    "@supabase/supabase-js": "^2.117.3",
-    "firebase": "12.19.0",
+    "cookie-parser": "^1.4.7",
+    "express": "^5.3.0",
+    "express-rate-limit": "^8.7.1",
+    "nodemailer": "^10.1.1",
+    "pg": "^8.23.1",
     "quill": "^2.0.3"
   },
   "devDependencies": {
-    "@firebase/rules-unit-testing": "^5.0.2",
+    "esbuild": "^0.28.2",
     "vite": "8.3.3"
   }
 }

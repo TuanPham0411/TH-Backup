@@ -1,5 +1,5 @@
 export const adminEmails = ['eric.scorp93@gmail.com', 'tuanpham.x93@gmail.com'];
-export const isAdmin = user => !!user?.emailVerified && adminEmails.includes(user.email?.toLowerCase());
+export const isAdmin = user => !!user?.emailVerified && user.isAdmin === true;
 export const projects = [
  {id:'esp32',category:'Embedded',name:'ESP32 AI Assistant',subtitle:'Hardware meets conversational AI',status:'In development',year:'2026',icon:'◈',description:'A personal chatbot assistant built around an ESP32 development board. An ongoing exploration of embedded hardware, interaction design and AI integration.',tags:['ESP32','Embedded systems','AI'],url:'https://thienha.io.vn/projects/xiaozhi-esp32'},
  {id:'learning',category:'Web',name:'Educational Games',subtitle:'Interactive learning for children',status:'In development',year:'2026',icon:'⌘',description:'A web-based learning platform for children, using visual and audio interactions to support age-appropriate skills. This is a personal project currently in development.',tags:['Web development','Learning','Interaction'],url:'https://thienha.io.vn/projects/game-of-thien'}

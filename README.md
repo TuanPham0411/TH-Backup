@@ -1,62 +1,40 @@
-# TH · Pham Hoang Tuan — OT portfolio
+# TH portfolio + MES on Raspberry Pi
 
-English personal website built from the owner-provided CV. Focus: production networks, MES, software tools, test systems and data analysis. Includes career timeline, education, two in-development projects, printable/downloadable resume, responsive navigation, project search/filter/details, private bookmarks, user profile, verified-email inquiries, request tracking and a verified-owner inbox. No payment processing or invented completed client projects.
+Portfolio: `https://th.io.vn`. MES: `https://mes.th.io.vn`.
+Target: Pi 3B+, Raspberry Pi OS Lite ARM64, 1 GB RAM. See [deployment guide](deploy/README.md).
 
-## Development
+## Architecture
 
-Use existing `/workspace/Thien-Ha`, not a worktree. Node.js 24 and npm:
+Nginx serves both Vite builds and proxies `/api` to one Node.js process bound to `127.0.0.1:3000`. PostgreSQL holds portfolio records, accounts and MES business logic; private attachments live at `/var/lib/th-app/files`. Google OAuth and SMTP run through the backend. No Firebase or Supabase service, client SDK, hosted auth, storage or Edge Function is used by the deployed apps.
+
+GitHub hosted runners install dependencies, test and build both frontends and bundle the backend plus the official Node.js 22 ARM64 runtime. The existing self-hosted `th-server` runner only downloads and installs the artifact. Pull requests never run deployment code on the Pi. SSH and Cloudflare Tunnel configuration are untouched.
+
+## Development and checks
+
+Use Node.js 22.12+ (Node.js 24 also works).
 
 ```sh
-npm ci --cache /tmp/th-npm-cache
+npm ci
 npm test
 npm run build
-npm run dev
-# Or, after build:
-npm run preview -- --port 4173
+npm run build:mes
+npm run build:server
 ```
 
-Vite root: `site`; static public assets: `site/public`; output: `dist/web`. Firebase public configuration is in `site/firebase-config.js`; optional overrides require all four VITE_FIREBASE fields from `.env.example`. Do not put server credentials in public files or VITE variables. Fonts and images are self-hosted. Public viewer is the default on first load, including portfolio, project search/details and resume. Workspace and admin sections stay hidden until an appropriate account signs in. Saving projects or submitting an inquiry prompts sign-in. Continue as viewer returns to browsing; sign-out leaves the public site accessible. Contact drafts are retained while signing in and are cleared on sign-out. Firebase Rules continue to protect user data independently.
+`npm run dev` serves the portfolio; `npm run dev:mes` serves MES. Authentication needs the same-origin backend behind a local reverse proxy; Vite alone only previews the UI. `VITE_MES_PREVIEW=true npm run dev:mes` uses sample MES data.
 
-## Firebase — required production action
-
-The owner has reported working authentication. Enable Email/Password and Google in Firebase Authentication; authorize th.io.vn, www.th.io.vn and q-th.netlify.app. Keep the existing authDomain until the Google custom-domain callback is configured.
-
-**Publish the complete `firestore.rules` in Firebase Console → Firestore Database → Rules.** Older profile-only rules will deny bookmarks, inquiries and the owner inbox. Saving rules in Git does not publish them. `firebase.json` supports a CLI rules-only deployment for an authorized Firebase administrator:
+Integration tests require a **disposable** PostgreSQL database with a name ending in `_test`. They apply and reapply the Pi migrations and exercise the real API under its restricted runtime database role. Database fixtures persist in that disposable database; recreate it before another run.
 
 ```sh
-firebase deploy --only firestore:rules --project th-web-d816f
+TEST_DATABASE_URL=postgresql://postgres:test-only@127.0.0.1:5432/th_test npm run test:pi
 ```
 
-Rules identify admins by Firebase-issued, verified token email: `eric.scorp93@gmail.com` and `tuanpham.x93@gmail.com`. A client checkbox or Firestore role field cannot grant admin access. Both accounts must sign in and have verified email. Other users may read/write only their own profile and bookmarks. They may create inquiries using their own token email and UID, and read only their own inquiries. Only verified owners may read all inquiries, delete them or change status. Status updates cannot alter the sender, original message or timestamps of creation. All unmatched paths deny access.
+Frontend source lives in `site/` and `mes/site/`; backend in `server/`; Pi SQL migrations in `server/migrations/`. The older `mes/supabase/` directory is retained as historical SQL/authorization reference and for existing regression tests. It is not packaged or executed on Pi. Pi migrations retain the MES dispatcher and its account lifecycle, rich documents, tester mode and catalog/issue/timeline permissions, with local PostgreSQL grants.
 
-Owners manage requests through the hidden-unless-owner administration section. Its latest-100 query is ordered by createdAt using Firestore's automatic single-field index. User workspace reads up to 50 requests for the signed-in UID; it does not show all records globally. Data values are rendered as text, never HTML. Inbox email links open the user's mail app; sending an inquiry stores it in Firestore and does not send an email notification automatically.
+## Accounts
 
-Profile remains private; contact submissions explicitly require consent. Resume was recreated from the CV, omitting date of birth, gender and detailed residential address. The original CV is not published. Phone and primary email use the current CV. External project references are taken from that CV and are not independently verified as live products.
+Portfolio supports Google sign-in and email/password registration with email verification and one-time password reset. Only the configured `OWNER_EMAIL` becomes administrator through verified Google sign-in. The API always checks the database role, verification and record ownership; client-side UI checks are not authorization.
 
-## Tests
+MES supports verified Google owner login or local `hpham` activation/password login, admin-issued single-use user activation links, profile updates and password changes. Sessions use Secure, HttpOnly, SameSite=Lax cookies, expire in 12 hours and are revoked by logout, credential changes or user deactivation. No passwords or session tokens are placed in browser storage.
 
-`npm test` runs six unit checks covering configuration, safe auth errors, name bounds, exact verified owner UI identity, inquiry bounds and project references. Browser checks with mocked Firebase responses exercised five viewport sizes (1440×900, 1366×640, 390×844, 360×640, 320×568), login/register/reset, public viewer access, interaction-triggered sign-in, visitor-versus-owner UI, project filtering, details dialogs, privacy, mobile navigation and sign-out. These do not prove live database authorization.
-
-Security assertions are saved in `tests/firestore.security.cjs`. To run them with Node.js 24 and Java 21, install Firebase CLI 15.33.0 and run:
-
-```sh
-FIREBASE_EMULATORS_PATH=/tmp/th-firebase-emulators XDG_CONFIG_HOME=/tmp/th-firebase-config firebase emulators:exec --project demo-th-security --only firestore 'node tests/firestore.security.cjs'
-```
-
-This targets a **demo project**, not production. Emulator validation was attempted but could not run because downloading the emulator JAR from storage.googleapis.com was blocked. Security tests are unrun; publishing and live validation remain required. They cover outsider/anonymous reads, unverified admin identities, forged UID/email, role injection, bookmark boundaries and status-only updates by each verified owner.
-
-## Deployment
-
-GitHub `main` triggers the existing Netlify project. `netlify.toml`: Node 24, `npm run build`, publish `dist/web`. Check Netlify Published and live HTTPS separately; Git push is not proof a deploy succeeded. Do not change existing DNS.
-
-Google display-name configuration: set TH under Google Auth Platform → Branding. To remove the Firebase hostname from the Google flow, authorize `https://th.io.vn/__/auth/handler` in the OAuth Web client used by Firebase. The Netlify `/__/auth/*` proxy is already prepared; verify it on production before changing authDomain to th.io.vn. Google controls branding display and may require verification. No Google admin configuration was changed by this task.
-
-## Assets and updates
-
-`site/content.js` holds CV-based career/project data. Generated OT hero: `site/public/images/ot-hero.webp`. Portrait is an editorial version of the supplied neon-lit portrait, generated for the navy/cyan palette. Print-friendly resume: `site/public/resume.html`; `resume.pdf` is a generated export. Review career facts before updating. Motion respects prefers-reduced-motion and navigation/forms remain keyboard accessible.
-
-Portfolio is the primary experience: identity, OT specialization, career and projects. Private workspace and administration open only through My workspace, and Back to portfolio closes them. Contact copy covers career opportunities, technical discussion and collaboration.
-
-## Separate MES application
-
-`mes/` contains the independent TH MES feedback application for `mes.th.io.vn`, Supabase project `aaosgmphvhjcygldocyi`. See [MES setup and deployment](mes/README.md). Root `npm run build` continues to build only the portfolio; `npm run build:mes` builds MES to `mes/dist`. The MES Netlify project must use base directory `mes`; do not change the existing portfolio deployment settings.
+Attachments are private, up to 10 MB each and five per issue, with the existing allowed MIME types. Upload/download URLs expire in 60 seconds, work once and recheck the account and issue permission at use time. Uploads cannot overwrite an existing slot, and actual stored size/type are used when linking attachments. Files are always downloaded as attachments, never served as executable HTML.

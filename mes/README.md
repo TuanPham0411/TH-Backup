@@ -1,3 +1,9 @@
+# MES deployment
+
+Production now runs on Raspberry Pi with local PostgreSQL, local private file storage, local password sessions and backend Google OAuth. See [repository README](../README.md) and [Pi deployment guide](../deploy/README.md).
+
+The notes below describe the historical Supabase implementation and are retained only as reference. Do not use those deployment commands for the Pi release.
+
 # TH MES — Supabase / Netlify Free
 
 Independent feedback workspace for **mes.th.io.vn** / **mes-th.netlify.app**.

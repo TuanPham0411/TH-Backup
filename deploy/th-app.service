@@ -1,0 +1,28 @@
+[Unit]
+Description=TH portfolio and MES API
+After=network.target postgresql.service
+Requires=postgresql.service
+
+[Service]
+Type=simple
+User=thapp
+Group=thapp
+Environment=NODE_ENV=production
+Environment=NODE_OPTIONS=--max-old-space-size=192
+EnvironmentFile=/etc/th-app/runtime.env
+WorkingDirectory=/opt/th-app/current
+ExecStart=/opt/th-app/current/runtime/bin/node /opt/th-app/current/server/app.cjs
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+MemoryMax=320M
+TasksMax=64
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/th-app
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

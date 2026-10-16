@@ -1,9 +1,9 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {isAdmin,validInquiry,projects} from '../site/content.js';
-test('admin UI requires a verified exact owner email',()=>{
+test('admin UI requires verified server-issued administrator role',()=>{
  for(const email of ['eric.scorp93@gmail.com','tuanpham.x93@gmail.com']){
-  assert.equal(isAdmin({email,emailVerified:true}),true);
+  assert.equal(isAdmin({email,emailVerified:true,isAdmin:true}),true);
   assert.equal(isAdmin({email,emailVerified:false}),false);
  }
  assert.equal(isAdmin({email:'someone@gmail.com',emailVerified:true}),false);

@@ -1,9 +1,5 @@
-import { createClient } from '@supabase/supabase-js';
-import { supabaseUrl, supabaseKey } from './config.js';
-let client;
-let managed = sessionStorage.getItem('th-mes-session');
+
 let listener;
-let authRevision = 0;
 let tester = sessionStorage.getItem('th-mes-tester') === 'true';
 const watchers = new Set();
 let timer, loading = false;
@@ -18,24 +14,12 @@ async function refresh() {
   finally { loading = false; }
 }
 document.addEventListener("visibilitychange", () => { if (!document.hidden) refresh(); });
-export function initializeBackend() {
-  client = createClient(supabaseUrl, supabaseKey);
-  client.auth.onAuthStateChange((event, session) => {
-    if (event === "TOKEN_REFRESHED" && session && !managed) return;
-    if (session) { managed = null; sessionStorage.removeItem('th-mes-session'); }
-    // Do not await Supabase calls inside its auth callback.
-    const revision = ++authRevision;
-    setTimeout(() => { if (revision === authRevision) listener?.(session?.user || (managed ? { id: 'managed' } : null)); }, 0);
-  });
-}
+export function initializeBackend() {}
 export async function api(name, data = {}) {
-  const publicRequest = ["getDirectory", "passwordLogin", "activateAccount"].includes(name);
-  const session = publicRequest ? null : (await client.auth.getSession()).data.session;
-  const response = await fetch(`${supabaseUrl}/functions/v1/mes-api`, {
+  const response = await fetch('/api/mes', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', apikey: supabaseKey,
-      ...(session ? { Authorization: `Bearer ${session.access_token}`, ...(tester ? { 'X-MES-Tester': 'true' } : {}) } : {}),
-      ...(!publicRequest && managed ? { 'X-MES-Session': managed, ...(tester ? { 'X-MES-Tester': 'true' } : {}) } : {}) },
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json', ...(tester ? { 'X-MES-Tester': 'true' } : {}) },
     body: JSON.stringify({ name, data }),
   });
   const body = await response.json();
@@ -44,35 +28,16 @@ export async function api(name, data = {}) {
     setTimeout(refresh, 0);
   return body;
 }
-export function watchAuth(callback) { listener = callback; }
-export async function ownerLogin() {
-  const { error } = await client.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: location.origin, queryParams: { prompt: "select_account" } } });
-  if (error) throw error;
-}
-export async function managedLogin(token) {
-  tester = false; sessionStorage.removeItem('th-mes-tester');
-  const { data } = await client.auth.getSession();
-  if (data.session) await client.auth.signOut({ scope: 'local' });
-  ++authRevision;
-  managed = token;
-  sessionStorage.setItem('th-mes-session', token);
-  await listener?.({ id: 'managed' });
-}
+export function watchAuth(callback) { listener = callback; setTimeout(async () => { try { await api('getSession'); await callback({ id: 'local' }); } catch { await callback(null); } }, 0); }
+export async function ownerLogin() { location.href='/api/oauth/start'; }
+export async function managedLogin() { tester = false; sessionStorage.removeItem('th-mes-tester'); await listener?.({ id: 'local' }); }
 export async function setTesterMode(enabled) {
   tester = enabled;
-  if (enabled) sessionStorage.setItem('th-mes-tester', 'true');
-  else sessionStorage.removeItem('th-mes-tester');
-  const { data } = await client.auth.getSession();
-  await listener?.(data.session?.user || (managed ? { id: 'managed' } : null));
+  sessionStorage.setItem('th-mes-tester', String(enabled));
+  await listener?.({ id: 'local' });
 }
 export async function logout() {
-  tester = false; sessionStorage.removeItem('th-mes-tester');
-  if (managed) { try { await api('logout'); } catch { /* Local logout must still clear the token. */ } }
-  managed = null; sessionStorage.removeItem('th-mes-session');
-  const { error } = await client.auth.signOut({ scope: 'local' });
-  ++authRevision;
-  await listener?.(null);
-  if (error) throw error;
+  try { await api('logout'); } finally { tester = false; sessionStorage.removeItem('th-mes-tester'); await listener?.(null); }
 }
 export function watchRecords(path, onData, onError, order) {
   const watcher = { path, onData, onError, order };

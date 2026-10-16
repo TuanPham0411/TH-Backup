@@ -10,3 +10,5 @@ __pycache__/
 
 # Supabase CLI local state
 mes/supabase/.temp/
+
+work/
