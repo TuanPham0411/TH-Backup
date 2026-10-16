@@ -2,6 +2,7 @@
 # Install a GitHub-built release. Never invokes npm, compiler or changes tunnel/SSH.
 set -euo pipefail
 [[ $(id -u) == 0 ]] || { echo 'Run using sudo'; exit 1; }
+if [[ ${1:-} == --check ]]; then exit 0; fi
 release_source=$(realpath "${1:?Pass the extracted artifact directory}")
 release_id=${2:?Pass a release ID}
 [[ $release_id =~ ^[a-zA-Z0-9_-]+$ ]] || exit 1
@@ -75,6 +76,11 @@ curl -fsS -H 'Host: th.io.vn' http://127.0.0.1/ >/dev/null
 curl -fsS -H 'Host: mes.th.io.vn' http://127.0.0.1/ >/dev/null
 curl -fsS -H 'Host: mes.th.io.vn' -H 'Content-Type: application/json' --data '{"name":"getDirectory"}' http://127.0.0.1/api/mes >/dev/null
 systemctl is-active ssh cloudflared nginx postgresql th-app
+# Future releases use this root-owned entrypoint with a dedicated sudo rule.
+install -m 755 "$target/deploy/install.sh" /usr/local/sbin/th-deploy
+printf '%s\n' 'thadmin ALL=(root) NOPASSWD: /usr/local/sbin/th-deploy *' > "$backup/sudoers"
+visudo -cf "$backup/sudoers"
+install -m 440 "$backup/sudoers" /etc/sudoers.d/th-app-deploy
 trap - ERR
 rm -rf "$backup"
 # Keep current plus two older releases to limit use of the 32 GB card.

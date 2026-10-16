@@ -23,6 +23,12 @@ The installer has no Cloudflare or SSH mutation commands. Live deployment still 
 
    Open `https://mes.th.io.vn/#activate=CODE&username=hpham`, then choose a password. Activation is single-use, expires in 72 hours, and returns `already-activated` once the owner password is set. Google owner login can be used instead. The old Windows-agent sign-in is disabled by the existing account migration.
 
+## Sudo bootstrap
+
+The runner initially required a sudo password despite the earlier cached `sudo -n true` check. One-time password transport uses RSA-OAEP-SHA256 with a private key generated on Pi under `/var/tmp/th-pi-deploy-auth` (mode 700). Only the public key and encrypted ciphertext pass through GitHub; the password is piped directly into `sudo -S` and never logged or written as plaintext. The key is deleted after the bootstrap attempt. The temporary ciphertext is removed from the workflow after successful bootstrap.
+
+A successful install creates the root-owned `/usr/local/sbin/th-deploy` entrypoint and `/etc/sudoers.d/th-app-deploy`, allowing only that deployment command without a password for `thadmin`. Subsequent releases invoke this entrypoint; the runner has no need for passwordless arbitrary shell commands. Keep repository workflow write access restricted to trusted maintainers, since deployment artifacts include service configuration and migrations.
+
 ## Runtime and resources
 
 One process, PostgreSQL pool max 4, Node heap 192 MB, service memory cap 320 MB. Static files are served directly by Nginx. No Docker, npm install or frontend build on Pi. Releases live under `/opt/th-app/releases`; the atomic `current` symlink selects the active release. Three releases are retained after successful deployment. Attachments are stored outside releases and survive redeploys.
