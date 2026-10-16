@@ -26,13 +26,17 @@ Deno.serve(async (request) => {
     if (token) {
       const { data: auth, error } = await service.auth.getUser(token);
       if (error || !auth.user) return reply({ code: 'unauthenticated', error: 'Session expired' }, 401);
-      if (!isGoogleOwner(auth.user)) return reply({ code: 'permission-denied', error: 'Only the registered Google owner can use this login' }, 403);
+      if (!isGoogleOwner(auth.user)) return reply({ code: 'owner-required', error: 'Only the registered Google owner can use this login' }, 403);
       actor.owner = true; actor.uid = auth.user.id; actor.name = auth.user.user_metadata?.full_name || 'MES Owner';
     } else if (managed && /^[a-f0-9]{64}$/.test(managed)) actor.session = managed;
     else if (!publicAction(name)) return reply({ code: 'unauthenticated', error: 'Sign in first' }, 401);
     async function dispatch(action: string, payload = data) {
       const { data: result, error } = await service.rpc('mes_dispatch', { action, payload, actor });
-      if (error) throw Object.assign(new Error(error.message), { code: 'permission-denied' });
+      if (error) {
+        const code = error.code === 'P0001' ? 'permission-denied' : 'backend-not-ready';
+        console.error('MES database request failed', { action, code: error.code });
+        throw Object.assign(new Error('Database request failed'), { code });
+      }
       return result;
     }
     if (name === 'uploadUrl' || name === 'downloadUrl') {
@@ -79,6 +83,6 @@ Deno.serve(async (request) => {
     const e = error as { code?: string; message?: string };
     // Do not send SQL details, tokens, device secrets or platform internals to callers.
     const expected = e.code === 'permission-denied';
-    return reply({ code: expected ? 'permission-denied' : 'unavailable', error: expected ? 'Action denied. Check identity, active catalogs, field limits and verification expiry.' : 'MES service could not complete the request.' }, expected ? 403 : 503);
+    return reply({ code: expected ? 'permission-denied' : e.code === 'backend-not-ready' ? 'backend-not-ready' : 'unavailable', error: expected ? 'Action denied. Check identity, active catalogs, field limits and verification expiry.' : 'MES service could not complete the request.' }, expected ? 403 : 503);
   }
 });

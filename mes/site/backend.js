@@ -25,12 +25,13 @@ export function initializeBackend() {
   });
 }
 export async function api(name, data = {}) {
-  const session = (await client.auth.getSession()).data.session;
+  const publicRequest = ["getDirectory", "startWindowsChallenge", "completeWindowsChallenge", "loginManagedUser"].includes(name);
+  const session = publicRequest ? null : (await client.auth.getSession()).data.session;
   const response = await fetch(`${supabaseUrl}/functions/v1/mes-api`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', apikey: supabaseKey,
       ...(session ? { Authorization: `Bearer ${session.access_token}` } : {}),
-      ...(managed ? { 'X-MES-Session': managed } : {}) },
+      ...(!publicRequest && managed ? { 'X-MES-Session': managed } : {}) },
     body: JSON.stringify({ name, data }),
   });
   const body = await response.json();

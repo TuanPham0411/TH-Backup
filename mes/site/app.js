@@ -75,6 +75,8 @@ function toast(message) {
 }
 function errorMessage(e) {
   const c = String(e?.code || "");
+  if (c === "owner-required") return "This Google account is not accepted as the MES owner. Use eric.scorp93@gmail.com. Reset sign-in session to switch accounts.";
+  if (c === "backend-not-ready") return "MES database configuration needs attention. Check the deployed migration and API permissions.";
   if (c.includes("unauthenticated"))
     return "Sign in to the MES workspace first.";
   if (c.includes("permission-denied"))
@@ -1298,6 +1300,10 @@ $("sign-out").onclick = () =>
     } else await logout();
     $("account-dialog").close();
   });
+$("reset-session").onclick = () => run("account-status", $("reset-session"), async () => {
+  if (!state.preview) await logout();
+  showStatus("account-status", "Session cleared. Choose Owner and sign in with eric.scorp93@gmail.com.");
+});
 $("user-login-tab").onclick = () => {
   if ($("account-dialog").open) $("account-dialog").close();
   openAccount(false);

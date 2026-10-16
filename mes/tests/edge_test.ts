@@ -6,6 +6,7 @@ Deno.env.set('SUPABASE_SERVICE_ROLE_KEY', 'test-only-not-a-real-key');
 let rpcInput: Record<string, unknown> | undefined;
 let trustedEmail = 'eric.scorp93@gmail.com';
 let deny = false;
+let databaseCode = 'P0001';
 globalThis.fetch = async (input, init) => {
   const url = new URL(input instanceof Request ? input.url : String(input));
   const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
@@ -13,7 +14,7 @@ globalThis.fetch = async (input, init) => {
   if (url.pathname === '/auth/v1/user') return json({ id: 'google-owner-id', email: trustedEmail, email_confirmed_at: '2026-10-15', app_metadata: { provider: 'google' }, identities: [{ provider: 'google' }], user_metadata: { full_name: 'Owner' } });
   if (url.pathname === '/rest/v1/rpc/mes_dispatch') {
     rpcInput = JSON.parse(String(init?.body));
-    if (deny) return json({ message: 'private SQL detail and device secret', code: 'P0001' }, 400);
+    if (deny) return json({ message: 'private SQL detail and device secret', code: databaseCode }, 400);
     return json({ ok: true, rows: [] });
   }
   if (url.pathname.startsWith('/storage/v1/object/info/')) return json({ name: 'slot', size: 27, content_type: 'text/plain', metadata: { size: 999, mimetype: 'fake/browser-value' } });
@@ -61,6 +62,9 @@ Deno.test('MES Edge authorization and request routing', async (t) => {
     deny = true;
     const response = await handler(request('getSession', {}, { 'x-mes-session': 'a'.repeat(64) }));
     assert(response.status === 403 && !(await response.text()).includes('private SQL'), 'database error leaked');
+    databaseCode = 'PGRST202';
+    const configError = await handler(request('getSession', {}, { 'x-mes-session': 'a'.repeat(64) }));
+    assert(configError.status === 503 && (await configError.json()).code === 'backend-not-ready', 'configuration error mislabeled as an identity denial');
     deny = false;
   });
 });
