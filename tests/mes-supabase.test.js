@@ -3,8 +3,12 @@ import assert from 'node:assert/strict';
 import { isGoogleOwner, validPath, publicAction } from '../mes/supabase/functions/mes-api/policy.ts';
 test('Supabase owner requires confirmed exact Google identity', () => {
   const owner = { email: 'eric.scorp93@gmail.com', email_confirmed_at: '2026-10-15', app_metadata: { provider: 'google' }, identities: [{ provider: 'google' }] };
-  assert.equal(isGoogleOwner(owner), true);
-  for (const patch of [{ email: 'tuanpham.x93@gmail.com' }, { email_confirmed_at: undefined }, { app_metadata: { provider: 'email' } }, { identities: [] }]) assert.equal(isGoogleOwner({ ...owner, ...patch }), false);
+  assert.equal(isGoogleOwner(owner, [{ method: "oauth" }]), true);
+  assert.equal(isGoogleOwner({ ...owner, app_metadata: { provider: 'email' }, identities: [{provider:'email'},{provider:'google'}] }, [{method:'oauth'}]), true);
+  assert.equal(isGoogleOwner(owner, [{method:'password'}]), false);
+  assert.equal(isGoogleOwner(owner), false);
+  assert.equal(isGoogleOwner({...owner, identities:[{provider:'google'},{provider:'github'}]}, [{method:'oauth'}]), false);
+  for (const patch of [{ email: 'tuanpham.x93@gmail.com' }, { email_confirmed_at: undefined }, { identities: [] }]) assert.equal(isGoogleOwner({ ...owner, ...patch }, [{ method: "oauth" }]), false);
 });
 test('MES attachment paths bind exactly one issue and allocated slot', () => {
   assert.equal(validPath('issues/abc-123/slot-123'), true);

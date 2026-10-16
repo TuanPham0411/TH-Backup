@@ -1,7 +1,7 @@
 import "@fontsource/dm-sans/latin-400.css";
 import "@fontsource/dm-sans/latin-500.css";
 import "@fontsource/dm-sans/latin-600.css";
-import { initializeBackend, api, watchAuth, ownerLogin, managedLogin, logout, watchRecords, uploadAttachment, downloadAttachment as fetchAttachment } from "./backend.js";
+import { initializeBackend, setTesterMode, api, watchAuth, ownerLogin, managedLogin, logout, watchRecords, uploadAttachment, downloadAttachment as fetchAttachment } from "./backend.js";
 import { configured, previewMode } from "./config.js";
 import {
   statuses,
@@ -783,6 +783,8 @@ function renderDevices() {
     $("device-list").append(el("p", "No devices registered.", "helper"));
 }
 function updateIdentity() {
+  $("start-tester").hidden = !state.isOwner || state.preview;
+  $("tester-banner").hidden = !state.user?.isTester;
   $("admin-nav").hidden = !state.isOwner;
   $("account-name").textContent = state.user?.displayName || "Viewer";
   $("account-role").textContent = state.preview
@@ -1300,6 +1302,8 @@ $("sign-out").onclick = () =>
     } else await logout();
     $("account-dialog").close();
   });
+$("start-tester").onclick = () => run("account-status", $("start-tester"), () => setTesterMode(true));
+$("exit-tester").onclick = () => run("account-status", $("exit-tester"), () => setTesterMode(false));
 $("reset-session").onclick = () => run("account-status", $("reset-session"), async () => {
   if (!state.preview) await logout();
   showStatus("account-status", "Session cleared. Choose Owner and sign in with eric.scorp93@gmail.com.");
@@ -1472,7 +1476,7 @@ async function handleAuth(user) {
     subscribeLive();
     if ($("account-dialog").open) $("account-dialog").close();
     toast(
-      state.isOwner ? "Signed in as MES owner." : "Windows identity verified.",
+      state.isOwner ? "Signed in as MES owner." : state.user.isTester ? "Tester mode. Feedback is saved to the live workspace." : "Windows identity verified.",
     );
   } catch (e) {
     if (generation === sessionGeneration) {

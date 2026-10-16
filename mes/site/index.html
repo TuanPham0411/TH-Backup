@@ -76,6 +76,10 @@
           Explore admin preview
         </button>
       </div>
+      <div id="tester-banner" class="preview-banner" hidden>
+        <div><strong>Tester · user simulation</strong><span>Feedback and attachments are saved to the live workspace as Tester.</span></div>
+        <button id="exit-tester" class="button small">Return to owner</button>
+      </div>
       <div id="global-message" role="status" aria-live="polite" hidden></div>
       <main>
         <section id="dashboard-page" class="page">
@@ -562,6 +566,7 @@
       </div>
       <div id="signed-in-account" hidden>
         <p id="signed-in-summary"></p>
+        <button id="start-tester" class="button full" hidden>Test as user (Tester)</button>
         <button id="sign-out" class="button full">Sign out</button>
       </div>
       <p id="account-status" role="status" aria-live="polite"></p>

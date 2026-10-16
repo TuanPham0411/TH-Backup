@@ -3,6 +3,7 @@ import { supabaseUrl, supabaseKey } from './config.js';
 let client;
 let managed = sessionStorage.getItem('th-mes-session');
 let listener;
+let tester = sessionStorage.getItem('th-mes-tester') === 'true';
 const watchers = new Set();
 let timer, loading = false;
 async function refresh() {
@@ -30,7 +31,7 @@ export async function api(name, data = {}) {
   const response = await fetch(`${supabaseUrl}/functions/v1/mes-api`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', apikey: supabaseKey,
-      ...(session ? { Authorization: `Bearer ${session.access_token}` } : {}),
+      ...(session ? { Authorization: `Bearer ${session.access_token}`, ...(tester ? { 'X-MES-Tester': 'true' } : {}) } : {}),
       ...(!publicRequest && managed ? { 'X-MES-Session': managed } : {}) },
     body: JSON.stringify({ name, data }),
   });
@@ -51,7 +52,15 @@ export async function managedLogin(token) {
   sessionStorage.setItem('th-mes-session', token);
   await listener?.({ id: 'managed' });
 }
+export async function setTesterMode(enabled) {
+  tester = enabled;
+  if (enabled) sessionStorage.setItem('th-mes-tester', 'true');
+  else sessionStorage.removeItem('th-mes-tester');
+  const { data } = await client.auth.getSession();
+  await listener?.(data.session?.user || null);
+}
 export async function logout() {
+  tester = false; sessionStorage.removeItem('th-mes-tester');
   if (managed) { try { await api('logout'); } catch { /* Local logout must still clear the token. */ } }
   managed = null; sessionStorage.removeItem('th-mes-session');
   const { error } = await client.auth.signOut({ scope: 'local' });

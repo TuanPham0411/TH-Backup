@@ -193,3 +193,28 @@ transactional authorization/workflow tests run locally. Browser preview is teste
 at desktop/tablet/mobile sizes; production browser checks use mocked API responses.
 Live Supabase deployment, Google login, actual Storage requests and real Windows
 installation remain unverified until the account setup above is complete.
+
+## Tester and linked Google account update (2026-10-16)
+
+For an existing installation, run only **supabase/migrations/202610160001_tester.sql**
+in SQL Editor, then redeploy mes-api from this revision. New installations run
+both migrations in timestamp order. This update preserves issues/files/users and
+adds one reserved account: display name **Tester**, username **mes.tester**.
+
+The owner signs in with Google, opens the account panel and chooses **Test as user
+(Tester)**. The banner stays visible; **Return to owner** exits. Test submissions
+and files are real production records marked with reporter Tester, not in-memory
+fixtures. Use existing catalogs and delete test issues as owner when finished.
+There is no shared Tester password. Tester cannot log in from the public user
+selector, Windows challenges or passwordless selection even when Windows policy
+is disabled. Every simulated request still requires the verified owner's Google
+OAuth token. The server downgrades it to the Tester identity and rejects owner
+operations; anonymous users/regular operators cannot forge this mode. This tests
+user permissions and submission handling, not Windows agent installation.
+
+Supabase keeps primary provider=email for accounts created with email then linked
+to Google. Owner checks now use the Auth-validated JWT's OAuth authentication method
+and linked Google identity, not that historical primary-provider value. A password
+session remains rejected even when the account has a Google identity. Accounts
+with another linked OAuth provider fail closed until their provider handling is
+reviewed; the configured MES provider is Google only.

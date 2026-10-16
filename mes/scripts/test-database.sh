@@ -20,4 +20,6 @@ create schema storage;
 create table storage.buckets(id text primary key,name text,public boolean,file_size_limit bigint,allowed_mime_types text[]);
 SQL
 docker exec -i "$container" psql -U postgres -d mes_test -v ON_ERROR_STOP=1 < "$mes_root/supabase/migrations/202610150001_mes.sql"
+docker exec -i "$container" psql -U postgres -d mes_test -v ON_ERROR_STOP=1 < "$mes_root/supabase/migrations/202610160001_tester.sql"
 docker exec -i "$container" psql -U postgres -d mes_test -v ON_ERROR_STOP=1 < "$mes_root/tests/supabase.sql"
+docker exec -i "$container" psql -U postgres -d mes_test -v ON_ERROR_STOP=1 < "$mes_root/tests/tester.sql"

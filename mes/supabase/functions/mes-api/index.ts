@@ -1,5 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.117.3';
-import { isGoogleOwner, validPath, publicAction } from './policy.ts';
+import { isGoogleOwner, validatedTokenMethods, validPath, publicAction } from './policy.ts';
 const url = Deno.env.get('SUPABASE_URL')!;
 const service = createClient(url, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, { auth: { persistSession: false, autoRefreshToken: false } });
 const bucket = service.storage.from('mes-attachments');
@@ -8,7 +8,7 @@ Deno.serve(async (request) => {
   const origin = request.headers.get('origin');
   const headers = { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'Vary': 'Origin',
     ...(origin && origins.has(origin) ? { 'Access-Control-Allow-Origin': origin } : {}),
-    'Access-Control-Allow-Headers': 'authorization, apikey, content-type, x-mes-session, x-client-info',
+    'Access-Control-Allow-Headers': 'authorization, apikey, content-type, x-mes-session, x-mes-tester, x-client-info',
     'Access-Control-Allow-Methods': 'POST, OPTIONS' };
   const reply = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers });
   if (origin && !origins.has(origin)) return reply({ code: 'permission-denied', error: 'Origin not allowed' }, 403);
@@ -26,8 +26,10 @@ Deno.serve(async (request) => {
     if (token) {
       const { data: auth, error } = await service.auth.getUser(token);
       if (error || !auth.user) return reply({ code: 'unauthenticated', error: 'Session expired' }, 401);
-      if (!isGoogleOwner(auth.user)) return reply({ code: 'owner-required', error: 'Only the registered Google owner can use this login' }, 403);
-      actor.owner = true; actor.uid = auth.user.id; actor.name = auth.user.user_metadata?.full_name || 'MES Owner';
+      if (!isGoogleOwner(auth.user, validatedTokenMethods(token))) return reply({ code: 'owner-required', error: 'Only the registered Google owner can use this login' }, 403);
+      actor.owner = true;
+      if (request.headers.get('x-mes-tester') === 'true') actor.tester = true;
+      actor.uid = auth.user.id; actor.name = auth.user.user_metadata?.full_name || 'MES Owner';
     } else if (managed && /^[a-f0-9]{64}$/.test(managed)) actor.session = managed;
     else if (!publicAction(name)) return reply({ code: 'unauthenticated', error: 'Sign in first' }, 401);
     async function dispatch(action: string, payload = data) {
