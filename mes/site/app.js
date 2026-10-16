@@ -1,3 +1,5 @@
+import { createRichEditor } from "./rich-editor.js";
+import { documentText, renderDocument } from "./rich-document.js";
 import { t, initializeLanguage, getLanguage } from "./i18n.js";
 import "@fontsource/dm-sans/latin-400.css";
 import "@fontsource/dm-sans/latin-500.css";
@@ -545,7 +547,7 @@ function renderDetail(issue) {
   $("detail-content").replaceChildren(
     el("h2", "Feedback details"),
     data,
-    userEl("p", issue.description, "feedback-body"),
+    reportBody(issue),
     renderOccurrences(issue.occurrences || []),
     attachments,
   );
@@ -605,6 +607,7 @@ function renderTimeline() {
           userEl("p", `${t("After")}: ${event.after[key]}`),
         );
       }
+      if (JSON.stringify(event.before.richDocument || null) !== JSON.stringify(event.after.richDocument || null)) details.append(el("p", "Formatting or inline images updated."));
       row.append(details);
     }
     $("issue-timeline").append(row);
@@ -865,8 +868,9 @@ $("feedback-form").onsubmit = (e) => {
       departmentId: $("department-select").value,
       process: $("process-input").value.trim(),
       occurrences: readOccurrences(),
-      description: $("description-input").value.trim(),
+      richDocument: feedbackEditor.getDocument(),
     };
+    data.description = documentText(data.richDocument);
     data.subject = data.description.split(/\r?\n/)[0].slice(0, 100);
     const invalid = validateIssue(data) || validateFiles(state.files);
     if (invalid) {
@@ -897,7 +901,8 @@ $("feedback-form").onsubmit = (e) => {
         assessment: "",
         createdAt: Date.now(),
         updatedAt: Date.now(),
-        attachments: state.files.map((f) => ({
+        attachments: state.files.map((f, slotIndex) => ({
+          slotIndex,
           name: f.name,
           size: f.size,
           type: attachmentType(f),
@@ -949,6 +954,7 @@ $("feedback-form").onsubmit = (e) => {
       }
     }
     $("feedback-form").reset();
+    feedbackEditor.reset();
     $("occurrence-rows").replaceChildren();
     state.files = [];
     renderFiles();
@@ -970,6 +976,7 @@ function renderFiles() {
       remove = el("button", "Remove", "text-button");
     remove.type = "button";
     remove.onclick = () => {
+      feedbackEditor.removeFile(file);
       state.files.splice(index, 1);
       $("attachment-input").value = "";
       renderFiles();
@@ -982,7 +989,7 @@ function renderFiles() {
   });
 }
 $("attachment-input").onchange = () => {
-  const files = [...$("attachment-input").files],
+  const files = [...state.files, ...$("attachment-input").files],
     invalid = validateFiles(files);
   if (invalid) {
     showStatus("create-status", invalid);
@@ -1045,31 +1052,38 @@ $("comment-form").onsubmit = (e) => {
     showStatus("comment-status", "Update recorded in the timeline.");
   });
 };
-$("edit-issue").onclick = () => {
+$("edit-issue").onclick = async () => {
   if (!ownerOnly()) return;
   const issue = state.issues.find((x) => x.id === state.selected);
   $("edit-subject").value = issue.subject;
   $("edit-process").value = issue.process;
-  $("edit-description").value = issue.description;
+  editImageFiles.length = 0; editSlots.clear(); editUploaded.clear();
   $("edit-dialog").showModal();
+  $("edit-form").querySelector('button[type="submit"]').disabled = true;
+  try { await editEditor.setDocument(issue.richDocument, issue.description); }
+  catch { toast("Could not load formatted feedback."); }
+  finally { $("edit-form").querySelector('button[type="submit"]').disabled = false; }
 };
 $("edit-form").onsubmit = (e) => {
   e.preventDefault();
   if (!ownerOnly()) return;
-  run("edit-status", $("edit-form").querySelector("button"), async () => {
+  run("edit-status", $("edit-form").querySelector('button[type="submit"]'), async () => {
     const data = {
       id: state.selected,
       operation: "edit",
       subject: $("edit-subject").value.trim(),
       process: $("edit-process").value.trim(),
-      description: $("edit-description").value.trim(),
+      richDocument: editEditor.getDocument(),
     };
+    data.description = documentText(data.richDocument);
     if (state.preview) {
       const issue = state.issues.find((x) => x.id === state.selected);
+      for (const file of editImageFiles) issue.attachments.push({name:file.name,size:file.size,type:attachmentType(file),slotIndex:editSlots.get(file),preview:true,previewUrl:previewFileUrl(file)});
       const before = {
         subject: issue.subject,
         process: issue.process,
         description: issue.description,
+        richDocument: issue.richDocument || null,
       };
       Object.assign(issue, data);
       demoEvent(issue, "edit", "Owner edited feedback details (preview).", {
@@ -1078,9 +1092,21 @@ $("edit-form").onsubmit = (e) => {
           subject: data.subject,
           process: data.process,
           description: data.description,
+          richDocument: data.richDocument,
         },
       });
-    } else await callable("updateIssue", data);
+    } else {
+      const issue = state.issues.find(x => x.id === state.selected);
+      const files = [];
+      for (const file of editImageFiles) {
+        const slot = issue.uploadSlots[editSlots.get(file)];
+        if (!editUploaded.has(file)) { await uploadAttachment(`issues/${issue.id}/${slot}`,file,attachmentType(file)); editUploaded.add(file); }
+        files.push({slot,name:file.name});
+      }
+      if (files.length) await callable("attachFiles",{issueId:issue.id,files});
+      await callable("updateIssue", data);
+    }
+    editEditor.reset(); editImageFiles.length = 0; editSlots.clear(); editUploaded.clear();
     $("edit-dialog").close();
     toast("Feedback updated.");
   });
@@ -1452,6 +1478,8 @@ async function handleAuth(user) {
   $("device-result").hidden = true;
   renderDevices();
   $("feedback-form").reset();
+  feedbackEditor.reset(); editEditor.reset(); editImageFiles.length = 0; editSlots.clear(); editUploaded.clear();
+  $("edit-dialog").close();
   $("occurrence-rows").replaceChildren();
   clearImages();
   renderFiles();
@@ -1559,7 +1587,40 @@ $("image-full").ondblclick = () => $("image-stage").classList.toggle("natural-si
 $("image-viewer").addEventListener("click", event => { if (event.target === $("image-viewer")) $("image-viewer").close(); });
 window.addEventListener("beforeunload", clearImages);
 
-initializeLanguage(() => { renderAll(); renderTimeline(); updateIdentity(); if (state.selected) { const issue = state.issues.find(i => i.id === state.selected); if (issue) renderDetail(issue); } });
+const editImageFiles = [], editSlots = new Map(), editUploaded = new Set();
+function findImage(issue, slot) {
+  return (issue.attachments || []).find(file => file.slotIndex === slot || file.path === `issues/${issue.id}/${issue.uploadSlots?.[slot]}`);
+}
+function reportBody(issue) {
+  if (!issue.richDocument) return userEl("p", issue.description, "feedback-body");
+  try { return renderDocument(issue.richDocument, slot => inlineImage(issue, slot)); }
+  catch { return userEl("p", issue.description, "feedback-body"); }
+}
+function inlineImage(issue, slot) {
+  const file = findImage(issue,slot);
+  if (!file || !["image/jpeg","image/png","image/webp"].includes(file.type)) return el("span", t("Inline image is not available yet."), "inline-image-missing");
+  const button=el("button",undefined,"inline-report-image");button.type="button";
+  button.setAttribute("aria-label",`${t("View image")}: ${file.name}`);
+  const image=document.createElement("img");image.alt=file.name;image.loading="lazy";button.append(image);
+  imageUrl(file).then(url=>{if(button.isConnected)image.src=url;}).catch(()=>{button.append(el("span",t("Image unavailable. Click to retry.")));});
+  button.onclick=()=>openImage(file);return button;
+}
+const feedbackEditor = createRichEditor($("description-input"), {
+  files:()=>state.files,
+  addImages:files=>{const invalid=validateFiles([...state.files,...files]);if(invalid)throw new Error(invalid);if(files.some(file=>!["image/jpeg","image/png","image/webp"].includes(attachmentType(file))))throw new Error("Use JPG, PNG or WEBP images.");state.files.push(...files);renderFiles();return files;},
+  slotForFile:file=>state.files.indexOf(file), imageForSlot:()=>Promise.reject(), notice:toast,
+});
+const editEditor = createRichEditor($("edit-description"), {
+  files:()=>editImageFiles,
+  addImages:files=>{
+    const issue=state.issues.find(x=>x.id===state.selected);
+    const invalid=validateFiles([...(issue?.attachments||[]),...editImageFiles,...files]);if(invalid)throw new Error(invalid);
+    if(files.some(file=>!["image/jpeg","image/png","image/webp"].includes(attachmentType(file))))throw new Error("Use JPG, PNG or WEBP images.");
+    for(const file of files){const slot=Array.from({length:5},(_,i)=>i).find(i=>!findImage(issue,i)&&![...editSlots.values()].includes(i));if(slot===undefined)throw new Error("Attach no more than 5 files.");editSlots.set(file,slot);editImageFiles.push(file);}return files;
+  },
+  slotForFile:file=>editSlots.get(file), imageForSlot:slot=>{const issue=state.issues.find(x=>x.id===state.selected),file=findImage(issue,slot);return file?imageUrl(file):Promise.reject();},notice:toast,
+});
+initializeLanguage(() => { feedbackEditor.setLanguage(); editEditor.setLanguage(); renderAll(); renderTimeline(); updateIdentity(); if (state.selected) { const issue = state.issues.find(i => i.id === state.selected); if (issue) renderDetail(issue); } });
 selectOptions($("issue-status"), [
   { id: "All", name: "All statuses" },
   ...statuses.map((s) => ({ id: s, name: s })),

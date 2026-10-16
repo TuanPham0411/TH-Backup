@@ -1803,3 +1803,30 @@ td strong {
  .occurrence-row label { flex-basis:100%; }
  .occurrence-row input { min-height:42px; }
 }
+
+.rich-editor-shell { border:1px solid #dbe3ef; border-radius:12px; overflow:hidden; margin:8px 0 22px; background:#fff; }
+.rich-editor-shell:focus-within { border-color:#8094f1; box-shadow:0 0 0 3px #4263eb10; }
+.rich-toolbar { display:flex; flex-wrap:wrap; align-items:center; gap:5px; padding:9px; background:#f5f7fc; border-bottom:1px solid #dfe6f1; }
+.rich-toolbar button,.rich-toolbar select { width:auto; margin:0; padding:6px 8px; min-height:32px; border:1px solid transparent; border-radius:6px; font:12px 'DM Sans',sans-serif; color:#344869; background:transparent; cursor:pointer; }
+.rich-toolbar select { max-width:140px; background:#fff; border-color:#dce4f1; }
+.rich-toolbar button:hover,.rich-toolbar button[aria-pressed=true] { background:#e3eafe; color:#3657d3; border-color:#c6d3fb; }
+.rich-toolbar [data-format=bold] { font-weight:700; }
+.rich-toolbar [data-format=italic] { font-style:italic; }
+.rich-toolbar [data-format=underline] { text-decoration:underline; }
+.rich-toolbar [data-format=strike] { text-decoration:line-through; }
+.rich-toolbar input[type=color] { flex:0 0 34px; width:34px; height:32px; padding:4px; margin:0; border:1px solid #dce4f1; border-radius:6px; background:white; cursor:pointer; }
+.rich-editor-shell .ql-container { font:14px 'DM Sans',sans-serif; border:0; }
+.rich-editor-shell .ql-editor { min-height:230px; padding:18px; line-height:1.7; color:#263a56; overflow-wrap:anywhere; }
+.rich-editor-shell .ql-editor img { display:block; max-width:100%; max-height:450px; margin:12px 0; object-fit:contain; }
+.rich-editor-shell .ql-editor.ql-blank::before { left:18px; right:18px; font-style:normal; color:#8293ac; }
+.rich-report { line-height:1.8; overflow-wrap:anywhere; padding:16px 0; font-size:14px; color:#263a56; }
+.rich-report p { white-space:pre-wrap; margin:0 0 .8em; }
+.rich-report h1 { font-size:28px; }.rich-report h2 { font-size:23px; }.rich-report h3 { font-size:19px; }
+.rich-report blockquote { padding:12px 18px; border-left:3px solid #8ea4ee; background:#f4f7fe; margin:12px 0; }
+.rich-report ul,.rich-report ol { margin:8px 0 16px; padding-left:26px; }
+.inline-report-image { display:block; max-width:100%; margin:14px 0; padding:8px; border:1px solid #dce4f1; border-radius:10px; background:#f8faff; cursor:zoom-in; }
+.inline-report-image img { display:block; max-width:100%; max-height:540px; width:auto; height:auto; object-fit:contain; }
+.inline-image-missing { display:block; padding:16px; background:#fff7e6; color:#856b39; border-radius:8px; }
+#edit-dialog { width:94vw; max-width:850px; max-height:92dvh; overflow:auto; }
+#edit-dialog .ql-editor { min-height:200px; max-height:45dvh; }
+@media(max-width:480px) { .rich-toolbar { padding:7px; gap:3px; }.rich-toolbar select { max-width:115px; }.rich-toolbar button { min-width:32px; min-height:36px; }.rich-editor-shell .ql-editor { min-height:200px; padding:14px; } }

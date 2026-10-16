@@ -1,3 +1,4 @@
+import { normalizeDocument, documentText } from '../_shared/rich-document.js';
 import { createClient } from 'npm:@supabase/supabase-js@2.117.3';
 import { isGoogleOwner, validatedTokenMethods, validPath, publicAction } from './policy.ts';
 const url = Deno.env.get('SUPABASE_URL')!;
@@ -19,6 +20,10 @@ Deno.serve(async (request) => {
     if (raw.length > 32768) return reply({ error: 'Request too large' }, 413);
     const { name, data = {} } = JSON.parse(raw);
     if (typeof name !== 'string' || !data || typeof data !== 'object' || Array.isArray(data)) return reply({ error: 'Invalid request' }, 400);
+    if ((name === 'createIssue' || (name === 'updateIssue' && data.operation === 'edit')) && data.richDocument !== undefined) {
+      try { data.richDocument = normalizeDocument(data.richDocument); data.description = documentText(data.richDocument); }
+      catch { return reply({ code: 'invalid-argument', error: 'Invalid formatted feedback or inline image.' }, 400); }
+    }
     if (name === 'finishDelete') return reply({ error: 'Unknown action' }, 400);
     const actor: Record<string, unknown> = {};
     const token = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '');

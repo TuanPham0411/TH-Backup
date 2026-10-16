@@ -63,6 +63,16 @@ Deno.test('MES Edge authorization and request routing', async (t) => {
     const files = (rpcInput?.payload as { files: { size: number; type: string }[] }).files;
     assert(files[0].size === 27 && files[0].type === 'text/plain', 'untrusted file metadata accepted');
   });
+  await t.step('formatted feedback is normalized on server before database writes', async () => {
+    const richDocument={version:1,ops:[{insert:'Safe feedback',attributes:{bold:true,onclick:'bad',color:'url(javascript:bad)'}},{insert:'\n'}]};
+    const response=await handler(request('createIssue',{description:'spoofed',richDocument},{authorization:`Bearer ${oauthToken}`}));
+    assert(response.status===200,'rich feedback rejected');
+    const payload=rpcInput?.payload as {description:string;richDocument:{ops:{attributes:Record<string,unknown>}[]}};
+    assert(payload.description==='Safe feedback','plain text was not derived from rich content');
+    assert(payload.richDocument.ops[0].attributes.bold===true && !('onclick' in payload.richDocument.ops[0].attributes),'unsafe rich attributes stored');
+    const unsafe=await handler(request('createIssue',{richDocument:{version:1,ops:[{insert:{image:'https://evil.example'}}]}},{authorization:`Bearer ${oauthToken}`}));
+    assert(unsafe.status===400,'external image URL accepted');
+  });
   await t.step('database failures do not leak SQL or secrets', async () => {
     deny = true;
     const response = await handler(request('getSession', {}, { 'x-mes-session': 'a'.repeat(64) }));

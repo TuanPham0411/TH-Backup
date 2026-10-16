@@ -26,3 +26,5 @@ docker exec -i "$container" psql -U postgres -d mes_test -v ON_ERROR_STOP=1 < "$
 
 docker exec -i "$container" psql -U postgres -d mes_test -v ON_ERROR_STOP=1 < "$mes_root/supabase/migrations/202610160002_feedback_experience.sql"
 docker exec -i "$container" psql -U postgres -d mes_test -v ON_ERROR_STOP=1 < "$mes_root/tests/feedback.sql"
+docker exec -i "$container" psql -U postgres -d mes_test -v ON_ERROR_STOP=1 < "$mes_root/supabase/migrations/202610160003_rich_feedback.sql"
+docker exec -i "$container" psql -U postgres -d mes_test -v ON_ERROR_STOP=1 < "$mes_root/tests/rich.sql"

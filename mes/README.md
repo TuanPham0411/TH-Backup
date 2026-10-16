@@ -257,3 +257,39 @@ Node model tests, and mocked browser workflows at 1440, 1024 and 390 pixels for
 language persistence, draft preservation, simplified submission, multiple times,
 user content preservation, image viewing and layout. Actual live signed image
 transfer and upgraded production schema still need deployment/account validation.
+
+## Rich feedback editor update
+
+Run **supabase/migrations/202610160003_rich_feedback.sql** after the previous
+feedback-experience migration, then redeploy **mes-api** from this revision.
+The frontend is published by the MES Netlify project. Existing plain-text feedback
+continues to display and can be opened in the new editor without losing its text.
+
+The create and owner-edit dialogs support font family, 12–32px size, headings,
+bold/italic/underline/strikethrough, lists, alignment, text color, clear formatting,
+undo/redo and inserting local images. Images may also be pasted from the clipboard
+or dropped into the editor. Inline images share the existing **5 total files,
+10 MB each** limit with ordinary attachments; JPG/PNG/WEBP are supported. Removing
+an attachment removes its inline occurrences from the create draft.
+
+Content is stored as a bounded versioned Delta in richDocument, not HTML. A shared
+validator in supabase/functions/_shared/rich-document.js runs in both the editor
+and Edge API. The API derives plain text for searching/title generation, strips
+unsupported formatting and rejects image URLs; images reference only reserved
+attachment slots 0–4. The report renderer builds allowlisted DOM elements using
+textContent and explicit styles, and resolves image slots through authenticated
+attachment downloads. Blob/data URLs and file bytes are never stored in documents.
+Legacy plain text remains in description; image-only feedback gets a summary.
+
+Owner edits keep the before/after rich document in the timeline. Owners may upload
+new images into remaining reserved slots after the operator's 15-minute upload
+window; ordinary users/Tester still keep that window and cannot edit reports.
+No overwrite permission or public bucket access is added. If an edit upload fails,
+retry saving the same open edit dialog so completed uploads can be finalized.
+Canceling a failed upload may require owner follow-up for the unfinalized slot.
+
+Checked locally: model validation and malicious URL/style bounds, Edge request
+normalization, PostgreSQL persistence/audit/upload permissions, and browser preview
+workflows at 1440/390px for formatting, font/color, local/clipboard/drop images,
+inline report display/full view, language changes and owner editing. Live backend
+migration, function deployment and authenticated file transfer require owner setup.
