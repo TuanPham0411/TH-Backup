@@ -1,0 +1,78 @@
+name: Build sites for Raspberry Pi
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: th-server-release
+  cancel-in-progress: false
+
+jobs:
+  build:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install and verify
+        run: |
+          npm ci
+          npm test
+
+      - name: Build portfolio and MES
+        run: |
+          npm run build
+          npm run build:mes
+          test -s dist/web/index.html
+          test -s mes/dist/index.html
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: websites
+          retention-days: 3
+          if-no-files-found: error
+          path: |
+            dist/web/
+            mes/dist/
+
+  stage:
+    needs: build
+    runs-on: [self-hosted, Linux, ARM64]
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: websites
+          path: ${{ runner.temp }}/th-build-${{ github.run_id }}
+
+      - name: Store release on Pi
+        shell: bash
+        env:
+          BUILD_DIR: ${{ runner.temp }}/th-build-${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          release="$HOME/th-sites/releases/${GITHUB_SHA}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+
+          test -s "$BUILD_DIR/dist/web/index.html"
+          test -s "$BUILD_DIR/mes/dist/index.html"
+
+          install -d "$release/portfolio" "$release/mes"
+          cp -a "$BUILD_DIR/dist/web/." "$release/portfolio/"
+          cp -a "$BUILD_DIR/mes/dist/." "$release/mes/"
+          printf '%s\n' "$GITHUB_SHA" > "$release/COMMIT"
+
+          echo "Release stored: $release"
+          du -sh "$release/portfolio" "$release/mes"
