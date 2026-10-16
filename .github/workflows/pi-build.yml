@@ -67,8 +67,6 @@ jobs:
             work/release.sha256
           retention-days: 7
   deploy:
-    env:
-      SUDO_BOOTSTRAP_CIPHERTEXT: P8ZTjySLWRlp4+YeTU120GLxvm9MZ59tSWw6dpt29q76cyATk5k9TpCM7aMBZErjoYFAMpoHKA+gynJdUvhWtfL1eNSdnTBW5vPuZC8N3yLfC1Q03XqPiIOOnpZCwFTaphD82BNhM/NHSfAPIe2FVPyAG0ngNjl4mMFFLFNUmE/pjfz8E8vcxKtEkJH/PklgUkY9shpaev3SkjDWIEtH3W+xvRFIaiv8j7r+/8R/Ozx8wn/9laYRs2UhjM9Qxn00EYg3EWKW0nl9HXA2Ae7KVn7Ik2NWWJrjjdAK3NL5sdZ7lsvhkeXeXEqzEPDYuC8/cwq4dTtSiKlJICXEwDR2uGWMV5iPLEwt1L6gW4hgQkQZ3X7QjnpyTx2UUZFQeAgUmJKmbwbQenFRXkp7mGAJwyj3S4f/LjaxT6fkbx8zvhefZmgaXeA5OArLPRgmjYkcKTwBMU+JDLMfXllpiUZYiPC7JvzN6UD2HHrk+Hr9178kgHskh3q2cAGcRYN6W79R
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     needs: build
     runs-on: [self-hosted, Linux, ARM64]
@@ -96,11 +94,7 @@ jobs:
           sha256sum -c release.sha256
           mkdir unpacked
           tar -xzf release.tar.gz -C unpacked
-          trap 'rm -rf /var/tmp/th-pi-deploy-auth' EXIT
-          printf '%s' "$SUDO_BOOTSTRAP_CIPHERTEXT" | base64 -d | \
-            openssl pkeyutl -decrypt -inkey /var/tmp/th-pi-deploy-auth/key.pem \
-              -pkeyopt rsa_padding_mode:oaep -pkeyopt rsa_oaep_md:sha256 | \
-            sudo -S -k -p '' bash unpacked/deploy/install.sh "$PWD/unpacked" "$RELEASE_ID"
+          sudo -n /usr/local/sbin/th-deploy "$PWD/unpacked" "$RELEASE_ID"
       - name: Inspect routing without credentials
         run: sudo -n /usr/local/sbin/th-deploy --inspect-routing
       - name: Remove downloaded artifact
