@@ -3,6 +3,7 @@ import { supabaseUrl, supabaseKey } from './config.js';
 let client;
 let managed = sessionStorage.getItem('th-mes-session');
 let listener;
+let authRevision = 0;
 let tester = sessionStorage.getItem('th-mes-tester') === 'true';
 const watchers = new Set();
 let timer, loading = false;
@@ -19,20 +20,22 @@ async function refresh() {
 document.addEventListener("visibilitychange", () => { if (!document.hidden) refresh(); });
 export function initializeBackend() {
   client = createClient(supabaseUrl, supabaseKey);
-  client.auth.onAuthStateChange((_event, session) => {
+  client.auth.onAuthStateChange((event, session) => {
+    if (event === "TOKEN_REFRESHED" && session && !managed) return;
     if (session) { managed = null; sessionStorage.removeItem('th-mes-session'); }
     // Do not await Supabase calls inside its auth callback.
-    setTimeout(() => listener?.(session?.user || (managed ? { id: 'managed' } : null)), 0);
+    const revision = ++authRevision;
+    setTimeout(() => { if (revision === authRevision) listener?.(session?.user || (managed ? { id: 'managed' } : null)); }, 0);
   });
 }
 export async function api(name, data = {}) {
-  const publicRequest = ["getDirectory", "startWindowsChallenge", "completeWindowsChallenge", "loginManagedUser"].includes(name);
+  const publicRequest = ["getDirectory", "passwordLogin", "activateAccount"].includes(name);
   const session = publicRequest ? null : (await client.auth.getSession()).data.session;
   const response = await fetch(`${supabaseUrl}/functions/v1/mes-api`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', apikey: supabaseKey,
       ...(session ? { Authorization: `Bearer ${session.access_token}`, ...(tester ? { 'X-MES-Tester': 'true' } : {}) } : {}),
-      ...(!publicRequest && managed ? { 'X-MES-Session': managed } : {}) },
+      ...(!publicRequest && managed ? { 'X-MES-Session': managed, ...(tester ? { 'X-MES-Tester': 'true' } : {}) } : {}) },
     body: JSON.stringify({ name, data }),
   });
   const body = await response.json();
@@ -47,7 +50,10 @@ export async function ownerLogin() {
   if (error) throw error;
 }
 export async function managedLogin(token) {
-  await client.auth.signOut({ scope: 'local' });
+  tester = false; sessionStorage.removeItem('th-mes-tester');
+  const { data } = await client.auth.getSession();
+  if (data.session) await client.auth.signOut({ scope: 'local' });
+  ++authRevision;
   managed = token;
   sessionStorage.setItem('th-mes-session', token);
   await listener?.({ id: 'managed' });
@@ -57,13 +63,14 @@ export async function setTesterMode(enabled) {
   if (enabled) sessionStorage.setItem('th-mes-tester', 'true');
   else sessionStorage.removeItem('th-mes-tester');
   const { data } = await client.auth.getSession();
-  await listener?.(data.session?.user || null);
+  await listener?.(data.session?.user || (managed ? { id: 'managed' } : null));
 }
 export async function logout() {
   tester = false; sessionStorage.removeItem('th-mes-tester');
   if (managed) { try { await api('logout'); } catch { /* Local logout must still clear the token. */ } }
   managed = null; sessionStorage.removeItem('th-mes-session');
   const { error } = await client.auth.signOut({ scope: 'local' });
+  ++authRevision;
   await listener?.(null);
   if (error) throw error;
 }

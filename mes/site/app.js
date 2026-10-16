@@ -46,6 +46,7 @@ const state = {
   leaders: [],
   departments: [],
   issues: [],
+  myIssues: [],
   devices: [],
   page: "dashboard",
   selected: null,
@@ -82,14 +83,12 @@ function toast(message) {
 }
 function errorMessage(e) {
   const c = String(e?.code || "");
+  if (["invalid-credentials", "rate-limited", "password-policy"].includes(c)) return e.message;
   if (c === "owner-required") return "This Google account is not accepted as the MES owner. Use eric.scorp93@gmail.com. Reset sign-in session to switch accounts.";
-  if (c === "backend-not-ready") return "MES database configuration needs attention. Check the deployed migration and API permissions.";
+  if (c === "backend-not-ready") return "Account service update required. Deploy the MES accounts SQL installer and the matching API.";
   if (c.includes("unauthenticated"))
     return "Sign in to the MES workspace first.";
-  if (c.includes("permission-denied"))
-    return e.message?.includes("Windows")
-      ? "Your verification has expired or the device was revoked. Verify this computer again."
-      : "Access denied. Confirm this user or owner is authorized and the MES access policies are deployed.";
+  if (c.includes("permission-denied")) return "This action is not allowed. Your account may be inactive or its session may have expired. Sign in again or contact the administrator.";
   if (
     c.includes("unavailable") ||
     c.includes("not-found") ||
@@ -146,7 +145,9 @@ function selectOptions(node, items, { placeholder, selected } = {}) {
 function openAccount(owner = false) {
   $("user-login-tab").setAttribute("aria-pressed", String(!owner));
   $("admin-login-tab").setAttribute("aria-pressed", String(owner));
-  $("windows-login-form").hidden = owner || !!state.user;
+  $("windows-login-form").hidden = true;
+  $("password-login-form").hidden = !!state.user;
+  $("activation-form").hidden = true;
   $("admin-login-form").hidden = !owner || !!state.user;
   $("signed-in-account").hidden = !state.user;
   showStatus("account-status", "");
@@ -172,15 +173,17 @@ function navigate(page) {
     toast("Owner access is required.");
     return;
   }
-  if (page === "create" && !requireMember()) return;
+  if (["create", "profile", "my-dashboard", "my-issues"].includes(page) && !requireMember()) return;
+  const section = page === "my-dashboard" ? "dashboard" : page === "my-issues" ? "issues" : page;
   state.page = page;
   document
     .querySelectorAll("main>.page")
-    .forEach((s) => (s.hidden = s.id !== `${page}-page`));
+    .forEach((s) => (s.hidden = s.id !== `${section}-page`));
   document
     .querySelectorAll("[data-page]")
     .forEach((b) => b.classList.toggle("active", b.dataset.page === page));
   $("page-crumb").textContent = {
+    "my-dashboard": "My dashboard", "my-issues": "My tickets", profile: "My profile",
     dashboard: "Dashboard",
     issues: "Issue list",
     create: "Submit feedback",
@@ -190,7 +193,11 @@ function navigate(page) {
   $("mobile-nav").setAttribute("aria-expanded", "false");
   document.querySelector(".sidebar").classList.remove("open");
   window.scrollTo({ top: 0, behavior: "instant" });
-  if (page === "settings") loadDevices();
+  $("dashboard-title").textContent = page === "my-dashboard" ? "My dashboard" : "Dashboard";
+  $("issues-title").textContent = page === "my-issues" ? "My tickets" : "Issue list";
+  if (page === "profile") populateProfile();
+  $("data-scope").textContent = page === "my-dashboard" ? "Your feedback · updates every 15 seconds." : state.preview ? "Preview only · sample data, no production connection." : "All workspace feedback · updates every 15 seconds.";
+  renderAll();
   if (page === "create") renderForm();
 }
 function renderDirectories() {
@@ -215,14 +222,18 @@ function renderForm() {
     ? "Preview mode. Submitting creates sample feedback only in this browser session."
     : state.user
       ? `${state.user.displayName} · ${t(state.isOwner ? "Owner access" : state.user.isTester ? "Tester access" : state.requiresWindows ? "Signed Windows verification active" : "Managed user access")}. ${t("Your identity is validated by the server.")}`
-      : "Verify this Windows computer before submitting feedback.";
+      : "Sign in with the account provided by your administrator.";
   $("submit-feedback").textContent = state.preview
     ? "Create preview feedback →"
     : "Submit feedback →";
 }
+function scopedIssues() {
+  if (!["my-dashboard", "my-issues"].includes(state.page)) return state.issues;
+  return state.preview ? state.issues.filter(i => i.reporterUid === state.user?.uid) : state.myIssues;
+}
 function selectedPeriod() {
   const days = $("dashboard-period").value;
-  return state.issues.filter(
+  return scopedIssues().filter(
     (i) =>
       days === "all" ||
       stamp(i.createdAt) >= Date.now() - Number(days) * 86400000,
@@ -394,7 +405,7 @@ function renderDepartments(issues) {
     );
 }
 function filtered() {
-  return filterIssues(state.issues, {
+  return filterIssues(scopedIssues(), {
     search: $("issue-search").value,
     status: $("issue-status").value || "All",
     department: $("issue-department").value || "All",
@@ -707,10 +718,8 @@ function renderSettings() {
       edit = el("button", "Edit", "text-button"),
       toggle = el("button", u.active ? "Deactivate" : "Restore", "text-button");
     edit.onclick = () => {
-      const name = window.prompt(t("Display name"), u.displayName);
-      if (!name?.trim()) return;
       const username = window
-        .prompt(t("Windows username"), u.username)
+        .prompt(t("Username"), u.username)
         ?.trim()
         .toLowerCase();
       if (!username) return;
@@ -720,14 +729,12 @@ function renderSettings() {
       }
       run("settings-status", edit, async () => {
         if (state.preview) {
-          u.displayName = name.trim();
           u.username = username;
         } else
           await callable("manageUser", {
             operation: "update",
             uid: u.id,
             username,
-            displayName: name.trim(),
           });
         renderDirectories();
         showStatus("settings-status", "User updated.");
@@ -745,7 +752,19 @@ function renderSettings() {
         renderDirectories();
         showStatus("settings-status", "User access updated.");
       });
-    controls.append(edit, document.createTextNode(" · "), toggle);
+    const reset = el("button", "New activation link", "text-button");
+    reset.onclick = () => {
+      if (!confirm(t("Reset this account? Its current password and sessions will be revoked."))) return;
+      run("settings-status", reset, async () => {
+        if (state.preview) { toast("Preview only. No activation link was issued."); return; }
+        displayActivation(await callable("resetUserActivation", { uid: u.id }));
+        showStatus("settings-status", "Activation link ready. Share it privately with the user.");
+      });
+    };
+    if (u.accountState === "pending") active.append(badge("Pending activation", "state"));
+    edit.disabled = toggle.disabled = reset.disabled = ["mes-owner", "mes-tester"].includes(u.id);
+    reset.disabled ||= !u.active;
+    controls.append(edit, document.createTextNode(" · "), toggle, document.createTextNode(" · "), reset);
     row.append(active, controls);
     $("user-rows").append(row);
   }
@@ -806,7 +825,7 @@ function updateIdentity() {
     ? "Sample data · preview"
     : state.ready
       ? "Live workspace"
-      : "Not connected";
+      : state.user ? "Connecting…" : "Sign in to connect";
   if (!state.isOwner && state.page === "settings") navigate("dashboard");
   renderForm();
 }
@@ -817,10 +836,10 @@ function stopLive() {
 }
 function onDataError(error) {
   message(errorMessage(error));
-  if (String(error.code).includes("permission-denied") && state.user) {
+  if (["permission-denied", "unauthenticated"].includes(String(error.code)) && state.user) {
     stopLive();
     toast(
-      "Workspace access was denied. Verify your account or ask the owner to check the deployed MES access policies.",
+      "This action is not allowed. Your account may be inactive or its session may have expired. Sign in again or contact the administrator.",
     );
     logout().catch(() => handleAuth(null));
   }
@@ -829,15 +848,16 @@ function subscribeLive() {
   stopLive();
   const add = (path, field, order) => unsubscribers.push(watchRecords(path, (rows) => {
     state[field] = rows;
-    if (field === "issues") { state.ready = true; renderAll(); updateIdentity(); }
+    if (["issues", "myIssues"].includes(field)) { state.ready = true; renderAll(); updateIdentity(); }
     else renderDirectories();
   }, onDataError, order));
   add("teamLeaders", "leaders");
   add("departments", "departments");
   if (state.isOwner) add("users", "users");
   add("issues", "issues", "desc");
+  add("myIssues", "myIssues", "desc");
   unsubscribers.push(watchRecords("settings/policy", (rows) => {
-    state.requiresWindows = rows[0]?.requiresWindows !== false;
+    state.requiresWindows = false;
     renderForm();
   }, onDataError));
   $("data-scope").textContent = "All workspace feedback · updates every 15 seconds.";
@@ -1155,7 +1175,7 @@ $("user-form").onsubmit = (e) => {
     if (!safeUsername(username) || username === "hpham") {
       showStatus(
         "settings-status",
-        "Use a valid Windows username. hpham is reserved for the owner.",
+        "Use a valid username. hpham is reserved for the owner.",
       );
       return;
     }
@@ -1171,11 +1191,9 @@ $("user-form").onsubmit = (e) => {
         active: true,
       });
     else
-      await callable("manageUser", {
-        operation: "create",
-        username,
-        displayName,
-      });
+      displayActivation(await callable("manageUser", {
+        operation: "create", username, displayName,
+      }));
     $("user-form").reset();
     renderDirectories();
     showStatus("settings-status", "User created.");
@@ -1248,59 +1266,63 @@ $("device-form").onsubmit = (e) => {
     showStatus("settings-status", "Device registered.");
   });
 };
-$("windows-login-form").onsubmit = (e) => {
+$("password-login-form").onsubmit = e => {
   e.preventDefault();
-  run(
-    "account-status",
-    $("windows-login-form").querySelector("button"),
-    async () => {
-      if (state.preview) {
-        state.user = { uid: "demo-1", ...state.users[0] };
-        state.isOwner = false;
-        updateIdentity();
-        $("account-dialog").close();
-        return;
-      }
-      const selected = state.users.find((u) => u.id === $("login-user").value);
-      if (!selected) {
-        showStatus("account-status", "Select your display name.");
-        return;
-      }
-      let token;
-      if (state.requiresWindows) {
-        const challenge = await callable("startWindowsChallenge", {
-          username: selected.username,
-        });
-        let response;
-        try {
-          response = await fetch("http://127.0.0.1:8765/attest", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(challenge),
-            signal: AbortSignal.timeout(12000),
-          });
-        } catch {
-          showStatus(
-            "account-status",
-            "Cannot reach the Windows agent. Start the installed TH MES agent and allow local-network access in your browser.",
-          );
-          return;
-        }
-        const proof = await response.json();
-        if (!response.ok) {
-          showStatus(
-            "account-status",
-            proof.error || "No matching Windows profile found.",
-          );
-          return;
-        }
-        token = (await callable("completeWindowsChallenge", proof)).sessionToken;
-      } else
-        token = (await callable("loginManagedUser", { uid: selected.id }))
-          .sessionToken;
-      await managedLogin(token);
-    },
-  );
+  run("account-status", e.currentTarget.querySelector("button"), async () => {
+    const username = $("account-username").value.trim().toLowerCase();
+    const password = $("account-password").value;
+    try {
+      const result = await callable("passwordLogin", { username, password });
+      $("account-password").value = "";
+      await managedLogin(result.sessionToken);
+    } finally { $("account-password").value = ""; }
+  });
+};
+function showActivation(username = "", code = "") {
+  if (!$("account-dialog").open) openAccount();
+  $("password-login-form").hidden = true; $("admin-login-form").hidden = true;
+  $("activation-form").hidden = false; $("signed-in-account").hidden = true;
+  $("activate-username").value = username; $("activate-code").value = code;
+}
+$("show-activation").onclick = () => showActivation($("account-username").value);
+$("back-to-login").onclick = () => { $("activate-password").value = ""; $("activate-confirm").value = ""; $("activate-code").value = ""; $("account-dialog").close(); openAccount(); };
+$("activation-form").onsubmit = e => {
+  e.preventDefault();
+  run("account-status", e.currentTarget.querySelector('button[type="submit"],button:not([type])'), async () => {
+    if ($("activate-password").value !== $("activate-confirm").value) throw Object.assign(new Error("Passwords do not match."), { code: "invalid-argument" });
+    const result = await callable("activateAccount", { username: $("activate-username").value.trim().toLowerCase(), activationCode: $("activate-code").value.trim(), password: $("activate-password").value });
+    $("activation-form").reset(); $("activation-form").hidden = true;
+    await managedLogin(result.sessionToken);
+  });
+};
+function displayActivation(result) {
+  const link = new URL(location.origin + "/");
+  link.hash = new URLSearchParams({ activate: result.activationCode, username: result.username }).toString();
+  $("activation-link").value = link.href; $("activation-result").hidden = false;
+}
+$("copy-activation").onclick = () => run("settings-status", $("copy-activation"), async () => { await navigator.clipboard.writeText($("activation-link").value); toast("Activation link copied. Share it privately."); });
+function populateProfile() {
+  const user = state.user || {};
+  for (const [id, key] of [["profile-username","username"],["profile-name","displayName"],["profile-email","email"],["profile-phone","phone"],["profile-title","jobTitle"]]) $(id).value = user[key] || "";
+  $("profile-form").querySelector("button").disabled = !!user.isTester;
+  $("password-form").hidden = !!user.isTester;
+}
+$("profile-form").onsubmit = e => {
+  e.preventDefault();
+  run("profile-status", e.currentTarget.querySelector("button"), async () => {
+    const data = { displayName: $("profile-name").value.trim(), email: $("profile-email").value.trim(), phone: $("profile-phone").value.trim(), jobTitle: $("profile-title").value.trim() };
+    if (!state.preview) await callable("saveProfile", data);
+    Object.assign(state.user, data); updateIdentity(); showStatus("profile-status", "Profile saved.");
+  });
+};
+$("password-form").onsubmit = e => {
+  e.preventDefault();
+  run("password-status", e.currentTarget.querySelector("button"), async () => {
+    if ($("new-password").value !== $("confirm-password").value) throw Object.assign(new Error("Passwords do not match."), { code: "invalid-argument" });
+    if (state.preview) { showStatus("password-status", "Preview only. No password was changed."); return; }
+    const result = await callable("changePassword", { currentPassword: $("current-password").value, password: $("new-password").value });
+    $("password-form").reset(); await managedLogin(result.sessionToken); navigate("profile"); toast("Password updated. Other sessions were signed out.");
+  });
 };
 $("owner-google-login").onclick = () =>
   run("account-status", $("owner-google-login"), async () => {
@@ -1331,7 +1353,7 @@ $("start-tester").onclick = () => run("account-status", $("start-tester"), () =>
 $("exit-tester").onclick = () => run("account-status", $("exit-tester"), () => setTesterMode(false));
 $("reset-session").onclick = () => run("account-status", $("reset-session"), async () => {
   if (!state.preview) await logout();
-  showStatus("account-status", "Session cleared. Choose Owner and sign in with eric.scorp93@gmail.com.");
+  showStatus("account-status", "Session cleared. Sign in with your username and password.");
 });
 $("user-login-tab").onclick = () => {
   if ($("account-dialog").open) $("account-dialog").close();
@@ -1364,7 +1386,7 @@ $("preview-admin").onclick = () => {
   );
 };
 $("new-feedback").onclick = () => navigate("create");
-$("view-all").onclick = () => navigate("issues");
+$("view-all").onclick = () => navigate(state.page === "my-dashboard" ? "my-issues" : "issues");
 $("back-to-issues").onclick = () => navigate("issues");
 document
   .querySelectorAll("[data-page]")
@@ -1452,8 +1474,9 @@ $("refresh-button").onclick = async () => {
 async function loadDirectory() {
   try {
     const data = await callable("getDirectory");
-    state.users = data.users;
-    state.requiresWindows = data.requiresWindows;
+    if (data.accountVersion !== 1 || data.apiVersion !== "accounts-v1") throw Object.assign(new Error("Account service update required"), { code: "backend-not-ready" });
+    state.users = data.users || [];
+    state.requiresWindows = false;
     renderDirectories();
     message("");
   } catch (e) {
@@ -1467,6 +1490,7 @@ async function handleAuth(user) {
   state.isOwner = false;
   state.ready = false;
   state.issues = [];
+  state.myIssues = [];
   state.users = [];
   state.leaders = [];
   state.departments = [];
@@ -1474,6 +1498,8 @@ async function handleAuth(user) {
   state.timeline = [];
   state.selected = null;
   state.files = [];
+  $("activation-result").hidden = true; $("activation-link").value = "";
+  $("profile-form").reset(); $("password-form").reset();
   $("device-result").replaceChildren();
   $("device-result").hidden = true;
   renderDevices();
@@ -1485,7 +1511,7 @@ async function handleAuth(user) {
   renderFiles();
   $("detail-content").replaceChildren();
   $("issue-timeline").replaceChildren();
-  if (["detail", "create", "settings"].includes(state.page))
+  if (["detail", "create", "settings", "profile", "my-dashboard", "my-issues"].includes(state.page))
     navigate("dashboard");
   renderAll();
   updateIdentity();
@@ -1496,16 +1522,17 @@ async function handleAuth(user) {
   try {
     const session = await callable("getSession");
     if (generation !== sessionGeneration) return;
+    if (session.accountVersion !== 1) throw Object.assign(new Error("Account service update required"), { code: "backend-not-ready" });
     state.user = session.user;
     state.isOwner = session.isOwner;
-    state.requiresWindows = session.requiresWindows;
+    state.requiresWindows = false;
     message("");
     updateIdentity();
     renderDirectories();
     subscribeLive();
-    if ($("account-dialog").open) $("account-dialog").close();
+    if ($("account-dialog").open && $("activation-form").hidden) $("account-dialog").close();
     toast(
-      state.isOwner ? "Signed in as MES owner." : state.user.isTester ? "Tester mode. Feedback is saved to the live workspace." : "Windows identity verified.",
+      state.isOwner ? "Signed in as MES owner." : state.user.isTester ? "Tester mode. Feedback is saved to the live workspace." : "Signed in successfully.",
     );
   } catch (e) {
     if (generation === sessionGeneration) {
@@ -1660,4 +1687,11 @@ if (state.preview) {
   );
   renderAll();
   updateIdentity();
+}
+
+const activationParams = new URLSearchParams(location.hash.slice(1));
+if (activationParams.has("activate")) {
+  const code = activationParams.get("activate"), username = activationParams.get("username") || "";
+  history.replaceState(null, "", location.pathname + location.search);
+  if (/^[a-f0-9]{64}$/.test(code || "")) showActivation(username, code);
 }

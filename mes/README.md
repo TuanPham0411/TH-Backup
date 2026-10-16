@@ -1,295 +1,180 @@
 # TH MES — Supabase / Netlify Free
 
-The independent MES feedback workspace for **mes.th.io.vn** uses Supabase project
-**aaosgmphvhjcygldocyi** for Google owner authentication, PostgreSQL, a private
-attachment bucket and the mes-api Edge Function. There is no Firebase dependency,
-Cloud Functions or Blaze requirement in MES. The portfolio in ../site keeps its
-existing Firebase project and Netlify settings.
+Independent feedback workspace for **mes.th.io.vn** / **mes-th.netlify.app**.
+Supabase project: **aaosgmphvhjcygldocyi**. The portfolio in ../site retains its
+existing Firebase configuration; MES has no Firebase dependency or paid-service
+requirement. Free-plan quotas still apply to storage, traffic and Edge requests.
 
-Only **eric.scorp93@gmail.com**, confirmed through Supabase Google OAuth, is the MES
-owner. `hpham` is an owner label, not a password login. Managed operators use the
-signed Windows verification flow and receive opaque, server-revocable 12-hour
-sessions. Their tokens are hashed in the database and held in sessionStorage in
-the browser; signing keys stay out of the frontend and source control.
+## Account model
 
-## Features and boundaries
+- The owner provisions usernames in Administration. There is no public signup.
+- Creating an account returns a private **one-time activation link**, valid for
+  **72 hours**. Share it directly with that user. They choose their own password
+  on first use; no email delivery service or Windows agent is required.
+- Passwords require at least 10 characters and at most 72 UTF-8 bytes. PostgreSQL
+  pgcrypto bcrypt (cost 10) stores only hashes. Activation codes and 12-hour session
+  tokens are 256-bit random values, also stored only as hashes. The activation
+  secret is in a URL fragment and removed from the address bar when opened.
+- Owner account **hpham** is reserved in the database. Bootstrap is performed only
+  by the project owner through SQL Editor, never through an anonymous endpoint.
+  The optional Google owner login remains limited to the confirmed
+  **eric.scorp93@gmail.com** OAuth identity. A linked email/password Supabase Auth
+  session is not accepted as Google proof.
+- Owners can create/rename, disable/restore accounts and issue replacement links.
+  Replacement activation revokes the previous password, codes and sessions.
+  Renaming/disabling, password changes and sign-out revoke sessions on the server.
+  Restoring an account never resurrects revoked sessions. Password resets require
+  an administrator; there is no SMTP dependency. Reserved owner/Tester accounts
+  cannot be reset, renamed or disabled through user-management APIs.
+- Users edit their own display name, contact email, phone and job title. Updating
+  contact email does not change login or grant privileges. User-provided roles or
+  target user IDs cannot change the acting identity. Historical ticket labels
+  remain unchanged.
+- **My dashboard** and **My tickets** are filtered by the authenticated user ID
+  inside PostgreSQL. The shared dashboard and issue list remain available to all
+  active members. Ticket details, progress, timeline and attachments remain shared
+  within the workspace; this is not private per-ticket access control.
+- The legacy name-selection/Windows sign-in endpoints and legacy sessions are
+  disabled after this update. Existing user IDs and tickets are retained. Issue a
+  new activation link for each existing user to enable password access.
+- Login/activation and current-password checks allow 10 attempts per account in a
+  15-minute window. Counters persist even after failed attempts. This is not a
+  replacement for infrastructure-level abuse protection.
 
-- Full-width dashboard, status and department charts, activity, issue filters,
-  pagination and safe CSV export. Catalogs, users and issues refresh every 15
-  seconds, with refresh requests after writes. Reads are batched into one Edge request per
-  refresh, and polling pauses in hidden tabs. No production sample data.
-- Feedback: display name, owner-managed Team Leader/Department, process, subject,
-  detailed description and up to five nonempty files, each at most 10 MB.
-- Owner: edit/delete, assess, change priority/status, add comments, inspect complete
-  timeline with before/after audit; manage catalogs, users and Windows devices.
-- Issues/files require an active verified operator or the sole owner. They are not
-  public. Active display names/usernames are exposed before sign-in by design.
-- All database operations go through one transactional, service-only dispatcher.
-  Tables live in mes_private with RLS, no browser grants and no browser policies.
-  Anonymous/authenticated roles cannot invoke the dispatcher. The Edge Function
-  validates Google access tokens with Supabase Auth, or passes opaque sessions for
-  database verification. It never trusts client-supplied roles or actor identities.
-- Storage bucket is private, with no browser object policies. Scoped signed upload
-  URLs are issued only for five reserved slots in the first 15 minutes. Supabase
-  upload URLs remain valid for two hours once issued, cannot overwrite, and enforce
-  bucket size/MIME limits. Attachments are finalized using actual object metadata.
-  Downloads are signed for 60 seconds; an issued link can be used until it expires.
-- Upload failures leave the already-created issue saved. Do not resubmit it.
-  Owner deletion tombstones the issue, removes objects then removes issue/timeline;
-  retry deletion if storage cleanup failed. Unfinalized uploads need owner follow-up.
-- Supported files: JPG, PNG, WEBP, PDF, TXT, CSV, XLSX. This is not malware scanning.
-- Windows proof checks the presence of a matching profile folder under C:\Users,
-  not the currently logged-on identity. A protected local agent signs a one-time
-  five-minute nonce. User rename/deactivation, device revocation, expiry and logout
-  invalidate access. Keep Windows verification enabled; turning it off deliberately
-  allows account selection without machine proof. Device keys are software secrets,
-  not hardware attestation. See windows-agent/README.txt for installation.
+## Deploy this update (database + API + frontend are all required)
 
-## 1. Apply database migration
+### 1. Supabase SQL Editor
 
-Free plan is sufficient for this implementation within its quotas. Do not enable
-paid plans if you want no service charges. Free resources can pause or hit limits;
-there is no promise of unlimited storage, requests or availability. Review current
-Supabase and Netlify plan limits in your accounts. Domain renewal is separate.
+Open the correct project → **SQL Editor → New query**. Run the **entire** file:
 
-Open your project's **SQL Editor**, create a new query and run the complete file:
+**[supabase/install-accounts.sql](supabase/install-accounts.sql)**
 
-**supabase/migrations/202610150001_mes.sql**
+This generated installer applies every MES migration in one transaction, supports
+both fresh and existing databases, preserves data and can be rerun. Do not run
+only part of the file or edit dollar-quote delimiters. It restores service-only
+API grants and creates the private attachment bucket. Do not expose mes_private
+or add anonymous table/storage policies.
 
-This creates private tables, the transactional dispatcher, service-role-only grants
-and the private mes-attachments bucket. Run it once on a fresh project. Do not open
-mes_private as an exposed API schema and do not add permissive public policies.
-If the project already has MES Firebase data, it has NOT been imported by this
-change. Preserve Firebase until a separate reviewed export/import is complete.
-Existing Firebase sessions and old issued challenges do not migrate.
+At the end, `owner_activation` contains username **hpham** and a private
+`activationCode` if the owner has not activated yet. Do not post this result in
+chat or commit it. On the website select **Activate account**, enter hpham and that
+code, then choose your password. If the result is `already-activated`, use your
+existing password. To obtain another code before first activation:
 
-## 2. Enable Google owner login
-
-In Supabase **Authentication → Sign In / Providers → Google**, enable Google and
-configure your Google OAuth Client ID/secret directly in the dashboard. Never paste
-OAuth secrets into chat, source code or VITE variables.
-
-In Google Cloud Console create/use a Web OAuth client and add this exact authorized
-redirect URI (you can add it to an existing client without removing Firebase URIs):
-
-```
-https://aaosgmphvhjcygldocyi.supabase.co/auth/v1/callback
+```sql
+SELECT public.mes_issue_owner_activation();
 ```
 
-If Google consent is in Testing mode, add eric.scorp93@gmail.com as a test user.
-Google OAuth setup does not require Firebase Blaze.
+For recovery of an already activated owner, the project owner can explicitly
+revoke its password/sessions and issue a new code **in SQL Editor only**:
 
-In Supabase **Authentication → URL Configuration** set Site URL to
-`https://mes.th.io.vn` and allow that exact URL plus the exact new Netlify hostname
-(https://mes-th.netlify.app). Do not use broad wildcard redirect URLs. Keep Google signup enabled
-for the owner's first login; the Edge API rejects every other Google email. Managed
-operators do not need Supabase Auth accounts, emails or passwords.
+```sql
+SELECT mes_private.issue_account_activation('mes-owner');
+```
 
-## 3. Deploy the Edge Function
+The owner-bootstrap function and private helpers have no browser/public execution
+grants. These SQL commands require project-owner database access.
 
-The browser publishable key is already in site/config.js. It does NOT authorize
-schema changes or API deployment. Use Supabase CLI in your own trusted terminal
-with Node 22+ (or Google Cloud Shell):
+If using migrations through the Supabase CLI instead, `supabase db push` applies
+202610160004_accounts.sql after previous migrations. Then run the bootstrap query
+in SQL Editor. Use either migration deployment or the full SQL Editor installer.
+If mixing methods later, reconcile CLI migration history first.
 
-```sh
+### 2. Deploy the Edge API from Cloud Shell / terminal
+
+For a new checkout:
+
+```bash
+git clone https://github.com/TuanPham0411/Thien-Ha.git
+cd Thien-Ha/mes
 npx --yes supabase@2.121.0 login
-cd mes
 npx --yes supabase@2.121.0 functions deploy mes-api --project-ref aaosgmphvhjcygldocyi
 ```
 
-Log in through the CLI's secure flow, never by sharing a token in chat. The included
-supabase/config.toml sets verify_jwt=false because operators use opaque Windows
-sessions, not Supabase JWTs. **The function performs authorization itself**; turning
-off gateway verification does not make data public. Supabase supplies SUPABASE_URL
-and SUPABASE_SERVICE_ROLE_KEY to Edge Functions. Never copy the latter to Netlify,
-VITE variables, the Windows agent or chat.
+For an existing checkout, pull the latest main first and run the deployment from
+its `mes` directory. Complete CLI authentication in your own terminal/browser.
+Never send access tokens, database passwords or service-role keys in chat.
+`supabase/config.toml` sets verify_jwt=false because the function validates explicit
+opaque account sessions and optional owner OAuth itself. Keep that config: the
+public publishable key is not a JWT. Supabase supplies the service key only to the
+Edge runtime. It must never appear in frontend settings or Netlify variables.
 
-For a new Netlify hostname add it to the exact CORS allowlist in the Function's
-secrets/settings, for example set MES_ALLOWED_ORIGINS to:
+CORS permits only https://mes.th.io.vn and https://mes-th.netlify.app by default.
+To add another origin, configure MES_ALLOWED_ORIGINS on Supabase; do not use `*`.
 
-```
-https://mes.th.io.vn,https://mes-th.netlify.app
-```
+### 3. Netlify frontend
 
-Defaults allow https://mes.th.io.vn and https://mes-th.netlify.app. For local development explicitly add the exact
-local origin in a local functions environment file. Do not use `*` with sessions.
-No Firebase Storage CORS command or Google service-account IAM setup is needed.
+Use the separate **mes-th** Netlify project connected to main:
 
-Alternatively, to deploy migration plus function via CLI instead of SQL Editor:
+- Base directory: **mes**
+- Build: **npm run build**
+- Publish: **dist**
+- Node: **24**
 
-```sh
-npx --yes supabase@2.121.0 login
-bash mes/scripts/deploy.sh
-```
+Wait for a successful deployment of this commit; trigger a deploy if automatic
+builds are not enabled. Then refresh the site. The interface checks both API
+`accounts-v1` and database accountVersion 1 and explains when the backend update
+is missing. A green frontend deployment alone does not deploy Supabase.
 
-This links the project and asks for the database password in your terminal; do not
-send it in chat. Do not separately run db push after manually running the same SQL
-unless you first reconcile migration history with Supabase CLI migration repair.
+Optional Google owner access also needs Supabase Google provider configuration,
+its OAuth callback URL in Google Cloud and the two MES origins in Supabase Auth
+redirect URLs. Username/password access does not require that setup.
 
-## 4. Create a separate Netlify site
+## Workspace features
 
-Import TuanPham0411/Thien-Ha, branch main, as a **new** Netlify project:
+Full-width English/Vietnamese dashboard, activity/status/department charts,
+reporting-period filters, shared/personal issue search, status/priority filters,
+pagination and CSV export. Polling batches reads every 15 seconds and pauses in
+hidden tabs. Anonymous visitors see the shell and can sign in; workspace records
+are not public. There is no sample data in production.
 
-| Setting | Value |
-|---|---|
-| Base directory | mes |
-| Build command | npm run build |
-| Publish directory | dist, relative to base |
-| Config file | mes/netlify.toml |
-| Node | 24 |
+Feedback requires the signed-in requester, owner-managed department, process and
+content. Multiple optional incident moments or ranges are supported. Rich feedback
+supports font/size/style/color, headings/lists/alignment, undo/redo and inline local,
+pasted or dropped images. Owners assess, prioritize, update status, comment,
+edit/delete issues and inspect the complete audit timeline. Tester mode is an
+owner-only simulation which stores real tickets under the reserved Tester ID.
 
-Optional public overrides: VITE_MES_SUPABASE_URL and
-VITE_MES_SUPABASE_PUBLISHABLE_KEY. Do not set VITE_MES_PREVIEW in production.
-Add mes.th.io.vn to this new project and follow its DNS instructions for the mes
-record. Keep portfolio project settings, th.io.vn/www records and nameservers.
-Complete HTTPS, Supabase redirect URLs and the exact Edge CORS allowlist above.
+Rich content is a bounded versioned Delta, never stored HTML. The shared validator
+normalizes allowed formats, rejects external image URLs and references attachment
+slots 0–4. Rendering uses safe DOM elements/textContent. Existing plain text still
+works. Private image previews open in a fit/full-size viewer.
 
-## 5. Initialize and test live
+Up to five nonempty JPG/PNG/WEBP/PDF/TXT/CSV/XLSX files, at most 10 MB each. Storage
+has no anonymous/browser policies. Authorized downloads use short-lived signed
+links. Uploads are allowed in reserved slots for 15 minutes after submission;
+owners may use remaining slots later. Issued signed upload URLs last up to two
+hours and cannot overwrite. Actual object metadata is validated before finalizing
+attachments. This is not malware scanning.
 
-1. Owner → Continue with Google → eric.scorp93@gmail.com.
-2. Create Team Leaders and Departments; create users with the real normalized
-   Windows profile folder username and display name. Names must be unique.
-3. Register a Windows computer and download its unique device.json immediately.
-   The secret is returned once; it cannot be read back from listDevices.
-4. Download /downloads/th-mes-agent.zip. Review/install on Windows with trusted
-   Python 3.11+; follow its README. Installer uses an interactive scheduled task
-   for the installing account, not a SYSTEM service. Shared workstations require
-   IT to deploy per account or package a managed service. Allow browser local-network
-   access when prompted. Never distribute device keys publicly.
-5. Verify a matching user; submit feedback plus an attachment, download it, check
-   dashboard and timeline. Owner changes status/assessment/comments; verify the
-   operator cannot perform those actions. Revoke the device and confirm denial.
-6. Test absent/mismatched Windows folders and another Google account (denied),
-   inactive users, expired/replayed proofs, and sign-out clearing private views.
+If upload fails, the issue is already saved; avoid duplicate submission. Owner
+delete tombstones the issue, deletes objects, then removes the issue and timeline;
+retry if cleanup fails. Unfinalized uploads may need owner follow-up.
 
-## Local development and verification
+## Development and checks
 
-```sh
-# From repository root, Node 24
-npm ci --cache /tmp/th-npm-cache
-npm ci --prefix mes --cache /tmp/th-npm-cache
-npm test
-python3 -m unittest discover -s mes/tests -v
+```bash
+npm ci
 npm run build
-npm run build:mes
-npm run dev:mes
 ```
 
-In-memory preview, disconnected from all production services:
+From the repository root: `npm test`, `npm run build:mes` and
+`bash mes/scripts/test-database.sh` (Docker required). The database suite uses a
+throwaway PostgreSQL container; it tests all incremental migrations plus repeated
+full-installer runs. No production data is touched.
 
-```sh
-VITE_MES_PREVIEW=true npm run build:mes -- --outDir /tmp/th-mes-preview
+From mes: `deno task check` and `deno task test:edge`. Edge HTTP tests mock Supabase
+network calls and check identity, CORS, account errors, Storage metadata and rich
+content normalization. `VITE_MES_PREVIEW=true npm run build` is an isolated UI demo;
+never enable it for production.
+
+Regenerate the consolidated installer after changing migrations:
+
+```bash
+node mes/scripts/build-installer.mjs
 ```
 
-It has a permanent sample banner and discards changes on refresh. It cannot prove
-live authorization. SQL integration checks are in tests/supabase.sql and the
-isolated PostgreSQL runner scripts/test-database.sh. The runner stubs only the
-Supabase storage.buckets schema/roles needed for migration; it does not emulate
-Supabase Auth, Storage HTTP or Google's OAuth service. No production data is used.
-Deno type check: `deno task check`; Edge HTTP tests: `deno task test:edge` (from mes).
-
-Current validation: Node tests, Python agent core/protocol tests, SQL migration and
-transactional authorization/workflow tests run locally. Browser preview is tested
-at desktop/tablet/mobile sizes; production browser checks use mocked API responses.
-Live Supabase deployment, Google login, actual Storage requests and real Windows
-installation remain unverified until the account setup above is complete.
-
-## Tester and linked Google account update (2026-10-16)
-
-For an existing installation, run only **supabase/migrations/202610160001_tester.sql**
-in SQL Editor, then redeploy mes-api from this revision. New installations run
-both migrations in timestamp order. This update preserves issues/files/users and
-adds one reserved account: display name **Tester**, username **mes.tester**.
-
-The owner signs in with Google, opens the account panel and chooses **Test as user
-(Tester)**. The banner stays visible; **Return to owner** exits. Test submissions
-and files are real production records marked with reporter Tester, not in-memory
-fixtures. Use existing catalogs and delete test issues as owner when finished.
-There is no shared Tester password. Tester cannot log in from the public user
-selector, Windows challenges or passwordless selection even when Windows policy
-is disabled. Every simulated request still requires the verified owner's Google
-OAuth token. The server downgrades it to the Tester identity and rejects owner
-operations; anonymous users/regular operators cannot forge this mode. This tests
-user permissions and submission handling, not Windows agent installation.
-
-Supabase keeps primary provider=email for accounts created with email then linked
-to Google. Owner checks now use the Auth-validated JWT's OAuth authentication method
-and linked Google identity, not that historical primary-provider value. A password
-session remains rejected even when the account has a Google identity. Accounts
-with another linked OAuth provider fail closed until their provider handling is
-reviewed; the configured MES provider is Google only.
-
-## Bilingual feedback, incident times and image gallery update
-
-Existing installations: run only **supabase/migrations/202610160002_feedback_experience.sql**
-after the Tester upgrade above. This upgrade changes the database dispatcher and
-preserves existing reports. New installations apply all migration files in order.
-The generic mes-api endpoint already forwards the new fields; frontend updates
-are delivered through the independent MES Netlify build.
-
-The form automatically uses the signed-in requester, then asks for Department,
-Process/Station and feedback content. It no longer asks for a Team Leader or a
-separate title; the server derives the internal summary from the first 100
-characters of the first content line. Existing Team Leader data is retained for
-historical reports. Feedback content is 1–5,000 characters.
-
-Incident times are optional: up to 20 mixed point/range entries, with explicit
-start/end datetimes. Local form values convert to ISO UTC for storage; report
-views format them in the browser's local timezone. Invalid/reversed ranges and
-dates outside 2000–2100 are rejected by both client and database. CSV export
-includes the incident times as ISO values.
-
-The VI/EN selector persists in localStorage, defaults to Vietnamese and updates
-labels, states and dates. It does not translate or rewrite user names, feedback,
-filenames or comments. Switching language preserves the feedback draft and time
-rows. Vietnamese font glyphs are self-hosted alongside the Latin font subset.
-
-JPG/PNG/WEBP attachments appear in a report gallery. Clicking opens an accessible
-native dialog with Fit/100% controls, double-click zoom toggle, Escape to close
-and scroll/pan at natural size. Non-image files retain download controls. Images
-are fetched through authenticated, 60-second signed downloads, then rendered as
-session-local blob URLs; no public bucket or permanent links are introduced.
-A bounded cache avoids repeated image downloads during dashboard refreshes and
-is cleared/revoked on auth changes/sign-out. Preview images stay in memory only.
-
-Validation includes the PostgreSQL upgrade and invalid-time/identity assertions,
-Node model tests, and mocked browser workflows at 1440, 1024 and 390 pixels for
-language persistence, draft preservation, simplified submission, multiple times,
-user content preservation, image viewing and layout. Actual live signed image
-transfer and upgraded production schema still need deployment/account validation.
-
-## Rich feedback editor update
-
-Run **supabase/migrations/202610160003_rich_feedback.sql** after the previous
-feedback-experience migration, then redeploy **mes-api** from this revision.
-The frontend is published by the MES Netlify project. Existing plain-text feedback
-continues to display and can be opened in the new editor without losing its text.
-
-The create and owner-edit dialogs support font family, 12–32px size, headings,
-bold/italic/underline/strikethrough, lists, alignment, text color, clear formatting,
-undo/redo and inserting local images. Images may also be pasted from the clipboard
-or dropped into the editor. Inline images share the existing **5 total files,
-10 MB each** limit with ordinary attachments; JPG/PNG/WEBP are supported. Removing
-an attachment removes its inline occurrences from the create draft.
-
-Content is stored as a bounded versioned Delta in richDocument, not HTML. A shared
-validator in supabase/functions/_shared/rich-document.js runs in both the editor
-and Edge API. The API derives plain text for searching/title generation, strips
-unsupported formatting and rejects image URLs; images reference only reserved
-attachment slots 0–4. The report renderer builds allowlisted DOM elements using
-textContent and explicit styles, and resolves image slots through authenticated
-attachment downloads. Blob/data URLs and file bytes are never stored in documents.
-Legacy plain text remains in description; image-only feedback gets a summary.
-
-Owner edits keep the before/after rich document in the timeline. Owners may upload
-new images into remaining reserved slots after the operator's 15-minute upload
-window; ordinary users/Tester still keep that window and cannot edit reports.
-No overwrite permission or public bucket access is added. If an edit upload fails,
-retry saving the same open edit dialog so completed uploads can be finalized.
-Canceling a failed upload may require owner follow-up for the unfinalized slot.
-
-Checked locally: model validation and malicious URL/style bounds, Edge request
-normalization, PostgreSQL persistence/audit/upload permissions, and browser preview
-workflows at 1440/390px for formatting, font/color, local/clipboard/drop images,
-inline report display/full view, language changes and owner editing. Live backend
-migration, function deployment and authenticated file transfer require owner setup.
+Validated account lifecycle/authorization with local PostgreSQL, Edge HTTP tests,
+production build and browser API-mocked workflows at desktop/mobile sizes. Real
+Google OAuth, Supabase database/Edge deployment and production Storage transfer
+still require project-owner access; local tests do not prove live deployment.

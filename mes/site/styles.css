@@ -1830,3 +1830,16 @@ td strong {
 #edit-dialog { width:94vw; max-width:850px; max-height:92dvh; overflow:auto; }
 #edit-dialog .ql-editor { min-height:200px; max-height:45dvh; }
 @media(max-width:480px) { .rich-toolbar { padding:7px; gap:3px; }.rich-toolbar select { max-width:115px; }.rich-toolbar button { min-width:32px; min-height:36px; }.rich-editor-shell .ql-editor { min-height:200px; padding:14px; } }
+
+/* Account lifecycle and self-service profile */
+.profile-form { display:grid; gap:16px; margin-top:20px; }
+.profile-form label { display:grid; gap:7px; font-weight:500; }
+.profile-form input { width:100%; min-width:0; }
+.profile-form .helper { margin:0; font-weight:400; }
+.activation-result { padding:20px; margin:16px 0 24px; background:#eff5ff; border:1px solid #c7d8fc; border-radius:12px; }
+.activation-result label { display:grid; gap:8px; margin:12px 0; }
+.activation-result input { width:100%; font-family:monospace; }
+#account-dialog { max-height:92dvh; overflow:auto; }
+#admin-login-form { margin-top:20px; padding-top:16px; border-top:1px solid #e5eaf3; }
+[hidden] { display:none !important; }
+.settings-grid:has(> article[hidden]) { grid-template-columns:1fr; }

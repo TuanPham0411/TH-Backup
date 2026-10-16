@@ -7,6 +7,7 @@ let rpcInput: Record<string, unknown> | undefined;
 let trustedEmail = 'eric.scorp93@gmail.com';
 let deny = false;
 let databaseCode = 'P0001';
+let accountError: string | undefined;
 globalThis.fetch = async (input, init) => {
   const url = new URL(input instanceof Request ? input.url : String(input));
   const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
@@ -15,7 +16,7 @@ globalThis.fetch = async (input, init) => {
   if (url.pathname === '/rest/v1/rpc/mes_dispatch') {
     rpcInput = JSON.parse(String(init?.body));
     if (deny) return json({ message: 'private SQL detail and device secret', code: databaseCode }, 400);
-    return json({ ok: true, rows: [] });
+    return json(accountError ? { errorCode: accountError } : { ok: true, rows: [] });
   }
   if (url.pathname.startsWith('/storage/v1/object/info/')) return json({ name: 'slot', size: 27, content_type: 'text/plain', metadata: { size: 999, mimetype: 'fake/browser-value' } });
   throw new Error(`Unexpected test endpoint: ${url.pathname}`);
@@ -46,6 +47,7 @@ Deno.test('MES Edge authorization and request routing', async (t) => {
     trustedEmail = 'eric.scorp93@gmail.com';
     assert((await handler(request('getSession', {}, { authorization: `Bearer ${oauthToken}` }))).status === 200, 'owner denied');
     assert((rpcInput?.actor as { owner: boolean }).owner, 'owner context missing');
+    assert((rpcInput?.actor as { uid: string }).uid === 'mes-owner', 'Google and password owner must share reserved account');
     const passwordToken = 'header.' + btoa(JSON.stringify({amr:[{method:'password'}]})) + '.signature';
     assert((await handler(request('getSession', {}, { authorization: `Bearer ${passwordToken}` }))).status === 403, 'linked Google identity must not allow password login');
     await handler(request('getSession', {}, { authorization: `Bearer ${oauthToken}`, 'x-mes-tester':'true' }));
@@ -54,8 +56,21 @@ Deno.test('MES Edge authorization and request routing', async (t) => {
   await t.step('opaque operator session does not become owner', async () => {
     const session = 'a'.repeat(64);
     assert((await handler(request('read', { path: 'issues' }, { 'x-mes-session': session, 'x-mes-tester':'true' }))).status === 200, 'managed session failed');
-    assert(JSON.stringify(rpcInput?.actor) === JSON.stringify({ session }), 'managed identity forged');
+    assert(JSON.stringify(rpcInput?.actor) === JSON.stringify({ session, tester: true }), 'managed identity must be resolved by database');
     assert((await handler(request('finishDelete', {}, { 'x-mes-session': session }))).status === 400, 'internal cleanup exposed');
+  });
+  await t.step('account login and activation are anonymous, with safe structured failures', async () => {
+    for (const name of ['passwordLogin','activateAccount']) {
+      const response = await handler(request(name, {username:'hpham',password:'test-password'}, {authorization:'Bearer stale-session','x-mes-tester':'true'}));
+      assert(response.status === 200 && JSON.stringify(rpcInput?.actor) === '{}', 'public account operation trusted caller identity');
+    }
+    for (const [code,status] of [['invalid-credentials',401],['rate-limited',429],['password-policy',400]] as const) {
+      accountError = code;
+      const response = await handler(request('passwordLogin'));
+      assert(response.status === status && (await response.json()).code === code, 'account failure incorrectly mapped');
+    }
+    accountError = undefined;
+    assert((await handler(request('loginManagedUser'))).status === 401, 'legacy public login enabled');
   });
   await t.step('attachment metadata is read from Storage', async () => {
     const response = await handler(request('attachFiles', { issueId: 'issue', files: [{ slot: 'slot', name: 'evidence.txt', size: 1, type: 'image/png' }] }, { 'x-mes-session': 'a'.repeat(64) }));

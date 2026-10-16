@@ -28,21 +28,28 @@ Deno.serve(async (request) => {
     const actor: Record<string, unknown> = {};
     const token = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '');
     const managed = request.headers.get('x-mes-session');
-    if (token) {
+    if (token && !publicAction(name)) {
       const { data: auth, error } = await service.auth.getUser(token);
       if (error || !auth.user) return reply({ code: 'unauthenticated', error: 'Session expired' }, 401);
       if (!isGoogleOwner(auth.user, validatedTokenMethods(token))) return reply({ code: 'owner-required', error: 'Only the registered Google owner can use this login' }, 403);
       actor.owner = true;
       if (request.headers.get('x-mes-tester') === 'true') actor.tester = true;
-      actor.uid = auth.user.id; actor.name = auth.user.user_metadata?.full_name || 'MES Owner';
-    } else if (managed && /^[a-f0-9]{64}$/.test(managed)) actor.session = managed;
+      actor.uid = 'mes-owner'; actor.name = auth.user.user_metadata?.full_name || 'MES Owner';
+    } else if (managed && /^[a-f0-9]{64}$/.test(managed) && !publicAction(name)) {
+      actor.session = managed;
+      if (request.headers.get('x-mes-tester') === 'true') actor.tester = true;
+    }
     else if (!publicAction(name)) return reply({ code: 'unauthenticated', error: 'Sign in first' }, 401);
     async function dispatch(action: string, payload = data) {
       const { data: result, error } = await service.rpc('mes_dispatch', { action, payload, actor });
       if (error) {
-        const code = error.code === 'P0001' ? 'permission-denied' : 'backend-not-ready';
+        const code = error.code === '28000' ? 'unauthenticated' : error.code === 'P0001' ? 'permission-denied' : 'backend-not-ready';
         console.error('MES database request failed', { action, code: error.code });
         throw Object.assign(new Error('Database request failed'), { code });
+      }
+      if (result?.errorCode) {
+        const messages: Record<string,string> = { 'invalid-credentials': 'Incorrect credentials or activation link. Ask the administrator if you need a new link.', 'rate-limited': 'Too many attempts. Try again in 15 minutes.', 'password-policy': 'Use at least 10 characters and no more than 72 UTF-8 bytes.' };
+        throw Object.assign(new Error(messages[result.errorCode] || 'Account request failed'), { code: result.errorCode });
       }
       return result;
     }
@@ -84,11 +91,14 @@ Deno.serve(async (request) => {
       return reply(await dispatch('finishDelete'));
     }
     const result = await dispatch(name);
+    if (name === 'getDirectory') return reply({ ...result, apiVersion: 'accounts-v1' });
     if (name === 'registerDevice') result.allowedOrigins = [...origins];
     return reply(result);
   } catch (error) {
     const e = error as { code?: string; message?: string };
     // Do not send SQL details, tokens, device secrets or platform internals to callers.
+    if (['invalid-credentials','rate-limited','password-policy'].includes(e.code || '')) return reply({ code: e.code, error: e.message }, e.code === 'rate-limited' ? 429 : e.code === 'password-policy' ? 400 : 401);
+    if (e.code === 'unauthenticated') return reply({ code: e.code, error: 'Session expired or account inactive. Sign in again.' }, 401);
     const expected = e.code === 'permission-denied';
     return reply({ code: expected ? 'permission-denied' : e.code === 'backend-not-ready' ? 'backend-not-ready' : 'unavailable', error: expected ? 'Action denied. Check identity, active catalogs, field limits and verification expiry.' : 'MES service could not complete the request.' }, expected ? 403 : 503);
   }

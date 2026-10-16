@@ -19,5 +19,5 @@ export function validPath(value: unknown): value is string {
   return typeof value === 'string' && /^issues\/[a-zA-Z0-9_-]{1,128}\/[a-zA-Z0-9_-]{1,128}$/.test(value);
 }
 export function publicAction(name: string) {
-  return ['getDirectory', 'startWindowsChallenge', 'completeWindowsChallenge', 'loginManagedUser'].includes(name);
+  return ['getDirectory', 'passwordLogin', 'activateAccount'].includes(name);
 }

@@ -14,7 +14,7 @@ test('MES attachment paths bind exactly one issue and allocated slot', () => {
   assert.equal(validPath('issues/abc-123/slot-123'), true);
   for (const path of ['issues/../slot', 'issues/a/b/extra', 'issues/a', '/issues/a/b', null, 'other/a/b']) assert.equal(validPath(path), false);
 });
-test('Only directory and identity challenges are anonymous API operations', () => {
-  for (const name of ['getDirectory','startWindowsChallenge','completeWindowsChallenge','loginManagedUser']) assert.equal(publicAction(name), true);
-  for (const name of ['read','createIssue','setPolicy','registerDevice','deleteIssue','finishDelete']) assert.equal(publicAction(name), false);
+test('Only account entry and directory are anonymous API operations', () => {
+  for (const name of ['getDirectory','passwordLogin','activateAccount']) assert.equal(publicAction(name), true);
+  for (const name of ['read','createIssue','setPolicy','registerDevice','deleteIssue','finishDelete','manageUser','resetUserActivation','saveProfile','changePassword','startWindowsChallenge','completeWindowsChallenge','loginManagedUser']) assert.equal(publicAction(name), false);
 });

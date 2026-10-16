@@ -20,7 +20,7 @@
         ><button data-page="issues">
           <span>☷</span>Issue list <b id="nav-count">0</b></button
         ><button data-page="create"><span>⊕</span>Submit feedback</button
-        ><button data-page="settings" id="admin-nav" hidden>
+        ><button data-page="my-dashboard"><span>◴</span>My dashboard</button><button data-page="my-issues"><span>▤</span>My tickets</button><button data-page="profile"><span>◎</span>My profile</button><button data-page="settings" id="admin-nav" hidden>
           <span>⚙</span>Administration
         </button>
       </nav>
@@ -87,7 +87,7 @@
           <div class="page-heading">
             <div>
               <p class="eyebrow">MES FEEDBACK MANAGEMENT</p>
-              <h1>Dashboard</h1>
+              <h1 id="dashboard-title">Dashboard</h1>
               <p class="subtitle">
                 A clear view of feedback, priorities and resolution progress.
               </p>
@@ -158,7 +158,7 @@
           <div class="page-heading">
             <div>
               <p class="eyebrow">TRACK & FOLLOW UP</p>
-              <h1>Issue list</h1>
+              <h1 id="issues-title">Issue list</h1>
               <p class="subtitle">
                 View feedback details, handling progress and the complete
                 timeline.
@@ -383,6 +383,25 @@
             </aside>
           </div>
         </section>
+        <section id="profile-page" class="page" hidden>
+          <div class="page-heading"><div><p class="eyebrow">YOUR ACCOUNT</p><h1>My profile</h1><p class="subtitle">Manage your personal details and password.</p></div></div>
+          <div class="settings-grid"><article class="card"><h2>Personal information</h2>
+          <form id="profile-form" class="profile-form">
+            <label>Username<input id="profile-username" readonly autocomplete="username" /></label>
+            <label>Display name<input id="profile-name" required maxlength="80" autocomplete="name" /></label>
+            <label>Email<input id="profile-email" type="email" maxlength="160" autocomplete="email" /></label>
+            <label>Phone<input id="profile-phone" type="tel" maxlength="32" autocomplete="tel" /></label>
+            <label>Job title<input id="profile-title" maxlength="80" autocomplete="organization-title" /></label>
+            <button class="button primary">Save profile</button><p id="profile-status" role="status"></p>
+          </form></article><article class="card"><h2>Change password</h2>
+          <form id="password-form" class="profile-form">
+            <label>Current password<input id="current-password" type="password" required autocomplete="current-password" /></label>
+            <label>New password<input id="new-password" type="password" required minlength="10" autocomplete="new-password" /></label>
+            <label>Confirm password<input id="confirm-password" type="password" required minlength="10" autocomplete="new-password" /></label>
+            <p class="helper">Use at least 10 characters. Other sessions will be signed out.</p>
+            <button class="button primary">Update password</button><p id="password-status" role="status"></p>
+          </form></article></div>
+        </section>
         <section id="settings-page" class="page" hidden>
           <div class="page-heading">
             <div>
@@ -394,7 +413,7 @@
             </div>
           </div>
           <div class="settings-grid">
-            <article class="card">
+            <article class="card" hidden>
               <h2>Team Leaders</h2>
               <form id="leader-form" class="inline-form">
                 <input
@@ -426,14 +445,13 @@
               <div>
                 <h2>User directory</h2>
                 <p>
-                  Managed usernames and display names. Deactivated users cannot
-                  submit.
+                  Create accounts and share a private activation link. Users set their own password and personal details.
                 </p>
               </div>
             </div>
             <form id="user-form" class="form-grid user-form">
               <div>
-                <label for="new-username">Windows username</label
+                <label for="new-username">Username</label
                 ><input
                   id="new-username"
                   required
@@ -446,7 +464,6 @@
                 <label for="new-display-name">Display name</label
                 ><input
                   id="new-display-name"
-                  required
                   maxlength="80"
                   placeholder="e.g. Pham Hoang Tuan"
                 />
@@ -455,6 +472,7 @@
                 <button class="button primary">Create user</button>
               </div>
             </form>
+            <div id="activation-result" class="activation-result" hidden><h3>Account activation</h3><p class="helper">Share this link privately with the user. It expires in 72 hours and can only be used once. Creating another link signs out existing sessions.</p><label>Private activation link<input id="activation-link" readonly data-user-content /></label><button id="copy-activation" type="button" class="button">Copy activation link</button></div>
             <div class="table-wrap">
               <table>
                 <thead>
@@ -469,7 +487,7 @@
               </table>
             </div>
           </article>
-          <div class="settings-grid">
+          <div class="settings-grid" hidden>
             <article class="card">
               <h2>Submission policy</h2>
               <label class="checkbox"
@@ -523,12 +541,29 @@
         ×
       </button>
       <p class="eyebrow">TH MES ACCESS</p>
-      <h2 id="account-title">Identify yourself</h2>
+      <h2 id="account-title">Sign in to TH MES</h2>
       <div class="auth-tabs">
         <button id="user-login-tab" aria-pressed="true">User</button
         ><button id="admin-login-tab" aria-pressed="false">Owner</button>
       </div>
-      <form id="windows-login-form">
+      <form id="password-login-form" class="profile-form">
+        <label>Username<input id="account-username" required maxlength="64" autocomplete="username" autocapitalize="none" spellcheck="false" /></label>
+        <label>Password<input id="account-password" type="password" required autocomplete="current-password" /></label>
+        <button class="button primary full">Sign in</button>
+        <p class="helper">Accounts are provided by the administrator. First time or forgot your password? Ask for an activation link.</p>
+        <button id="show-activation" type="button" class="text-button">Activate account</button>
+      </form>
+      <form id="activation-form" class="profile-form" hidden>
+        <p class="helper">Use the username and one-time code provided by your administrator. Choose your own password.</p>
+        <label>Username<input id="activate-username" required maxlength="64" autocomplete="username" autocapitalize="none" spellcheck="false" /></label>
+        <label>Activation code<input id="activate-code" required pattern="[a-f0-9]{64}" autocomplete="off" data-user-content /></label>
+        <label>New password<input id="activate-password" type="password" required minlength="10" autocomplete="new-password" /></label>
+        <label>Confirm password<input id="activate-confirm" type="password" required minlength="10" autocomplete="new-password" /></label>
+        <p class="helper">Use at least 10 characters and no more than 72 UTF-8 bytes.</p>
+        <button class="button primary full">Set password and sign in</button>
+        <button id="back-to-login" type="button" class="text-button">Back to sign in</button>
+      </form>
+      <form id="windows-login-form" hidden>
         <label for="login-user">Your display name</label
         ><select id="login-user" required></select>
         <p class="helper">
@@ -546,8 +581,7 @@
       </form>
       <div id="admin-login-form" hidden>
         <p class="helper">
-          Only the single Google account registered as the MES owner can manage
-          the workspace.
+          Owner: sign in with username hpham above, or use the registered Google account.
         </p>
         <button
           id="owner-google-login"
