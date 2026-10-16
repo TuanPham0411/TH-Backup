@@ -1,0 +1,32 @@
+name: Check Raspberry Pi
+
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  inspect:
+    if: github.ref == 'refs/heads/main'
+    runs-on: [self-hosted, Linux, ARM64]
+    timeout-minutes: 3
+
+    steps:
+      - name: Inspect server
+        shell: bash
+        run: |
+          set -eu
+          hostname
+          whoami
+          uname -m
+          free -h
+          df -h /
+          for tool in git curl node npm nginx psql python3; do
+            command -v "$tool" || true
+          done
+          systemctl is-active ssh cloudflared nginx postgresql || true
+          if sudo -n true 2>/dev/null; then
+            echo "Non-interactive sudo: available"
+          else
+            echo "Non-interactive sudo: unavailable"
+          fi
