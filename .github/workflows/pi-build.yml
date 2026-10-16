@@ -99,3 +99,19 @@ jobs:
         env:
           RELEASE_DIR: ${{ runner.temp }}/th-release-${{ github.run_id }}-${{ github.run_attempt }}
         run: rm -rf -- "$RELEASE_DIR"
+  verify-public:
+    needs: deploy
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - name: Check HTTPS sites through Cloudflare from outside the Pi
+        shell: bash
+        run: |
+          set -euo pipefail
+          for host in th.io.vn mes.th.io.vn; do
+            curl --fail --silent --show-error --retry 3 --retry-delay 5 --max-time 20 "https://$host/" -o /dev/null
+            curl --fail --silent --show-error --retry 3 --retry-delay 5 --max-time 20 "https://$host/api/health" | python3 -c 'import json,sys; assert json.load(sys.stdin).get("ok") is True'
+          done
+          curl --fail --silent --show-error --max-time 20 \
+            -H 'Content-Type: application/json' --data '{"name":"getDirectory"}' \
+            https://mes.th.io.vn/api/mes | python3 -c 'import json,sys; assert json.load(sys.stdin).get("apiVersion") == "accounts-v1"'
