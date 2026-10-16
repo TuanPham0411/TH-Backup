@@ -76,6 +76,11 @@ jobs:
         env:
           SELECTED_RUNNER: ${{ runner.name }}
         run: test "$SELECTED_RUNNER" = th-server
+      - name: Check deployment sudo permissions
+        shell: bash
+        run: |
+          sudo -n -l
+          sudo -n bash -c true
       # No checkout/build/package installation on the Pi. Never run PR code here.
       - uses: actions/download-artifact@v4
         with:
