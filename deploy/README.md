@@ -99,3 +99,23 @@ Sign in as the MES owner and open Administration → User directory. Click a use
 Ordinary users can change only their own display name, email, phone, job title and password through My profile. Account ownership and access state are enforced in PostgreSQL, independently of browser controls. Changing a username revokes existing sessions.
 
 Dashboard filters group status, priority and performance by submission date. Activity counts submissions and resolutions independently over the selected calendar horizon, with at most 12 date buckets. Average resolution includes completed tickets with valid recorded timestamps; an em dash means no usable samples. Animations run on navigation or changed data, respect reduced-motion preferences and use browser compositing rather than an additional chart runtime on the Pi.
+
+### Operations Studio: publishing, capture and monitoring
+
+The MES now uses horizontal workspace navigation with persistent Day/Night mode (top toolbar). Admin controls are under Administration:
+
+- **Notice board management:** create/edit notices, pin, publish/unpublish or delete. Drafts are visible only to the owner; signed-in workspace members see published notices on Dashboard.
+- **Workspace video playlist:** upload MP4, WEBM or MOV with a title, rename or delete. Videos stream from the Pi with HTTP range support. Playback starts muted and supports next/previous, automatic advance and single-video looping. MP4 H.264 is recommended for broad device support; no transcoding runs on the Pi. Maximum 20 videos, 50 MB/video.
+- **Issue types:** add, rename, disable/restore or delete categories. New feedback records the category ID and historical name. Older tickets remain Unclassified; editing/deleting a category does not rewrite history. General is retained as the compatibility default for older clients.
+- **Ticket progress:** the owner sets 0–100% in Issue handling. Resolved/Closed tickets are always 100%. Members see progress in the ticket list, details and recent tickets. Existing tickets use a status-based estimate until the first explicit handling update. Department and issue-type charts follow the reporting period.
+- **Evidence capture:** feedback supports browser camera snapshots/recording and native device capture inputs. Browser capture is video-only (no microphone), up to 60 seconds; all camera tracks stop on close, leaving the form or hiding the tab. Images show thumbnails and render directly in ticket details; ticket videos appear as download links. Keep photos/documents ≤10 MB and ticket videos ≤25 MB, maximum five attachments. Workspace media and ticket files share a 2 GiB application quota; quotas are admission limits with a small bounded allowance for simultaneous streamed ticket uploads. The server streams files and does not buffer/transcode videos on the Pi.
+
+**Network monitoring:** add up to five HTTP(S) URLs (ports 80/443) under Administration → Network monitoring. The server checks enabled targets every five minutes, serially. Check now has a persisted 60-second cooldown. Each check pins a validated DNS address, verifies TLS, refuses redirects, times out DNS/request operations after eight seconds each and reads at most 1 MiB. Select a useful endpoint: a small health response gives latency/status, while a download endpoint of at least 16 KiB also gives estimated sample throughput. This measures the Pi-to-service path, not client Wi-Fi capacity or upload bandwidth. HTTP 2xx is healthy; errors/timeouts are recorded as failures. Dashboard shows response latency, bounded sample Mbps, successful-check percentage, latency variation and recent availability history, based on up to 288 latest samples within 24 hours. A sample older than 11 minutes is marked stale. Logs persist in PostgreSQL for seven days; Download log exports up to 3,000 samples for the selected target as CSV.
+
+Public destinations work without extra configuration. For an intentional RFC1918 IPv4 service, add its exact hostname/IP to `MONITOR_ALLOWED_HOSTS` in `/etc/th-app/runtime.env`, comma-separated, and restart `th-app`. Loopback and metadata/link-local destinations remain blocked. Credentials in URLs, custom ports and redirect chains are not supported. Example:
+
+```dotenv
+MONITOR_ALLOWED_HOSTS=mes-gateway.internal,192.168.1.20
+```
+
+Nginx accepts MES bodies up to 51 MB with 180-second upload/proxy timeouts. Cloudflare Tunnel and SSH configuration are unchanged. The automatic monitor runs inside the existing Node service with bounded samples and seven-day log retention; no additional daemon is installed.

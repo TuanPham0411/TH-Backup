@@ -8,7 +8,7 @@ export function revealPage(page) {
 }
 export function animateDashboard(root) {
   if (!allowed() || root.hidden) return;
-  root.querySelectorAll('.activity-bars span,.bar-track>div').forEach((bar,n)=>{
+  root.querySelectorAll('.activity-bars span,.bar-track>div,.ticket-track i').forEach((bar,n)=>{
     const vertical=bar.parentElement.classList.contains('activity-bars');
     bar.style.transformOrigin=vertical?'center bottom':'left center';
     bar.animate([{transform:vertical?'scaleY(0)':'scaleX(0)',opacity:.3},{transform:'scale(1)',opacity:1}],{duration:950,delay:Math.min(n*28,420),easing:ease,fill:'backwards'});

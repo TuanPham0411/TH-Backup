@@ -1,3 +1,4 @@
+import { initWorkspace, progressView, ticketProgress } from "./workspace.js";
 import { revealPage, animateDashboard } from "./motion.js";
 import { activitySeries, resolutionSummary, submissionCohort } from "./analytics.js";
 import { createRichEditor } from "./rich-editor.js";
@@ -201,6 +202,7 @@ function navigate(page) {
   $("data-scope").textContent = page === "my-dashboard" ? "Your feedback · updates every 15 seconds." : state.preview ? "Preview only · sample data, no production connection." : "All workspace feedback · updates every 15 seconds.";
   renderAll();
   if (page === "create") renderForm();
+  workspace.navigate(page);
   revealPage($(`${section}-page`));
   if (section === "dashboard") animateDashboard($("dashboard-page"));
 }
@@ -264,6 +266,7 @@ function renderDashboard() {
   }
   renderActivity(scopedIssues());
   renderOperations(issues);
+  workspace.renderCharts(issues);
   renderDonut(issues);
   renderDepartments(issues);
   $("recent-issues").replaceChildren();
@@ -277,6 +280,7 @@ function renderDashboard() {
     content.append(
       userEl("h3", issue.subject),
       el("p", `${issue.departmentName} · ${issue.process}`),
+      progressView(issue, true),
     );
     row.append(el("span", "▤", "recent-icon"), content, badge(issue.status));
     row.onclick = () => openIssue(issue.id);
@@ -448,7 +452,7 @@ function renderIssues() {
       priority = el("td"),
       status = el("td");
     priority.append(badge(i.priority, "priority"));
-    status.append(badge(i.status));
+    status.append(badge(i.status), progressView(i, true));
     const open = el("td"),
       button = el("button", "↗", "text-button");
     button.setAttribute("aria-label", `Open ${i.subject}`);
@@ -539,6 +543,7 @@ function renderDetail(issue) {
     ["Requester", issue.reporterName],
     ["Department", issue.departmentName],
     ["Process / Station", issue.process],
+    ["Issue type", issue.issueTypeName || "Unclassified"],
   ]) {
     const d = el("div");
     d.append(el("small", label), userEl("span", value));
@@ -562,6 +567,7 @@ function renderDetail(issue) {
       card.append(button);
     }
     const row = el("div", undefined, "file-row"), button = el("button", state.preview ? "Preview file" : "Download", "text-button");
+    if (f.type?.startsWith("video/")) { button.textContent = `↗ ${t("Download video")}`; button.classList.add("video-evidence-link"); }
     button.onclick = () => downloadAttachment(f);
     row.append(userEl("span", `${f.name} · ${(f.size / 1024).toFixed(0)} KB`), button);
     card.append(row); gallery.append(card);
@@ -570,6 +576,7 @@ function renderDetail(issue) {
   if (!issue.attachments?.length)
     attachments.append(el("p", "No attachments.", "helper"));
   $("detail-content").replaceChildren(
+    progressView(issue),
     el("h2", "Feedback details"),
     data,
     reportBody(issue),
@@ -579,6 +586,7 @@ function renderDetail(issue) {
   if (!$("handling-form").contains(document.activeElement)) {
     $("handling-status").value = issue.status;
     $("handling-priority").value = issue.priority;
+    $("handling-progress").value = ticketProgress(issue);
     $("handling-assessment").value = issue.assessment || "";
     $("handling-note").value = "";
   }
@@ -877,6 +885,7 @@ function updateIdentity() {
   renderForm();
 }
 function stopLive() {
+  workspace.stop();
   unsubscribers.forEach((stop) => stop());
   unsubscribers = [];
   if (timelineUnsubscribe) timelineUnsubscribe();
@@ -893,6 +902,7 @@ function onDataError(error) {
 }
 function subscribeLive() {
   stopLive();
+  workspace.start();
   const add = (path, field, order) => unsubscribers.push(watchRecords(path, (rows) => {
     state[field] = rows;
     if (["issues", "myIssues"].includes(field)) { state.ready = true; renderAll(); updateIdentity(); }
@@ -933,6 +943,7 @@ $("feedback-form").onsubmit = (e) => {
     const data = {
       reporterUid: state.user.uid,
       departmentId: $("department-select").value,
+      issueTypeId: $("issue-type-select").value,
       process: $("process-input").value.trim(),
       occurrences: readOccurrences(),
       richDocument: feedbackEditor.getDocument(),
@@ -961,6 +972,8 @@ $("feedback-form").onsubmit = (e) => {
         id: createdId,
 
         departmentName: department.name,
+        issueTypeName: workspace.types.find(x=>x.id===data.issueTypeId)?.name || "General",
+        progress: 0,
         reporterName: reporter.displayName,
         reporterUsername: reporter.username,
         status: "New",
@@ -1036,7 +1049,9 @@ $("feedback-form").onsubmit = (e) => {
     else navigate("issues");
   });
 };
+const evidencePreviews = new Map();
 function renderFiles() {
+  for (const [file,url] of evidencePreviews) if (!state.files.includes(file)) { URL.revokeObjectURL(url); evidencePreviews.delete(file); }
   $("selected-files").replaceChildren();
   state.files.forEach((file, index) => {
     const row = el("div", undefined, "file-row"),
@@ -1052,6 +1067,10 @@ function renderFiles() {
       el("span", `${file.name} · ${(file.size / 1024).toFixed(0)} KB`),
       remove,
     );
+    if (attachmentType(file).startsWith("image/")) {
+      if (!evidencePreviews.has(file)) evidencePreviews.set(file,URL.createObjectURL(file));
+      const image=document.createElement("img"); image.src=evidencePreviews.get(file); image.alt=file.name; image.className="evidence-preview"; row.prepend(image);
+    }
     $("selected-files").append(row);
   });
 }
@@ -1076,6 +1095,7 @@ $("handling-form").onsubmit = (e) => {
       operation: "handling",
       status: $("handling-status").value,
       priority: $("handling-priority").value,
+      progress: Number($("handling-progress").value),
       assessment: $("handling-assessment").value.trim(),
       note: $("handling-note").value.trim(),
     };
@@ -1086,6 +1106,7 @@ $("handling-form").onsubmit = (e) => {
         status: data.status,
         priority: data.priority,
         assessment: data.assessment,
+        progress: ["Resolved","Closed"].includes(data.status) ? 100 : data.progress,
       });
       if (["Resolved", "Closed"].includes(data.status))
         issue.resolvedAt = Date.now();
@@ -1532,6 +1553,7 @@ async function loadDirectory() {
 }
 async function handleAuth(user) {
   const generation = ++sessionGeneration;
+  workspace.reset();
   stopLive();
   state.user = null;
   state.isOwner = false;
@@ -1697,7 +1719,13 @@ const editEditor = createRichEditor($("edit-description"), {
   },
   slotForFile:file=>editSlots.get(file), imageForSlot:slot=>{const issue=state.issues.find(x=>x.id===state.selected),file=findImage(issue,slot);return file?imageUrl(file):Promise.reject();},notice:toast,
 });
-initializeLanguage(() => { feedbackEditor.setLanguage(); editEditor.setLanguage(); renderAll(); renderTimeline(); updateIdentity(); if (state.selected) { const issue = state.issues.find(i => i.id === state.selected); if (issue) renderDetail(issue); } });
+const workspace = initWorkspace({state,toast,run,addEvidence(files) {
+  const invalid = validateFiles([...state.files,...files]);
+  if (invalid) { toast(invalid); return; }
+  state.files.push(...files); renderFiles();
+}});
+document.querySelector(".topbar .brand").onclick = event => { event.preventDefault(); navigate("dashboard"); };
+initializeLanguage(() => { workspace.render(); feedbackEditor.setLanguage(); editEditor.setLanguage(); renderAll(); renderTimeline(); updateIdentity(); if (state.selected) { const issue = state.issues.find(i => i.id === state.selected); if (issue) renderDetail(issue); } });
 selectOptions($("issue-status"), [
   { id: "All", name: "All statuses" },
   ...statuses.map((s) => ({ id: s, name: s })),

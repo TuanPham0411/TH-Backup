@@ -95,6 +95,48 @@ test('administrator edits, reissues and deletes accounts; self profile cannot el
  assert.equal((await pool.query("select data->>'reporterUid' uid from mes_private.records where collection='issues' and id='deleted-account-history'")).rows[0].uid,uid);
  const missing=await pool.query("select count(*)::int n from mes_private.credentials where uid=$1",[uid]);assert.equal(missing.rows[0].n,0);
 });
+test('workspace publishing, media, categories, progress and logs enforce roles and preserve history',async()=>{
+ const owner=(await api('passwordLogin',{username:'hpham',password:'test-owner-password'})).cookie;
+ const created=await api('manageUser',{operation:'create',username:'workspace.user',displayName:'Workspace User'},owner);
+ const user=(await api('activateAccount',{username:'workspace.user',activationCode:created.body.activationCode,password:'workspace-password'})).cookie;
+ async function ws(action,data={},cookie=owner){const response=await fetch(base+'/api/mes/workspace',{method:'POST',headers:{'x-forwarded-host':'mes.th.io.vn','Content-Type':'application/json',cookie:cookie||''},body:JSON.stringify({action,data})});return {status:response.status,body:await response.json()};}
+ assert.equal((await ws('read',{},'')).status,401);
+ assert.equal((await ws('save',{kind:'announcements',title:'Denied',body:'No'},user)).status,403);
+ const published=await ws('save',{kind:'announcements',title:'Production update',body:'New instructions',active:true,pinned:true});assert.equal(published.status,200,JSON.stringify(published.body));
+ const draft=await ws('save',{kind:'announcements',title:'Unpublished',body:'Draft',active:false});assert.equal(draft.status,200);
+ const visible=await ws('read',{},user);assert.equal(visible.status,200);assert.equal(visible.body.announcements.length,1);assert.equal(visible.body.announcements[0].title,'Production update');
+ const category=await ws('save',{kind:'issueTypes',name:'Connectivity'});assert.equal(category.status,200);
+ const dep=await api('manageDirectory',{type:'departments',operation:'create',name:'Workspace Department'},owner);assert.equal(dep.status,200);
+ const issue=await api('createIssue',{reporterUid:created.body.uid,departmentId:dep.body.id,issueTypeId:category.body.id,issueTypeName:'Forged',process:'Station A',description:'Connection interrupted'},user);assert.equal(issue.status,200,JSON.stringify(issue.body));
+ let stored=(await pool.query("select data from mes_private.records where collection='issues' and id=$1",[issue.body.id])).rows[0].data;assert.equal(stored.issueTypeName,'Connectivity');assert.equal(stored.progress,0);
+ assert.equal((await api('createIssue',{reporterUid:created.body.uid,departmentId:dep.body.id,issueTypeId:'missing',process:'Station',description:'Failure'},user)).status,403);
+ assert.equal((await api('updateIssue',{id:issue.body.id,operation:'handling',status:'In progress',priority:'High',progress:70},user)).status,403);
+ assert.equal((await api('updateIssue',{id:issue.body.id,operation:'handling',status:'In progress',priority:'High',progress:120},owner)).status,403);
+ assert.equal((await api('updateIssue',{id:issue.body.id,operation:'handling',status:'In progress',priority:'High',progress:70},owner)).status,200);
+ stored=(await pool.query("select data from mes_private.records where collection='issues' and id=$1",[issue.body.id])).rows[0].data;assert.equal(stored.progress,70);
+ assert.equal((await api('updateIssue',{id:issue.body.id,operation:'handling',status:'Closed',priority:'High',progress:10},owner)).status,200);
+ await ws('delete',{kind:'issueTypes',id:category.body.id});stored=(await pool.query("select data from mes_private.records where collection='issues' and id=$1",[issue.body.id])).rows[0].data;assert.equal(stored.issueTypeName,'Connectivity');assert.equal(stored.progress,100);
+ // Ticket video goes through the same authenticated, immutable attachment slots.
+ const filePath=`issues/${issue.body.id}/${issue.body.uploadSlots[0]}`;const grant=await api('uploadUrl',{path:filePath},user);assert.equal(grant.status,200);
+ const upload=await fetch(base+grant.body.url,{method:'PUT',headers:{'x-forwarded-host':'mes.th.io.vn','Content-Type':'video/mp4'},body:Buffer.from('test-mp4')});assert.equal(upload.status,200);
+ assert.equal((await api('attachFiles',{issueId:issue.body.id,files:[{slot:issue.body.uploadSlots[0],name:'evidence.mp4'}]},user)).status,200);
+ assert.equal((await ws('videoUpload',{title:'Video',type:'video/mp4',size:8},user)).status,403);
+ const media=await ws('videoUpload',{title:'Production training',type:'video/mp4',size:8});assert.equal(media.status,200,JSON.stringify(media.body));
+ let response=await fetch(base+media.body.url,{method:'PUT',headers:{'x-forwarded-host':'mes.th.io.vn','Content-Type':'video/mp4'},body:Buffer.from('12345678')});assert.equal(response.status,200);
+ assert.equal((await fetch(base+media.body.url,{method:'PUT',headers:{'x-forwarded-host':'mes.th.io.vn','Content-Type':'video/mp4'},body:'12345678'})).status,403);
+ assert.equal((await fetch(base+`/api/mes/media/${media.body.id}`,{headers:{'x-forwarded-host':'mes.th.io.vn'}})).status,401);
+ response=await fetch(base+`/api/mes/media/${media.body.id}`,{headers:{'x-forwarded-host':'mes.th.io.vn',cookie:user,range:'bytes=0-3'}});assert.equal(response.status,206);assert.equal(await response.text(),'1234');
+ assert.equal((await ws('videoUpdate',{id:media.body.id,title:'Updated title'})).status,200);
+ assert.equal((await ws('videoDelete',{id:media.body.id})).status,200);
+ assert.equal((await fetch(base+`/api/mes/media/${media.body.id}`,{headers:{'x-forwarded-host':'mes.th.io.vn',cookie:user}})).status,404);
+ assert.equal((await ws('save',{kind:'networkTargets',name:'Bad',url:'file:///etc/passwd'})).status,400);
+ const target=await ws('save',{kind:'networkTargets',name:'Test service',url:'https://example.com/health'});assert.equal(target.status,200);
+ assert.equal((await ws('probeLog',{id:target.body.id},user)).status,403);
+ await pool.query('insert into public.mes_probes(target_id,ok,latency_ms,mbps,bytes,status) values($1,true,42,2.5,100000,200)',[target.body.id]);
+ assert.equal((await ws('read',{},user)).body.targets.find(x=>x.id===target.body.id).probes[0].latency_ms,42);
+ assert.equal((await ws('probeLog',{id:target.body.id})).body.rows.length,1);
+ await ws('delete',{kind:'networkTargets',id:target.body.id});
+});
 test('portfolio server authorization, profile, bookmarks, inquiries and reset tokens',async()=>{
  const {rows:[u]}=await pool.query("insert into portfolio.users(email,password,name,verified) values('pi@example.test',extensions.crypt('test-user-password',extensions.gen_salt('bf',4)),'Pi User',true) returning *");
  const login=await api('login',{email:u.email,password:'test-user-password'},'','th.io.vn');assert.equal(login.status,200);assert.equal(login.body.user.isAdmin,false);const cookie=login.cookie;

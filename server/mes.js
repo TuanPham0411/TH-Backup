@@ -7,7 +7,7 @@ import {join} from 'node:path';
 import {hash,token,validPath,actorFor} from './security.js';
 import {normalizeDocument,documentText} from '../mes/site/rich-document.js';
 const publicActions=new Set(['getDirectory','passwordLogin','activateAccount']);
-const types=new Set(['image/jpeg','image/png','image/webp','application/pdf','text/plain','text/csv','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']);
+const types=new Set(['image/jpeg','image/png','image/webp','video/mp4','video/webm','video/quicktime','application/pdf','text/plain','text/csv','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']);
 export function mesRouter(pool,filesRoot) {
  const router=Router();
  async function dispatch(name,data,actor) {
@@ -32,10 +32,12 @@ export function mesRouter(pool,filesRoot) {
   }
   const type=req.headers['content-type'];
   if(!types.has(type))return res.status(400).json({error:'Unsupported file type'});
+  const {rows:[quota]}=await pool.query('select (select coalesce(sum(size),0) from public.files)+(select coalesce(sum(size),0) from public.mes_media) used');
+  if(Number(quota.used)+(type.startsWith('video/')?26214400:10485760)>2147483648)throw Object.assign(new Error('Storage quota reached'),{status:507,code:'resource-exhausted',expose:true});
   await mkdir(join(filesRoot,'issues',grant.path.split('/')[1]),{recursive:true});
   const temporary=path+'.'+token()+'.tmp';let size=0;
   try {
-   const limiter=new Transform({transform(chunk,encoding,callback){size+=chunk.length;callback(size>10485760?Object.assign(new Error('File too large'),{status:413}):null,chunk);}});
+   const limiter=new Transform({transform(chunk,encoding,callback){size+=chunk.length;callback(size>(type.startsWith('video/')?26214400:10485760)?Object.assign(new Error('File too large'),{status:413}):null,chunk);}});
    await pipeline(req,limiter,createWriteStream(temporary,{flags:'wx',mode:0o600}));
    if(!size)throw Object.assign(new Error('Empty file'),{status:400});
    // link is atomic and never overwrites an existing slot.

@@ -11,6 +11,9 @@ export const allowedTypes = [
   "image/jpeg",
   "image/png",
   "image/webp",
+  "video/mp4",
+  "video/webm",
+  "video/quicktime",
   "application/pdf",
   "text/plain",
   "text/csv",
@@ -23,6 +26,7 @@ export function attachmentType(file) {
     jpeg: "image/jpeg",
     png: "image/png",
     webp: "image/webp",
+    mp4: "video/mp4", webm: "video/webm", mov: "video/quicktime",
     pdf: "application/pdf",
     txt: "text/plain",
     csv: "text/csv",
@@ -41,10 +45,10 @@ export function validateFiles(files) {
   for (const file of files) {
     if (!file.name || file.name.length > 180) return "Use filenames of 1–180 characters.";
     if (!allowedTypes.includes(attachmentType(file)))
-      return `${file.name}: unsupported file type. Use JPG, PNG, WEBP, PDF, TXT, CSV or XLSX.`;
+      return `${file.name}: unsupported file type. Use JPG, PNG, WEBP, MP4, WEBM, MOV, PDF, TXT, CSV or XLSX.`;
     if (file.size <= 0) return `${file.name}: empty files cannot be uploaded.`;
-    if (file.size > 10 * 1024 * 1024)
-      return `${file.name}: maximum file size is 10 MB.`;
+    if (file.size > (attachmentType(file).startsWith("video/") ? 25 : 10) * 1024 * 1024)
+      return `${file.name}: maximum file size is ${attachmentType(file).startsWith("video/") ? 25 : 10} MB.`;
   }
   return "";
 }
