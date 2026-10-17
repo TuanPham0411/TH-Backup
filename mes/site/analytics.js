@@ -31,3 +31,17 @@ export function resolutionSummary(issues, now=Date.now()) {
   const pending=issues.filter(i=>!['Resolved','Closed'].includes(i.status));
   return {rate:issues.length?Math.round(100*complete.length/issues.length):0, averageHours:durations.length?durations.reduce((a,b)=>a+b,0)/durations.length/3600000:null, aged:pending.filter(i=>time(i.createdAt)>0&&now-time(i.createdAt)>=7*86400000).length,pending};
 }
+
+// Group by stable identity: renaming a type must not split its ticket count,
+// and two distinct types may legitimately share a display name.
+export function issueTypeSummary(issues, types = []) {
+  const names = new Map(types.map(type => [type.id, type.name]));
+  const groups = new Map();
+  for (const issue of issues) {
+    const id = issue.issueTypeId || '__unclassified';
+    const group = groups.get(id) || {id, name: names.get(id) || issue.issueTypeName || 'Unclassified', count: 0};
+    group.count++;
+    groups.set(id, group);
+  }
+  return [...groups.values()].sort((a,b) => b.count-a.count);
+}

@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {activitySeries,resolutionSummary,submissionCohort} from '../mes/site/analytics.js';
+import {activitySeries,resolutionSummary,submissionCohort,issueTypeSummary} from '../mes/site/analytics.js';
 const now=new Date('2026-10-17T12:00:00Z').getTime();
 const day=86400000;
 test('activity uses selected horizon, counts resolution independently and bounds chart density',()=>{
@@ -21,4 +21,9 @@ test('submission cohort matches calendar-day activity boundaries',()=>{
  const issues=[{createdAt:Date.parse('2026-10-10T18:00:00Z')},{createdAt:Date.parse('2026-10-11T00:00:00Z')},{createdAt:now+day}];
  assert.equal(submissionCohort(issues,'7',now).length,1);
  assert.equal(activitySeries(issues,'7',now).reduce((sum,bin)=>sum+bin.created,0),1);
+});
+
+test('issue type statistics retain identity across renames and duplicate labels',()=>{
+ const rows=issueTypeSummary([{issueTypeId:'a',issueTypeName:'Old name'},{issueTypeId:'a',issueTypeName:'New name'},{issueTypeId:'b',issueTypeName:'New name'},{}],[{id:'a',name:'Current name'}]);
+ assert.deepEqual(rows,[{id:'a',name:'Current name',count:2},{id:'b',name:'New name',count:1},{id:'__unclassified',name:'Unclassified',count:1}]);
 });

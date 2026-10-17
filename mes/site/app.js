@@ -1721,8 +1721,8 @@ const editEditor = createRichEditor($("edit-description"), {
 });
 const workspace = initWorkspace({state,toast,run,addEvidence(files) {
   const invalid = validateFiles([...state.files,...files]);
-  if (invalid) { toast(invalid); return; }
-  state.files.push(...files); renderFiles();
+  if (invalid) { toast(invalid); return false; }
+  state.files.push(...files); renderFiles(); return true;
 }});
 document.querySelector(".topbar .brand").onclick = event => { event.preventDefault(); navigate("dashboard"); };
 initializeLanguage(() => { workspace.render(); feedbackEditor.setLanguage(); editEditor.setLanguage(); renderAll(); renderTimeline(); updateIdentity(); if (state.selected) { const issue = state.issues.find(i => i.id === state.selected); if (issue) renderDetail(issue); } });

@@ -1,5 +1,6 @@
 // UI-only localization. Feedback, names, filenames and audit content are never translated.
 export const vi = {
+"Attachment rejected. Check file limits.":"Không thể đính kèm. Kiểm tra số lượng và dung lượng tệp.",
 "Throughput is a bounded HTTP download sample. Responses smaller than 16 KiB show no speed estimate. Logs are retained for 7 days.":"Tốc độ được đo từ mẫu tải HTTP có giới hạn. Phản hồi nhỏ hơn 16 KiB không hiển thị ước tính tốc độ. Log được lưu 7 ngày.",
 "OPERATIONS / LIVE WORKSPACE":"VẬN HÀNH / KHÔNG GIAN TRỰC TUYẾN",
 "One workspace. Every signal. Move production forward.":"Mọi thông tin vận hành, kết nối trong một không gian.",

@@ -1,3 +1,4 @@
+import { issueTypeSummary } from "./analytics.js";
 import { t, getLanguage } from "./i18n.js";
 const $ = (id) => document.getElementById(id);
 function node(tag, text, className = "") {
@@ -656,10 +657,14 @@ export function initWorkspace({ state, toast, run, addEvidence }) {
     canvas.toBlob(
       (blob) => {
         if (blob && photoGeneration === generation) {
-          addEvidence([
+          const attached = addEvidence([
             new File([blob], `photo-${Date.now()}.jpg`, { type: "image/jpeg" }),
           ]);
-          $("capture-status").textContent = t("Photo attached.");
+          $("capture-status").textContent = t(
+            attached
+              ? "Photo attached."
+              : "Attachment rejected. Check file limits.",
+          );
         }
       },
       "image/jpeg",
@@ -700,8 +705,9 @@ export function initWorkspace({ state, toast, run, addEvidence }) {
         chunks = [];
         return;
       }
+      let attached = false;
       if (blob.size && blob.size <= 25 * 1024 * 1024)
-        addEvidence([
+        attached = addEvidence([
           new File(
             [blob],
             `recording-${Date.now()}.${type === "video/mp4" ? "mp4" : "webm"}`,
@@ -713,7 +719,11 @@ export function initWorkspace({ state, toast, run, addEvidence }) {
       $("capture-record").disabled = false;
       $("capture-photo").disabled = false;
       $("capture-stop").disabled = true;
-      $("capture-status").textContent = t("Video attached.");
+      $("capture-status").textContent = t(
+        attached
+          ? "Video attached."
+          : "Attachment rejected. Check file limits.",
+      );
     };
     recorder.start(1000);
     recordStarted = Date.now();
@@ -753,17 +763,13 @@ export function initWorkspace({ state, toast, run, addEvidence }) {
   function renderCharts(issues) {
     const box = $("issue-type-chart");
     box.replaceChildren();
-    const groups = new Map();
-    for (const issue of issues) {
-      const name = issue.issueTypeName || t("Unclassified");
-      groups.set(name, (groups.get(name) || 0) + 1);
-    }
-    const max = Math.max(1, ...groups.values());
-    for (const [name, count] of [...groups].sort((a, b) => b[1] - a[1])) {
+    const groups = issueTypeSummary(issues, snapshot.issueTypes);
+    const max = Math.max(1, ...groups.map((group) => group.count));
+    for (const { id, name, count } of groups) {
       const row = node("div", undefined, "type-row"),
         head = node("div");
       head.append(
-        content("span", name),
+        content("span", id === "__unclassified" ? t(name) : name),
         node(
           "strong",
           `${count} · ${issues.length ? Math.round((count / issues.length) * 100) : 0}%`,
@@ -776,7 +782,7 @@ export function initWorkspace({ state, toast, run, addEvidence }) {
       row.append(head, track);
       box.append(row);
     }
-    if (!groups.size)
+    if (!groups.length)
       box.append(node("p", "No tickets in this period.", "workspace-empty"));
     const departments = new Map();
     for (const issue of issues) {
