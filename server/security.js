@@ -5,6 +5,9 @@ export const validPath = value => typeof value === 'string' && /^issues\/[a-zA-Z
 export const passwordOK = value => typeof value === 'string' && value.length >= 10 && Buffer.byteLength(value) <= 72;
 export function actorFor(session, tester) { return { ...(typeof session === 'string' && /^[a-f0-9]{64}$/.test(session) ? {session} : {}), ...(tester === 'true' ? {tester:true} : {}) }; }
 export function sameOrigin(req,res,next) {
+  // Google returns via a cross-site navigation. This exact GET endpoint is
+  // protected by OAuth state and the PKCE verifier cookie in oauthRouter.
+  if (req.method === 'GET' && req.originalUrl.split('?')[0] === '/api/oauth/callback') return next();
   if (req.headers.origin && req.headers.origin !== `https://${req.hostname}`) return res.status(403).json({error:'Origin denied'});
   if (req.headers['sec-fetch-site'] === 'cross-site') return res.status(403).json({error:'Origin denied'});
   next();

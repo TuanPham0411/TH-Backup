@@ -90,7 +90,7 @@ test('Google OAuth validates state and verified identity, sets local owner sessi
  assert.equal(start.status,302);const target=new URL(start.headers.get('location'));assert.equal(target.hostname,'accounts.google.com');assert.equal(target.searchParams.get('code_challenge_method'),'S256');
  const cookie=start.headers.getSetCookie().map(v=>v.split(';')[0]).join('; ');
  const state=target.searchParams.get('state');
- const bad=await fetch(base+'/api/oauth/callback?state=wrong&code=test',{redirect:'manual',headers:{'x-forwarded-host':'mes.th.io.vn',cookie}});assert.equal(bad.status,400);
+ const bad=await fetch(base+'/api/oauth/callback?state=wrong&code=test',{redirect:'manual',headers:{'x-forwarded-host':'mes.th.io.vn',cookie,'sec-fetch-site':'cross-site',origin:'https://accounts.google.com'}});assert.equal(bad.status,400);
  const originalFetch=globalThis.fetch;
  let identity={email:'intruder@example.test',email_verified:true};
  globalThis.fetch=async(input,init)=>{
@@ -99,7 +99,7 @@ test('Google OAuth validates state and verified identity, sets local owner sessi
   return originalFetch(input,init);
  };
  try {
-  const callback=()=>fetch(base+`/api/oauth/callback?state=${state}&code=test`,{redirect:'manual',headers:{'x-forwarded-host':'mes.th.io.vn',cookie}});
+  const callback=()=>fetch(base+`/api/oauth/callback?state=${state}&code=test`,{redirect:'manual',headers:{'x-forwarded-host':'mes.th.io.vn',cookie,'sec-fetch-site':'cross-site',origin:'https://accounts.google.com'}});
   assert.equal((await callback()).status,403);
   identity={email:'eric.scorp93@gmail.com',email_verified:false};assert.equal((await callback()).status,401);
   identity={email:'eric.scorp93@gmail.com',email_verified:true};const success=await callback();assert.equal(success.status,302);assert.match(success.headers.get('set-cookie'),/th_mes=.*HttpOnly/);
@@ -110,7 +110,7 @@ test('Google OAuth validates state and verified identity, sets local owner sessi
   const portfolioStart=await fetch(base+'/api/oauth/start',{redirect:'manual',headers:{'x-forwarded-host':'th.io.vn'}});
   const portfolioState=new URL(portfolioStart.headers.get('location')).searchParams.get('state');
   const portfolioCookies=portfolioStart.headers.getSetCookie().map(v=>v.split(';')[0]).join('; ');
-  const portfolioGoogle=await fetch(base+`/api/oauth/callback?state=${portfolioState}&code=test`,{redirect:'manual',headers:{'x-forwarded-host':'th.io.vn',cookie:portfolioCookies}});
+  const portfolioGoogle=await fetch(base+`/api/oauth/callback?state=${portfolioState}&code=test`,{redirect:'manual',headers:{'x-forwarded-host':'th.io.vn',cookie:portfolioCookies,'sec-fetch-site':'cross-site',origin:'https://accounts.google.com'}});
   assert.equal(portfolioGoogle.status,302);
   assert.equal((await api('session',{},attackerLogin.cookie,'th.io.vn')).body.user,null);
   assert.equal((await api('login',{email:'eric.scorp93@gmail.com',password:'attacker-password'},'','th.io.vn')).status,401);
