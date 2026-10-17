@@ -182,8 +182,8 @@ test("incident times allow multiple moments/ranges and reject invalid limits", (
 });
 
 test('video evidence has bounded file types and separate limits from images',()=>{
- assert.equal(validateFiles([{name:'recording.webm',type:'video/webm',size:24*1024*1024}]),'');
- assert.match(validateFiles([{name:'recording.mp4',type:'video/mp4',size:26*1024*1024}]),/25 MB/);
+ assert.equal(validateFiles([{name:'recording.webm',type:'video/webm',size:200*1024*1024}]),'');
+ assert.match(validateFiles([{name:'recording.mp4',type:'video/mp4',size:201*1024*1024}]),/200 MB/);
  assert.match(validateFiles([{name:'photo.jpg',type:'image/jpeg',size:11*1024*1024}]),/10 MB/);
  assert.match(validateFiles([{name:'script.mp4',type:'text/html',size:100}]),/unsupported/);
 });

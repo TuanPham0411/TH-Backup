@@ -1513,3 +1513,5 @@ dialog::backdrop {
   outline: 3px solid var(--accent);
   outline-offset: 3px;
 }
+
+.notice-media-gallery { display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin:14px 0; }.notice-media-gallery img,.notice-media-gallery video { width:100%;max-height:320px;object-fit:contain;border-radius:10px;background:#0b1014; }.notice-media-gallery img { height:auto; }.notice-media-editor { display:grid;gap:8px; }#notice-board { max-height:640px; }

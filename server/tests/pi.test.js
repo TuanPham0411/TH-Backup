@@ -95,7 +95,7 @@ test('administrator edits, reissues and deletes accounts; self profile cannot el
  assert.equal((await pool.query("select data->>'reporterUid' uid from mes_private.records where collection='issues' and id='deleted-account-history'")).rows[0].uid,uid);
  const missing=await pool.query("select count(*)::int n from mes_private.credentials where uid=$1",[uid]);assert.equal(missing.rows[0].n,0);
 });
-test('workspace publishing, media, categories, progress and logs enforce roles and preserve history',async()=>{
+test('workspace publishing, media, categories and progress enforce roles and preserve history',async()=>{
  const owner=(await api('passwordLogin',{username:'hpham',password:'test-owner-password'})).cookie;
  const created=await api('manageUser',{operation:'create',username:'workspace.user',displayName:'Workspace User'},owner);
  const user=(await api('activateAccount',{username:'workspace.user',activationCode:created.body.activationCode,password:'workspace-password'})).cookie;
@@ -129,13 +129,49 @@ test('workspace publishing, media, categories, progress and logs enforce roles a
  assert.equal((await ws('videoUpdate',{id:media.body.id,title:'Updated title'})).status,200);
  assert.equal((await ws('videoDelete',{id:media.body.id})).status,200);
  assert.equal((await fetch(base+`/api/mes/media/${media.body.id}`,{headers:{'x-forwarded-host':'mes.th.io.vn',cookie:user}})).status,404);
- assert.equal((await ws('save',{kind:'networkTargets',name:'Bad',url:'file:///etc/passwd'})).status,400);
- const target=await ws('save',{kind:'networkTargets',name:'Test service',url:'https://example.com/health'});assert.equal(target.status,200);
- assert.equal((await ws('probeLog',{id:target.body.id},user)).status,403);
- await pool.query('insert into public.mes_probes(target_id,ok,latency_ms,mbps,bytes,status) values($1,true,42,2.5,100000,200)',[target.body.id]);
- assert.equal((await ws('read',{},user)).body.targets.find(x=>x.id===target.body.id).probes[0].latency_ms,42);
- assert.equal((await ws('probeLog',{id:target.body.id})).body.rows.length,1);
- await ws('delete',{kind:'networkTargets',id:target.body.id});
+ assert.equal((await ws('probeLog',{})).status,400);
+ assert.equal((await ws('save',{kind:'networkTargets',name:'Removed'})).status,400);
+});
+test('200 MB video uploads stream in chunks for owner and user, with resume and notice privacy',async()=>{
+ async function cookieFor(uid){return 'th_mes='+(await pool.query('select mes_private.open_account_session($1) result',[uid])).rows[0].result.sessionToken;}
+ const owner=await cookieFor('mes-owner');const {rows:[person]}=await pool.query("select id from mes_private.records where collection='users' and data->>'username'='workspace.user'");const user=await cookieFor(person.id);
+ async function call(path,data,cookie=owner,method='POST',headers={}){const response=await fetch(base+path,{method,headers:{'x-forwarded-host':'mes.th.io.vn','Content-Type':'application/json',cookie,...headers},...(data===undefined?{}:{body:Buffer.isBuffer(data)?data:JSON.stringify(data)})});let body;try{body=await response.json();}catch{}return {status:response.status,body};}
+ const ws=(action,data,cookie=owner)=>call('/api/mes/workspace',{action,data},cookie);
+ const maximum=200*1024*1024,chunk=Buffer.alloc(4*1024*1024,93);
+ const media=await ws('videoUpload',{title:'200 MB boundary',type:'video/mp4',size:maximum});assert.equal(media.status,200);
+ assert.equal((await ws('videoUpload',{title:'Too large',type:'video/mp4',size:maximum+1})).status,400);
+ const started=await call('/api/mes/uploads',{kind:'media',path:media.body.id,type:'video/mp4',size:maximum});assert.equal(started.status,200,JSON.stringify(started.body));
+ assert.equal((await call('/api/mes/uploads/'+started.body.id,undefined,user,'GET')).status,403);
+ assert.equal((await call('/api/mes/uploads/'+started.body.id,Buffer.from('x'),owner,'PATCH',{'Content-Type':'application/octet-stream','Upload-Offset':'1'})).status,409);
+ for(let offset=0;offset<maximum;offset+=chunk.length){const r=await call('/api/mes/uploads/'+started.body.id,chunk,owner,'PATCH',{'Content-Type':'application/octet-stream','Upload-Offset':String(offset)});assert.equal(r.status,200,JSON.stringify(r.body));assert.equal(r.body.offset,offset+chunk.length);}
+ const again=await call('/api/mes/uploads',{kind:'media',path:media.body.id,type:'video/mp4',size:maximum});assert.equal(again.body.complete,true);assert.equal(again.body.offset,maximum);
+ const range=await fetch(base+`/api/mes/media/${media.body.id}`,{headers:{'x-forwarded-host':'mes.th.io.vn',cookie:user,range:`bytes=${maximum-1}-${maximum-1}`}});assert.equal(range.status,206);assert.equal(new Uint8Array(await range.arrayBuffer())[0],93);
+ const dep=(await pool.query("select id from mes_private.records where collection='departments' and (data->>'active')::boolean limit 1")).rows[0];
+ const issue=await api('createIssue',{reporterUid:person.id,departmentId:dep.id,process:'Large evidence',description:'Large user video'},user);assert.equal(issue.status,200);
+ const path=`issues/${issue.body.id}/${issue.body.uploadSlots[0]}`;
+ assert.equal((await call('/api/mes/uploads',{kind:'ticket',path,type:'video/mp4',size:maximum+1},user)).status,400);
+ const ticket=await call('/api/mes/uploads',{kind:'ticket',path,type:'video/mp4',size:maximum},user);assert.equal(ticket.status,200,JSON.stringify(ticket.body));
+ for(let offset=0;offset<maximum;offset+=chunk.length){const r=await call('/api/mes/uploads/'+ticket.body.id,chunk,user,'PATCH',{'Content-Type':'application/octet-stream','Upload-Offset':String(offset)});assert.equal(r.status,200,JSON.stringify(r.body));}
+ assert.equal((await api('attachFiles',{issueId:issue.body.id,files:[{slot:issue.body.uploadSlots[0],name:'200mb.mp4'}]},user)).status,200);
+ assert.equal(Number((await pool.query('select size from public.files where path=$1',[path])).rows[0].size),maximum);
+ const broken=await ws('mediaUpload',{purpose:'notice',title:'Retry incomplete chunk',type:'image/png',size:6});const partial=await call('/api/mes/uploads',{kind:'media',path:broken.body.id,type:'image/png',size:6});
+ try{const bad=await call('/api/mes/uploads/'+partial.body.id,Buffer.from('toolongfile'),owner,'PATCH',{'Content-Type':'application/octet-stream','Upload-Offset':'0'});assert.notEqual(bad.status,200);}catch(error){assert.ok(error instanceof TypeError);}
+ const partialStatus=await call('/api/mes/uploads/'+partial.body.id,undefined,owner,'GET');assert.equal(partialStatus.body.offset,0);assert.equal(partialStatus.body.complete,false);
+ assert.equal((await call('/api/mes/uploads/'+partial.body.id,Buffer.from('small!'),owner,'PATCH',{'Content-Type':'application/octet-stream','Upload-Offset':'0'})).status,200);
+ const image=await ws('mediaUpload',{purpose:'notice',title:'Notice photo',type:'image/png',size:8});assert.equal(image.status,200);
+ const imageUpload=await call('/api/mes/uploads',{kind:'media',path:image.body.id,type:'image/png',size:8});assert.equal(imageUpload.status,200);
+ assert.equal((await call('/api/mes/uploads/'+imageUpload.body.id,Buffer.from('imagepng'),owner,'PATCH',{'Content-Type':'application/octet-stream','Upload-Offset':'0'})).status,200);
+ const noticeVideo=await ws('mediaUpload',{purpose:'notice',title:'Notice video',type:'video/webm',size:8});assert.equal(noticeVideo.status,200);const v=await call('/api/mes/uploads',{kind:'media',path:noticeVideo.body.id,type:'video/webm',size:8});await call('/api/mes/uploads/'+v.body.id,Buffer.from('webmtest'),owner,'PATCH',{'Content-Type':'application/octet-stream','Upload-Offset':'0'});
+ const mediaGet=()=>fetch(base+`/api/mes/media/${image.body.id}`,{headers:{'x-forwarded-host':'mes.th.io.vn',cookie:user}});
+ assert.equal((await mediaGet()).status,404);
+ const notice=await ws('save',{kind:'announcements',title:'Photo and video',body:'Notice attachments',active:false,media:[image.body.id,noticeVideo.body.id]});assert.equal(notice.status,200,JSON.stringify(notice.body));
+ assert.equal((await mediaGet()).status,404);
+ assert.equal((await ws('save',{kind:'announcements',id:notice.body.id,title:'Photo and video',body:'Notice attachments',active:true,media:[image.body.id,noticeVideo.body.id]})).status,200);
+ assert.equal((await mediaGet()).status,200);
+ const visible=(await ws('read',{},user)).body;assert.equal(visible.announcements.find(x=>x.id===notice.body.id).media.length,2);assert.equal(visible.videos.some(x=>x.id===image.body.id),false);assert.equal(visible.targets,undefined);
+ assert.equal((await ws('save',{kind:'announcements',id:notice.body.id,title:'Denied',body:'Edit'},user)).status,403);
+ assert.equal((await ws('delete',{kind:'announcements',id:notice.body.id})).status,200);assert.equal((await mediaGet()).status,404);
+ assert.equal((await pool.query('select id from public.mes_media where id=any($1::text[])',[[image.body.id,noticeVideo.body.id]])).rowCount,0);
 });
 test('portfolio server authorization, profile, bookmarks, inquiries and reset tokens',async()=>{
  const {rows:[u]}=await pool.query("insert into portfolio.users(email,password,name,verified) values('pi@example.test',extensions.crypt('test-user-password',extensions.gen_salt('bf',4)),'Pi User',true) returning *");

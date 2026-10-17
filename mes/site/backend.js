@@ -1,3 +1,4 @@
+import {uploadChunks} from "./uploads.js";
 
 let listener;
 let tester = sessionStorage.getItem('th-mes-tester') === 'true';
@@ -50,9 +51,7 @@ export function watchRecords(path, onData, onError, order) {
   };
 }
 export async function uploadAttachment(path, file, type) {
-  const { url } = await api('uploadUrl', { path });
-  const response = await fetch(url, { method: 'PUT', headers: { 'Content-Type': type, 'x-upsert': 'false' }, body: file });
-  if (!response.ok) throw new Error('Attachment upload failed');
+  await uploadChunks({kind:'ticket',path,file,type,headers:tester?{'X-MES-Tester':'true'}:{}});
 }
 export async function downloadAttachment(path) {
   const { url } = await api('downloadUrl', { path });

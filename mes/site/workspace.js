@@ -1,3 +1,4 @@
+import { uploadChunks } from "./uploads.js";
 import { issueTypeSummary } from "./analytics.js";
 import { t, getLanguage } from "./i18n.js";
 const $ = (id) => document.getElementById(id);
@@ -55,7 +56,6 @@ export function initWorkspace({ state, toast, run, addEvidence }) {
       announcements: [],
       videos: [],
       issueTypes: [{ id: "general", name: "General", active: true }],
-      targets: [],
     },
     timer,
     generation = 0,
@@ -127,10 +127,7 @@ export function initWorkspace({ state, toast, run, addEvidence }) {
       snapshot = data;
       render();
     } catch (error) {
-      if (epoch === generation)
-        $("network-targets").textContent = t(
-          "Unable to refresh service telemetry.",
-        );
+      if (epoch === generation) console.warn("Workspace refresh failed");
     } finally {
       if (sequence === readSequence) loading = false;
     }
@@ -154,7 +151,6 @@ export function initWorkspace({ state, toast, run, addEvidence }) {
       announcements: [],
       videos: [],
       issueTypes: [{ id: "general", name: "General", active: true }],
-      targets: [],
     };
     videoIndex = 0;
     $("workspace-video").pause();
@@ -166,7 +162,6 @@ export function initWorkspace({ state, toast, run, addEvidence }) {
     theme();
     renderNotices();
     renderVideo();
-    renderNetwork();
     renderTypes();
     renderAdmin();
   }
@@ -182,7 +177,80 @@ export function initWorkspace({ state, toast, run, addEvidence }) {
     if ([...select.options].some((o) => o.value === selected))
       select.value = selected;
   }
+  let announcementMedia = [],
+    announcementFiles = [];
+  function renderNoticeEditor() {
+    const box = $("announcement-media-list");
+    box.replaceChildren();
+    for (const media of announcementMedia) {
+      const row = node("div", undefined, "admin-item");
+      row.append(
+        content("span", media.title),
+        button("Remove", () => {
+          announcementMedia = announcementMedia.filter(
+            (item) => item.id !== media.id,
+          );
+          if (!state.preview)
+            request("discardNoticeMedia", { ids: [media.id] }).catch(() => {});
+          renderNoticeEditor();
+        }),
+      );
+      box.append(row);
+    }
+    for (const file of announcementFiles) {
+      const row = node("div", undefined, "admin-item");
+      row.append(
+        content("span", file.name),
+        button("Remove", () => {
+          announcementFiles = announcementFiles.filter((item) => item !== file);
+          renderNoticeEditor();
+        }),
+      );
+      box.append(row);
+    }
+  }
+  $("announcement-files").onchange = () => {
+    const files = [...$("announcement-files").files];
+    if (
+      announcementMedia.length + announcementFiles.length + files.length >
+      5
+    ) {
+      toast("Maximum five notice attachments");
+      $("announcement-files").value = "";
+      return;
+    }
+    if (
+      files.some(
+        (file) =>
+          ![
+            "image/jpeg",
+            "image/png",
+            "image/webp",
+            "video/mp4",
+            "video/webm",
+            "video/quicktime",
+          ].includes(file.type) ||
+          file.size <= 0 ||
+          file.size > (file.type.startsWith("video/") ? 200 : 10) * 1024 * 1024,
+      )
+    ) {
+      toast("Notice images: maximum 10 MB; videos: maximum 200 MB.");
+      $("announcement-files").value = "";
+      return;
+    }
+    announcementFiles.push(...files);
+    $("announcement-files").value = "";
+    renderNoticeEditor();
+  };
+  let noticeSignature = "";
   function renderNotices() {
+    const signature = JSON.stringify([
+      snapshot.announcements,
+      getLanguage(),
+      !!state.user,
+    ]);
+    if (signature === noticeSignature) return;
+    noticeSignature = signature;
     const box = $("notice-board");
     box.replaceChildren();
     const rows = snapshot.announcements
@@ -202,6 +270,33 @@ export function initWorkspace({ state, toast, run, addEvidence }) {
         content("p", item.body),
         content("span", item.author, "notice-author"),
       );
+      if (item.media?.length) {
+        const gallery = node("div", undefined, "notice-media-gallery");
+        for (const media of item.media) {
+          const url = `/api/mes/media/${media.id}`;
+          if (media.type.startsWith("image/")) {
+            const link = document.createElement("a");
+            link.href = url;
+            link.target = "_blank";
+            link.rel = "noopener";
+            const image = document.createElement("img");
+            image.src = url;
+            image.alt = media.title;
+            image.loading = "lazy";
+            link.append(image);
+            gallery.append(link);
+          } else {
+            const video = document.createElement("video");
+            video.src = url;
+            video.controls = true;
+            video.playsInline = true;
+            video.preload = "metadata";
+            video.setAttribute("aria-label", media.title);
+            gallery.append(video);
+          }
+        }
+        article.insertBefore(gallery, article.lastChild);
+      }
       box.append(article);
     }
     if (!rows.length)
@@ -264,96 +359,6 @@ export function initWorkspace({ state, toast, run, addEvidence }) {
       "Cannot play this format. Try another video.",
     );
   };
-  function renderNetwork() {
-    const box = $("network-targets");
-    box.replaceChildren();
-    for (const target of snapshot.targets.filter((x) => x.active)) {
-      const card = node("article", undefined, "service-card"),
-        probes = target.probes || [],
-        last = probes[0],
-        success = probes.filter((p) => p.ok);
-      const stale =
-        last && Date.now() - new Date(last.checked_at).getTime() > 660000;
-      const top = node("div", undefined, "service-heading");
-      top.append(
-        content("h3", target.name),
-        node(
-          "span",
-          !last
-            ? "Not checked"
-            : stale
-              ? "Stale"
-              : last.ok
-                ? "Connected"
-                : "Disconnected",
-          `service-state ${!last || stale ? "unknown" : last.ok ? "online" : "offline"}`,
-        ),
-      );
-      card.append(top);
-      const metrics = node("div", undefined, "service-metrics");
-      const latencies = success
-          .map((p) => Number(p.latency_ms))
-          .filter(Number.isFinite),
-        jitter =
-          latencies.length > 1
-            ? latencies
-                .slice(1)
-                .reduce((sum, n, i) => sum + Math.abs(n - latencies[i]), 0) /
-              (latencies.length - 1)
-            : null;
-      for (const [value, label] of [
-        [
-          last?.latency_ms == null ? "—" : `${Math.round(last.latency_ms)} ms`,
-          "Response latency",
-        ],
-        [
-          last?.mbps == null ? "—" : `${Number(last.mbps).toFixed(2)} Mbps`,
-          "Sample throughput",
-        ],
-        [
-          probes.length
-            ? `${Math.round((success.length / probes.length) * 100)}%`
-            : "—",
-          "Availability",
-        ],
-        [
-          jitter === null ? "—" : `${Math.round(jitter)} ms`,
-          "Latency variation",
-        ],
-      ]) {
-        const m = node("div");
-        m.append(node("strong", value), node("small", label));
-        metrics.append(m);
-      }
-      card.append(metrics);
-      const strip = node("div", undefined, "uptime-strip");
-      for (const p of [...probes].slice(0, 72).reverse()) {
-        const bit = node("i", undefined, p.ok ? "up" : "down");
-        bit.title = `${date(p.checked_at)} · ${p.ok ? t("Connected") : p.error}`;
-        strip.append(bit);
-      }
-      card.append(
-        strip,
-        node(
-          "p",
-          last
-            ? `${t("Last check")}: ${date(last.checked_at)} · ${probes.length} ${t("samples")}`
-            : "Waiting for first automatic check.",
-          "helper",
-        ),
-      );
-      if (last?.error) card.append(content("p", last.error, "probe-error"));
-      box.append(card);
-    }
-    if (!box.childNodes.length)
-      box.append(
-        node(
-          "p",
-          "No monitored services. An administrator can add a URL in Administration.",
-          "workspace-empty",
-        ),
-      );
-  }
   const button = (label, handler, className = "text-button") => {
     const b = node("button", label, className);
     b.type = "button";
@@ -389,6 +394,9 @@ export function initWorkspace({ state, toast, run, addEvidence }) {
     $("announcement-admin").replaceChildren();
     for (const item of snapshot.announcements) {
       const edit = button("Edit", () => {
+          announcementMedia = [...(item.media || [])];
+          announcementFiles = [];
+          renderNoticeEditor();
           $("announcement-id").value = item.id;
           $("announcement-title").value = item.title;
           $("announcement-body").value = item.body;
@@ -445,74 +453,41 @@ export function initWorkspace({ state, toast, run, addEvidence }) {
         });
       $("video-admin").append(adminRow(item.title, [rename, del]));
     }
-    $("network-admin").replaceChildren();
-    for (const item of snapshot.targets) {
-      const edit = button("Edit", () => {
-          const url = prompt(t("URL to check"), item.url);
-          if (url?.trim())
-            perform(edit, () =>
-              request("save", {
-                kind: "networkTargets",
-                ...item,
-                url: url.trim(),
-              }),
-            );
-        }),
-        toggle = button(item.active ? "Pause" : "Resume", () =>
-          perform(toggle, () =>
-            request("save", {
-              kind: "networkTargets",
-              ...item,
-              active: !item.active,
-            }),
-          ),
-        ),
-        check = button("Check now", () =>
-          perform(check, () => request("probe", { id: item.id })),
-        ),
-        log = button("Download log", () =>
-          perform(log, async () => {
-            const { rows } = await request("probeLog", { id: item.id });
-            const lines = [
-              "checked_at,ok,latency_ms,mbps,bytes,http_status,error",
-              ...rows.map((r) =>
-                [
-                  r.checked_at,
-                  r.ok,
-                  r.latency_ms,
-                  r.mbps,
-                  r.bytes,
-                  r.status,
-                  r.error,
-                ]
-                  .map((v) => '"' + String(v ?? "").replaceAll('"', '""') + '"')
-                  .join(","),
-              ),
-            ];
-            const url = URL.createObjectURL(
-              new Blob([lines.join("\r\n")], {
-                type: "text/csv;charset=utf-8",
-              }),
-            );
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = `network-${item.id}.csv`;
-            a.click();
-            setTimeout(() => URL.revokeObjectURL(url), 10000);
-          }),
-        ),
-        del = button("Delete", () => deleteItem("networkTargets", item, del));
-      check.disabled = !item.active;
-      $("network-admin").append(
-        adminRow(item.name, [edit, toggle, check, log, del]),
-      );
-    }
   }
   $("announcement-form").onsubmit = (e) => {
     e.preventDefault();
     perform(e.submitter, async () => {
+      $("announcement-upload-progress").hidden = false;
+      try {
+        while (announcementFiles.length) {
+          const file = announcementFiles[0];
+          const media = await request("mediaUpload", {
+            purpose: "notice",
+            title: file.name.slice(0, 140),
+            type: file.type,
+            size: file.size,
+          });
+          await uploadChunks({
+            kind: "media",
+            path: media.id,
+            file,
+            onProgress: (value) =>
+              ($("announcement-upload-progress").value = value),
+          });
+          announcementMedia.push({
+            id: media.id,
+            title: file.name,
+            type: file.type,
+          });
+          announcementFiles.shift();
+          renderNoticeEditor();
+        }
+      } finally {
+        $("announcement-upload-progress").hidden = true;
+      }
       await request("save", {
         kind: "announcements",
+        media: announcementMedia.map((media) => media.id),
         ...($("announcement-id").value
           ? { id: $("announcement-id").value }
           : {}),
@@ -521,11 +496,21 @@ export function initWorkspace({ state, toast, run, addEvidence }) {
         pinned: $("announcement-pinned").checked,
         active: $("announcement-active").checked,
       });
+      announcementMedia = [];
+      announcementFiles = [];
+      renderNoticeEditor();
       $("announcement-form").reset();
       $("announcement-id").value = "";
     });
   };
   $("announcement-cancel").onclick = () => {
+    if (!state.preview)
+      request("discardNoticeMedia", {
+        ids: announcementMedia.map((media) => media.id),
+      }).catch(() => {});
+    announcementMedia = [];
+    announcementFiles = [];
+    renderNoticeEditor();
     $("announcement-form").reset();
     $("announcement-id").value = "";
   };
@@ -539,47 +524,24 @@ export function initWorkspace({ state, toast, run, addEvidence }) {
       $("issue-type-form").reset();
     });
   };
-  $("network-target-form").onsubmit = (e) => {
-    e.preventDefault();
-    perform(e.submitter, async () => {
-      await request("save", {
-        kind: "networkTargets",
-        name: $("network-target-name").value,
-        url: $("network-target-url").value,
-      });
-      $("network-target-form").reset();
-    });
-  };
   $("video-publish-form").onsubmit = (e) => {
     e.preventDefault();
     perform(e.submitter, async () => {
       const file = $("video-publish-file").files[0];
-      if (!file || file.size > 50 * 1024 * 1024)
-        throw new Error(t("Video must be at most 50 MB."));
-      const { url } = await request("videoUpload", {
+      if (!file || file.size > 200 * 1024 * 1024)
+        throw new Error(t("Video must be at most 200 MB."));
+      const { id } = await request("videoUpload", {
         title: $("video-publish-title").value,
         type: file.type,
         size: file.size,
       });
       $("video-upload-progress").hidden = false;
       try {
-        await new Promise((resolve, reject) => {
-          const xhr = new XMLHttpRequest();
-          xhr.open("PUT", url);
-          xhr.setRequestHeader("Content-Type", file.type);
-          xhr.upload.onprogress = (event) => {
-            if (event.lengthComputable)
-              $("video-upload-progress").value =
-                (event.loaded / event.total) * 100;
-          };
-          xhr.onload = () =>
-            xhr.status === 200
-              ? resolve()
-              : reject(new Error(t("Video upload failed.")));
-          xhr.onerror = () => reject(new Error(t("Video upload failed.")));
-          xhr.timeout = 180000;
-          xhr.ontimeout = xhr.onerror;
-          xhr.send(file);
+        await uploadChunks({
+          kind: "media",
+          path: id,
+          file,
+          onProgress: (value) => ($("video-upload-progress").value = value),
         });
         $("video-publish-form").reset();
       } finally {
@@ -692,7 +654,7 @@ export function initWorkspace({ state, toast, run, addEvidence }) {
       if (event.data.size) {
         chunks.push(event.data);
         size += event.data.size;
-        if (size >= 24 * 1024 * 1024 && recorder.state === "recording")
+        if (size >= 198 * 1024 * 1024 && recorder.state === "recording")
           recorder.stop();
       }
     };
@@ -706,7 +668,7 @@ export function initWorkspace({ state, toast, run, addEvidence }) {
         return;
       }
       let attached = false;
-      if (blob.size && blob.size <= 25 * 1024 * 1024)
+      if (blob.size && blob.size <= 200 * 1024 * 1024)
         attached = addEvidence([
           new File(
             [blob],
@@ -714,7 +676,7 @@ export function initWorkspace({ state, toast, run, addEvidence }) {
             { type },
           ),
         ]);
-      else toast("Recording exceeded 25 MB. Please record a shorter clip.");
+      else toast("Recording exceeded 200 MB. Please record a shorter clip.");
       chunks = [];
       $("capture-record").disabled = false;
       $("capture-photo").disabled = false;

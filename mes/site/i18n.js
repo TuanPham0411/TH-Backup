@@ -1,5 +1,10 @@
 // UI-only localization. Feedback, names, filenames and audit content are never translated.
 export const vi = {
+"Notice images / videos":"Ảnh / video của thông báo",
+"Up to 5 attachments per notice · images 10 MB · videos 200 MB.":"Tối đa 5 tệp mỗi thông báo · ảnh 10 MB · video 200 MB.",
+"Maximum five notice attachments":"Mỗi thông báo tối đa 5 tệp đính kèm",
+"Notice images: maximum 10 MB; videos: maximum 200 MB.":"Ảnh thông báo tối đa 10 MB; video tối đa 200 MB.",
+
 "Attachment rejected. Check file limits.":"Không thể đính kèm. Kiểm tra số lượng và dung lượng tệp.",
 "Throughput is a bounded HTTP download sample. Responses smaller than 16 KiB show no speed estimate. Logs are retained for 7 days.":"Tốc độ được đo từ mẫu tải HTTP có giới hạn. Phản hồi nhỏ hơn 16 KiB không hiển thị ước tính tốc độ. Log được lưu 7 ngày.",
 "OPERATIONS / LIVE WORKSPACE":"VẬN HÀNH / KHÔNG GIAN TRỰC TUYẾN",
@@ -32,11 +37,11 @@ export const vi = {
 "completed":"hoàn thành",
 "Unclassified":"Chưa phân loại",
 "No tickets in this period.":"Chưa có ticket trong kỳ này.",
-"Up to 5 files · images/documents 10 MB · videos 25 MB · MP4, WEBM, MOV supported":"Tối đa 5 tệp · ảnh/tài liệu 10 MB · video 25 MB · hỗ trợ MP4, WEBM, MOV",
+"Up to 5 files · images/documents 10 MB · videos 200 MB · MP4, WEBM, MOV supported":"Tối đa 5 tệp · ảnh/tài liệu 10 MB · video 200 MB · hỗ trợ MP4, WEBM, MOV",
 "◉ Camera / record video":"◉ Camera / quay video",
 "Take photo":"Chụp ảnh",
 "Record video":"Quay video",
-"Camera access requires HTTPS and your permission. Record up to 60 seconds; maximum 25 MB.":"Camera cần HTTPS và sự cho phép của bạn. Quay tối đa 60 giây; dung lượng tối đa 25 MB.",
+"Camera access requires HTTPS and your permission. Record up to 60 seconds; maximum 200 MB.":"Camera cần HTTPS và sự cho phép của bạn. Quay tối đa 60 giây; dung lượng tối đa 200 MB.",
 "EVIDENCE / CAPTURE":"MINH CHỨNG / GHI HÌNH",
 "Capture evidence":"Chụp / quay minh chứng",
 "Start recording":"Bắt đầu quay",
@@ -47,7 +52,7 @@ export const vi = {
 "Video attached.":"Đã đính kèm video.",
 "Camera unavailable or permission denied. Use the device capture buttons.":"Không thể mở camera hoặc chưa được cấp quyền. Hãy dùng nút chụp/quay của thiết bị.",
 "Recording is unavailable on this device.":"Thiết bị này không hỗ trợ quay video trong trình duyệt.",
-"Recording exceeded 25 MB. Please record a shorter clip.":"Video vượt quá 25 MB. Vui lòng quay ngắn hơn.",
+"Recording exceeded 200 MB. Please record a shorter clip.":"Video vượt quá 200 MB. Vui lòng quay ngắn hơn.",
 "Download video":"Tải video",
 "PUBLISH / NOTICES":"ĐĂNG TẢI / THÔNG BÁO",
 "Notice board management":"Quản lý bảng tin",
@@ -63,7 +68,7 @@ export const vi = {
 "Workspace video playlist":"Playlist video nội bộ",
 "Video title":"Tên video",
 "Video file":"Tệp video",
-"MP4, WEBM or MOV · maximum 50 MB each, 20 videos. MP4 H.264 provides the widest browser support. Playback starts muted.":"MP4, WEBM hoặc MOV · tối đa 50 MB/video, 20 video. MP4 H.264 tương thích nhiều trình duyệt nhất. Video tự phát ở chế độ tắt tiếng.",
+"MP4, WEBM or MOV · maximum 200 MB each, 20 videos. MP4 H.264 provides the widest browser support. Playback starts muted.":"MP4, WEBM hoặc MOV · tối đa 200 MB/video, 20 video. MP4 H.264 tương thích nhiều trình duyệt nhất. Video tự phát ở chế độ tắt tiếng.",
 "Upload video":"Tải video lên",
 "Rename":"Đổi tên",
 "CONFIGURE / CLASSIFICATION":"CẤU HÌNH / PHÂN LOẠI",
@@ -98,7 +103,7 @@ export const vi = {
 "samples":"mẫu đo",
 "Waiting for first automatic check.":"Đang chờ lần kiểm tra tự động đầu tiên.",
 "No monitored services. An administrator can add a URL in Administration.":"Chưa có dịch vụ giám sát. Quản trị viên có thể thêm URL trong mục Quản trị.",
-"Video must be at most 50 MB.":"Video tối đa 50 MB.",
+"Video must be at most 200 MB.":"Video tối đa 200 MB.",
 "Video upload failed.":"Tải video lên không thành công.",
 
 "ACCOUNT MANAGEMENT":"QUẢN LÝ TÀI KHOẢN",
@@ -195,7 +200,7 @@ export function t(value) {
   if (vi[normalized]) return vi[normalized];
   let m = normalized.match(/^(\d+) issue\(s\) · Page (\d+) of (\d+)$/);
   if (m) return `${m[1]} phản hồi · Trang ${m[2]}/${m[3]}`;
-  m = normalized.match(/^(.*): maximum file size is (10|25) MB\.$/);
+  m = normalized.match(/^(.*): maximum file size is (10|200) MB\.$/);
   if (m) return `${m[1]}: dung lượng tối đa ${m[2]} MB.`;
   m = normalized.match(/^Feedback (.+) was saved, but one or more attachments failed\. Do not resubmit the issue\. Contact the owner with this ID\.$/);
   if (m) return `Đã lưu phản hồi ${m[1]}, nhưng có tệp tải lên thất bại. Không gửi lại phản hồi. Liên hệ quản trị viên với mã này.`;

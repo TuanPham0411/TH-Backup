@@ -6,12 +6,21 @@ import { Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { join } from "node:path";
 import { actorFor, hash, token } from "./security.js";
-import { monitorURL, runProbe } from "./network-monitor.js";
 const fail = (status, message) =>
   Object.assign(new Error(message), { status, expose: true });
 const videoTypes = new Set(["video/mp4", "video/webm", "video/quicktime"]);
 export function workspaceRouter(pool, filesRoot) {
   const router = Router();
+  async function pruneNotice(ids) {
+    if (!ids?.length) return;
+    const { rows } = await pool.query(
+      "delete from public.mes_media m where m.id=any($1::text[]) and m.purpose='notice' and not exists(select 1 from public.mes_workspace w where w.kind='announcements' and coalesce(w.data->'media','[]'::jsonb) ? m.id) returning m.id",
+      [ids],
+    );
+    for (const item of rows)
+      await rm(join(filesRoot, "media", item.id), { force: true });
+  }
+
   async function session(actor, owner = false) {
     if (!actor.session) throw fail(401, "Sign in first");
     const {
@@ -27,7 +36,7 @@ export function workspaceRouter(pool, filesRoot) {
   const actor = (req) =>
     actorFor(req.cookies.th_mes, req.headers["x-mes-tester"]);
   router.get("/media/:id", async (req, res) => {
-    await session(actor(req));
+    const current = await session(actor(req));
     if (!/^[a-f0-9-]{36}$/.test(req.params.id)) return res.sendStatus(404);
     const {
       rows: [media],
@@ -36,6 +45,13 @@ export function workspaceRouter(pool, filesRoot) {
       [req.params.id],
     );
     if (!media) return res.sendStatus(404);
+    if (media.purpose === "notice" && !current.isOwner) {
+      const { rowCount } = await pool.query(
+        "select 1 from public.mes_workspace w where w.kind='announcements' and w.data->>'active'='true' and coalesce(w.data->'media','[]'::jsonb) ? $1",
+        [media.id],
+      );
+      if (!rowCount) return res.sendStatus(404);
+    }
     res.set({
       "Content-Type": media.type,
       "Cache-Control": "private, no-store",
@@ -112,10 +128,7 @@ export function workspaceRouter(pool, filesRoot) {
         "select kind,id,data from public.mes_workspace order by coalesce(data->>'updatedAt','0') desc,id",
       );
       const { rows: videos } = await pool.query(
-        "select id,title,type,size from public.mes_media where ready order by created_at,id",
-      );
-      const { rows: probes } = await pool.query(
-        "select p.* from public.mes_probes p join (select target_id,array_agg(id order by checked_at desc) ids from public.mes_probes where checked_at>now()-interval '24 hours' group by target_id) s on p.id=any(s.ids[1:288]) order by checked_at desc",
+        "select id,title,type,size,purpose from public.mes_media where ready order by created_at,id",
       );
       return res.json({
         announcements: rows
@@ -123,24 +136,25 @@ export function workspaceRouter(pool, filesRoot) {
             (r) =>
               r.kind === "announcements" && (current.isOwner || r.data.active),
           )
-          .map((r) => ({ id: r.id, ...r.data })),
-        issueTypes: rows
-          .filter((r) => r.kind === "issueTypes")
-          .map((r) => ({ id: r.id, ...r.data })),
-        targets: rows
-          .filter((r) => r.kind === "networkTargets")
           .map((r) => ({
             id: r.id,
             ...r.data,
-            probes: probes.filter((p) => p.target_id === r.id),
+            media: (r.data.media || [])
+              .map((id) =>
+                videos.find((v) => v.id === id && v.purpose === "notice"),
+              )
+              .filter(Boolean),
           })),
-        videos,
+        issueTypes: rows
+          .filter((r) => r.kind === "issueTypes")
+          .map((r) => ({ id: r.id, ...r.data })),
+        videos: videos.filter((v) => v.purpose === "playlist"),
       });
     }
     if (action === "save") {
       const { kind, id = randomUUID() } = data;
       if (
-        !["announcements", "issueTypes", "networkTargets"].includes(kind) ||
+        !["announcements", "issueTypes"].includes(kind) ||
         typeof id !== "string" ||
         !/^[a-zA-Z0-9-]{1,80}$/.test(id)
       )
@@ -158,6 +172,23 @@ export function workspaceRouter(pool, filesRoot) {
           data.body.length > 3000
         )
           throw fail(400, "Invalid announcement");
+        const media = data.media || [];
+        if (
+          !Array.isArray(media) ||
+          media.length > 5 ||
+          media.some(
+            (id) => typeof id !== "string" || !/^[a-f0-9-]{36}$/.test(id),
+          ) ||
+          new Set(media).size !== media.length
+        )
+          throw fail(400, "Maximum five notice attachments");
+        const { rowCount } = await pool.query(
+          "select id from public.mes_media where id=any($1::text[]) and ready and purpose='notice'",
+          [media],
+        );
+        if (rowCount !== media.length)
+          throw fail(400, "Notice media unavailable");
+        value.media = media;
         Object.assign(value, {
           title: data.title.trim(),
           body: data.body.trim(),
@@ -172,55 +203,74 @@ export function workspaceRouter(pool, filesRoot) {
         )
           throw fail(400, "Invalid name");
         value.name = data.name.trim();
-        if (kind === "networkTargets") value.url = monitorURL(data.url).href;
       }
-      const max =
-        kind === "networkTargets" ? 5 : kind === "issueTypes" ? 50 : 30;
+      const max = kind === "issueTypes" ? 50 : 30;
+      const previous =
+        kind === "announcements"
+          ? (
+              await pool.query(
+                "select data from public.mes_workspace where kind='announcements' and id=$1",
+                [id],
+              )
+            ).rows[0]?.data.media
+          : [];
       const result = await pool.query(
         "insert into public.mes_workspace(kind,id,data) select $1,$2,$3 where exists(select 1 from public.mes_workspace where kind=$1 and id=$2) or (select count(*) from public.mes_workspace where kind=$1)<$4 on conflict(kind,id) do update set data=excluded.data returning id",
         [kind, id, value, max],
       );
       if (!result.rowCount) throw fail(400, "Workspace limit reached");
+      await pruneNotice(previous);
       return res.json({ id });
     }
     if (action === "delete") {
       if (
-        !["announcements", "issueTypes", "networkTargets"].includes(
-          data.kind,
-        ) ||
+        !["announcements", "issueTypes"].includes(data.kind) ||
         typeof data.id !== "string"
       )
         throw fail(400, "Invalid item");
       if (data.kind === "issueTypes" && data.id === "general")
         throw fail(400, "General is retained for older clients");
-      await pool.query(
-        "delete from public.mes_workspace where kind=$1 and id=$2",
+      const { rows: removed } = await pool.query(
+        "delete from public.mes_workspace where kind=$1 and id=$2 returning data",
         [data.kind, data.id],
       );
-      if (data.kind === "networkTargets")
-        await pool.query("delete from public.mes_probes where target_id=$1", [
-          data.id,
-        ]);
+      if (data.kind === "announcements")
+        await pruneNotice(removed[0]?.data.media);
       return res.json({ ok: true });
     }
-    if (action === "videoUpload") {
+    if (action === "discardNoticeMedia") {
       if (
-        !videoTypes.has(data.type) ||
+        !Array.isArray(data.ids) ||
+        data.ids.length > 5 ||
+        data.ids.some((id) => typeof id !== "string")
+      )
+        throw fail(400, "Invalid attachments");
+      await pruneNotice(data.ids);
+      return res.json({ ok: true });
+    }
+    if (action === "videoUpload" || action === "mediaUpload") {
+      const purpose = data.purpose === "notice" ? "notice" : "playlist";
+      const imageTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
+      if (
+        !(
+          videoTypes.has(data.type) ||
+          (purpose === "notice" && imageTypes.has(data.type))
+        ) ||
         typeof data.title !== "string" ||
         !data.title.trim() ||
         data.title.length > 140 ||
         !Number.isInteger(data.size) ||
         data.size < 1 ||
-        data.size > 50 * 1024 * 1024
+        data.size > (videoTypes.has(data.type) ? 200 : 10) * 1024 * 1024
       )
         throw fail(400, "Invalid video");
       await pool.query(
-        "delete from public.mes_media where not ready and created_at<now()-interval '1 hour'",
+        "delete from public.mes_media where not ready and created_at<now()-interval '1 day' and not exists(select 1 from public.mes_uploads u where u.kind='media' and u.path=mes_media.id)",
       );
       const id = randomUUID();
       const created = await pool.query(
-        "insert into public.mes_media(id,title,type,size) select $1,$2,$3,$4::bigint where (select count(*) from public.mes_media)<20 and (select coalesce(sum(size),0) from public.mes_media)+(select coalesce(sum(size),0) from public.files)+$4::bigint<=2147483648 returning id",
-        [id, data.title.trim(), data.type, data.size],
+        "insert into public.mes_media(id,title,type,size,purpose) select $1,$2,$3,$4::bigint,$5 where (select count(*) from public.mes_media where purpose=$5)<(case when $5='playlist' then 20 else 150 end) and (select coalesce(sum(size),0) from public.mes_media)+(select coalesce(sum(size),0) from public.files)+(select coalesce(sum(size),0) from public.mes_uploads where kind='ticket' and not complete and expires>now())+$4::bigint<=2147483648 returning id",
+        [id, data.title.trim(), data.type, data.size, purpose],
       );
       if (!created.rowCount)
         throw fail(400, "Video count or storage quota reached");
@@ -245,6 +295,12 @@ export function workspaceRouter(pool, filesRoot) {
       return res.json({ ok: true });
     }
     if (action === "videoDelete") {
+      const { rowCount } = await pool.query(
+        "select 1 from public.mes_workspace where kind='announcements' and coalesce(data->'media','[]'::jsonb) ? $1",
+        [data.id],
+      );
+      if (rowCount)
+        throw fail(409, "Remove this media from its notice before deleting it");
       const {
         rows: [row],
       } = await pool.query(
@@ -253,31 +309,6 @@ export function workspaceRouter(pool, filesRoot) {
       );
       if (row) await rm(join(filesRoot, "media", row.id), { force: true });
       return res.json({ ok: true });
-    }
-    if (action === "probe") {
-      const {
-        rows: [target],
-      } = await pool.query(
-        "select id,data from public.mes_workspace where kind='networkTargets' and id=$1 and data->>'active'='true'",
-        [data.id],
-      );
-      if (!target) throw fail(404, "Target unavailable");
-      // Persisted cooldown applies across sessions and process restarts.
-      const {
-        rows: [claim],
-      } = await pool.query(
-        "update public.mes_workspace set data=jsonb_set(data,'{lastManual}',to_jsonb($2::bigint)) where kind='networkTargets' and id=$1 and coalesce((data->>'lastManual')::bigint,0)<$2::bigint-60000 returning id",
-        [target.id, Date.now()],
-      );
-      if (!claim) throw fail(429, "Wait 60 seconds between manual probes");
-      return res.json(await runProbe(pool, target));
-    }
-    if (action === "probeLog") {
-      const { rows } = await pool.query(
-        "select * from public.mes_probes where target_id=$1 order by checked_at desc limit 3000",
-        [data.id],
-      );
-      return res.json({ rows });
     }
     throw fail(400, "Unknown workspace action");
   });

@@ -47,8 +47,8 @@ export function validateFiles(files) {
     if (!allowedTypes.includes(attachmentType(file)))
       return `${file.name}: unsupported file type. Use JPG, PNG, WEBP, MP4, WEBM, MOV, PDF, TXT, CSV or XLSX.`;
     if (file.size <= 0) return `${file.name}: empty files cannot be uploaded.`;
-    if (file.size > (attachmentType(file).startsWith("video/") ? 25 : 10) * 1024 * 1024)
-      return `${file.name}: maximum file size is ${attachmentType(file).startsWith("video/") ? 25 : 10} MB.`;
+    if (file.size > (attachmentType(file).startsWith("video/") ? 200 : 10) * 1024 * 1024)
+      return `${file.name}: maximum file size is ${attachmentType(file).startsWith("video/") ? 200 : 10} MB.`;
   }
   return "";
 }

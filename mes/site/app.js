@@ -656,6 +656,7 @@ async function downloadAttachment(file) {
     return;
   }
   try {
+    if(file.type?.startsWith('video/')){const {url}=await callable('downloadUrl',{path:file.path});const link=el('a');link.href=url;link.download=file.name;link.click();return;}
     const blob = await fetchAttachment(file.path);
     const url = URL.createObjectURL(blob),
       a = el("a");
