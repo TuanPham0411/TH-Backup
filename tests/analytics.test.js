@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {activitySeries,resolutionSummary} from '../mes/site/analytics.js';
+import {activitySeries,resolutionSummary,submissionCohort} from '../mes/site/analytics.js';
 const now=new Date('2026-10-17T12:00:00Z').getTime();
 const day=86400000;
 test('activity uses selected horizon, counts resolution independently and bounds chart density',()=>{
@@ -15,4 +15,10 @@ test('resolution statistics exclude invalid durations and distinguish aging back
  const summary=resolutionSummary([{status:'Resolved',createdAt:now-2*day,resolvedAt:now-day},{status:'Closed',createdAt:now},{status:'New',createdAt:now-9*day},{status:'In progress',createdAt:now-day}],now);
  assert.equal(summary.rate,50);assert.equal(summary.averageHours,24);assert.equal(summary.aged,1);assert.equal(summary.pending.length,2);
  assert.equal(resolutionSummary([]).averageHours,null);
+});
+
+test('submission cohort matches calendar-day activity boundaries',()=>{
+ const issues=[{createdAt:Date.parse('2026-10-10T18:00:00Z')},{createdAt:Date.parse('2026-10-11T00:00:00Z')},{createdAt:now+day}];
+ assert.equal(submissionCohort(issues,'7',now).length,1);
+ assert.equal(activitySeries(issues,'7',now).reduce((sum,bin)=>sum+bin.created,0),1);
 });

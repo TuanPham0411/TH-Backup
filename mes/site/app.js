@@ -1,5 +1,5 @@
 import { revealPage, animateDashboard } from "./motion.js";
-import { activitySeries, resolutionSummary } from "./analytics.js";
+import { activitySeries, resolutionSummary, submissionCohort } from "./analytics.js";
 import { createRichEditor } from "./rich-editor.js";
 import { documentText, renderDocument } from "./rich-document.js";
 import { t, initializeLanguage, getLanguage } from "./i18n.js";
@@ -236,12 +236,7 @@ function scopedIssues() {
   return state.preview ? state.issues.filter(i => i.reporterUid === state.user?.uid) : state.myIssues;
 }
 function selectedPeriod() {
-  const days = $("dashboard-period").value;
-  return scopedIssues().filter(
-    (i) =>
-      days === "all" ||
-      stamp(i.createdAt) >= Date.now() - Number(days) * 86400000,
-  );
+  return submissionCohort(scopedIssues(), $("dashboard-period").value);
 }
 let dashboardSignature = "";
 function renderDashboard() {
@@ -751,6 +746,7 @@ function renderSettings() {
             active: !u.active,
           });
         renderDirectories();
+        await refreshAccounts();
         showStatus("settings-status", "User access updated.");
       });
     const reset = el("button", "New activation link", "text-button");

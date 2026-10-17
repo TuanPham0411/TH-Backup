@@ -1,4 +1,9 @@
 const time = value => typeof value === 'number' ? value : new Date(value || 0).getTime();
+export function submissionCohort(issues, period = 'all', now = Date.now()) {
+  if (period === 'all') return issues;
+  const start = new Date(now); start.setHours(0,0,0,0); start.setDate(start.getDate()-(Number(period)-1));
+  return issues.filter(issue=>time(issue.createdAt)>=start.getTime() && time(issue.createdAt)<=now);
+}
 export function activitySeries(issues, period = 'all', now = Date.now()) {
   const end = new Date(now); end.setHours(0,0,0,0); end.setDate(end.getDate()+1);
   const timestamps = issues.flatMap(i => [time(i.createdAt),time(i.resolvedAt)]).filter(t => t>0 && t<=now);
