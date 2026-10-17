@@ -91,3 +91,11 @@ Rotate credentials if they have been shared in a screenshot or other unintended 
 - **PostgreSQL:** stop only `th-app`, open `sudo -u postgres psql -d th_app`, run `\password th_api` and enter the new password at the hidden prompts, then `\q`. Update the password component of `DATABASE_URL` to match; percent-encode reserved URL characters. Restart `th-app` and check `/api/health`. Keep the existing database, tables, files and role name.
 
 Apply environment changes with `sudo systemctl restart th-app`. This does not restart SSH or Cloudflare Tunnel. OAuth callback requests must begin from a fresh Google login after a deployment or secret change; an old callback URL may have an expired state or authorization code.
+
+### MES account administration
+
+Sign in as the MES owner and open Administration → User directory. Click a user's display name or Edit to change username, display name, email, phone and job title. New activation link invalidates previous activation links, password and sessions; the replacement link is shown inside the account dialog, expires after 72 hours and is single-use. Restore inactive accounts before issuing a link. Deactivate revokes sessions; Delete account permanently removes the account and credentials while preserving historical feedback. Owner and reserved tester accounts cannot be deleted through this screen.
+
+Ordinary users can change only their own display name, email, phone, job title and password through My profile. Account ownership and access state are enforced in PostgreSQL, independently of browser controls. Changing a username revokes existing sessions.
+
+Dashboard filters group status, priority and performance by submission date. Activity counts submissions and resolutions independently over the selected calendar horizon, with at most 12 date buckets. Average resolution includes completed tickets with valid recorded timestamps; an em dash means no usable samples. Animations run on navigation or changed data, respect reduced-motion preferences and use browser compositing rather than an additional chart runtime on the Pi.

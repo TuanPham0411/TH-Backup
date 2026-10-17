@@ -109,7 +109,7 @@
               <div class="card-heading">
                 <div>
                   <h2>Feedback activity</h2>
-                  <p>New submissions and resolutions · last 7 days</p>
+                  <p id="activity-caption">Submissions and resolutions over time</p>
                 </div>
                 <span class="legend"
                   ><i></i> Submitted <i class="green"></i> Resolved</span
@@ -126,11 +126,15 @@
               <div class="card-heading">
                 <div>
                   <h2>Status overview</h2>
-                  <p>Distribution of current feedback</p>
+                  <p>Current status · selected submission cohort</p>
                 </div>
               </div>
               <div id="status-chart" class="status-chart"></div>
             </article>
+          </div>
+          <div class="chart-grid operations-grid">
+            <article class="card"><div class="card-heading"><div><h2>Resolution performance</h2><p>Selected cohort · grouped by submission date</p></div></div><div id="resolution-insights" class="resolution-insights"></div></article>
+            <article class="card"><div class="card-heading"><div><h2>Backlog by priority</h2><p>Focus on unresolved work in the selected cohort</p></div></div><div id="priority-chart"></div><p id="priority-empty" class="helper" hidden>No unresolved tickets in this period.</p></article>
           </div>
           <div class="chart-grid second-grid">
             <article class="card">
@@ -532,6 +536,22 @@
         >
       </footer>
     </div>
+    <dialog id="user-admin-dialog" aria-labelledby="user-admin-title">
+      <button class="dialog-close" data-close="user-admin-dialog" aria-label="Close">×</button>
+      <p class="eyebrow">ACCOUNT MANAGEMENT</p><h2 id="user-admin-title">Edit account</h2>
+      <p class="helper">Manage identity, profile and access. Existing feedback is preserved.</p>
+      <form id="user-admin-form" class="profile-form">
+        <label>Username<input id="admin-username" required maxlength="64" pattern="[a-z0-9][a-z0-9._-]*" /></label>
+        <label>Display name<input id="admin-name" required maxlength="80" /></label>
+        <label>Email<input id="admin-email" type="email" maxlength="160" /></label>
+        <label>Phone<input id="admin-phone" maxlength="32" /></label>
+        <label>Job title<input id="admin-title" maxlength="80" /></label>
+        <button class="button primary">Save changes</button>
+      </form>
+      <div class="account-actions"><button id="admin-reset" class="button" type="button">New activation link</button><button id="admin-toggle" class="button" type="button">Deactivate</button><button id="admin-delete" class="button danger" type="button">Delete account</button></div>
+      <div id="admin-activation" class="activation-result" hidden><label>Private activation link<input id="admin-activation-link" readonly /></label><button id="admin-copy" class="button" type="button">Copy link</button><p class="helper">Valid for 72 hours, single use. Previous links, password and sessions are revoked.</p></div>
+      <p id="user-admin-status" role="status"></p>
+    </dialog>
     <dialog id="account-dialog" aria-labelledby="account-title">
       <button
         class="dialog-close"

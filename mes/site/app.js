@@ -1,3 +1,5 @@
+import { revealPage, animateDashboard } from "./motion.js";
+import { activitySeries, resolutionSummary } from "./analytics.js";
 import { createRichEditor } from "./rich-editor.js";
 import { documentText, renderDocument } from "./rich-document.js";
 import { t, initializeLanguage, getLanguage } from "./i18n.js";
@@ -199,6 +201,8 @@ function navigate(page) {
   $("data-scope").textContent = page === "my-dashboard" ? "Your feedback · updates every 15 seconds." : state.preview ? "Preview only · sample data, no production connection." : "All workspace feedback · updates every 15 seconds.";
   renderAll();
   if (page === "create") renderForm();
+  revealPage($(`${section}-page`));
+  if (section === "dashboard") animateDashboard($("dashboard-page"));
 }
 function renderDirectories() {
   const active = (items) => items.filter((x) => x.active !== false);
@@ -239,7 +243,11 @@ function selectedPeriod() {
       stamp(i.createdAt) >= Date.now() - Number(days) * 86400000,
   );
 }
+let dashboardSignature = "";
 function renderDashboard() {
+  const signature = JSON.stringify([state.page,state.ready,$("dashboard-period").value,scopedIssues(),state.departments]);
+  const changed = signature !== dashboardSignature;
+  dashboardSignature = signature;
   const issues = selectedPeriod(),
     s = stats(issues);
   $("metrics").replaceChildren();
@@ -259,7 +267,8 @@ function renderDashboard() {
     );
     $("metrics").append(card);
   }
-  renderActivity(issues);
+  renderActivity(scopedIssues());
+  renderOperations(issues);
   renderDonut(issues);
   renderDepartments(issues);
   $("recent-issues").replaceChildren();
@@ -288,32 +297,16 @@ function renderDashboard() {
         "empty",
       ),
     );
+  if (changed) animateDashboard($("dashboard-page"));
 }
 function renderActivity(issues) {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const days = Array.from(
-    { length: 7 },
-    (_, n) => new Date(today.getTime() - (6 - n) * 86400000),
-  );
-  const counts = days.map((d) => ({
-    day: d,
-    created: issues.filter(
-      (i) =>
-        stamp(i.createdAt) >= d.getTime() &&
-        stamp(i.createdAt) < d.getTime() + 86400000,
-    ).length,
-    resolved: issues.filter(
-      (i) =>
-        stamp(i.resolvedAt) >= d.getTime() &&
-        stamp(i.resolvedAt) < d.getTime() + 86400000,
-    ).length,
-  }));
+  const counts = activitySeries(issues, $("dashboard-period").value);
+  $("activity-caption").textContent = $("dashboard-period").value === "all" ? "Submissions and resolutions · full recorded history" : `Submissions and resolutions · last ${$("dashboard-period").value} days`;
   const max = Math.max(1, ...counts.flatMap((d) => [d.created, d.resolved]));
   const axis = el("div", undefined, "chart-y");
   axis.append(
     el("span", String(max)),
-    el("span", String(Math.round(max / 2))),
+    el("span", max > 1 ? String(Math.floor(max / 2)) : ""),
     el("span", "0"),
   );
   const grid = el("div", undefined, "activity-grid");
@@ -326,8 +319,10 @@ function renderActivity(issues) {
     ]) {
       const bar = el("span");
       bar.style.height = `${(count / max) * 100}%`;
-      bar.title = `${d.day.toLocaleDateString(getLanguage() === "vi" ? "vi-VN" : "en-GB")}: ${count} ${name.toLowerCase()}`;
+      bar.title = `${d.day.toLocaleDateString(getLanguage() === "vi" ? "vi-VN" : "en-GB")} – ${new Date(d.end.getTime()-1).toLocaleDateString(getLanguage() === "vi" ? "vi-VN" : "en-GB")}: ${count} ${t(name)}`;
       bar.setAttribute("aria-label", bar.title);
+      bar.tabIndex = 0;
+      bar.dataset.tooltip = bar.title;
       bars.append(bar);
     }
     day.append(
@@ -372,7 +367,7 @@ function renderDonut(issues) {
     const row = el("div"),
       dot = el("i");
     dot.style.background = colors[n];
-    row.append(dot, el("span", s), el("strong", String(counts[n])));
+    row.append(dot, el("span", s), el("strong", `${counts[n]} · ${issues.length ? Math.round(counts[n] / issues.length * 100) : 0}%`));
     legend.append(row);
   });
   $("status-chart").replaceChildren(donut, legend);
@@ -403,6 +398,30 @@ function renderDepartments(issues) {
     $("department-chart").append(
       el("p", "Department data will appear here.", "empty"),
     );
+}
+function renderOperations(issues) {
+  const summary = resolutionSummary(issues);
+  $("resolution-insights").replaceChildren();
+  for (const [value,label,note] of [
+    [`${summary.rate}%`, "Completion rate", "Resolved or closed / selected cohort"],
+    [summary.averageHours === null ? "—" : summary.averageHours < 24 ? `${summary.averageHours.toFixed(1)}h` : `${(summary.averageHours/24).toFixed(1)}d`, "Average resolution", "Completed tickets with recorded timestamps"],
+    [String(summary.aged), "Aging backlog", "Unresolved for 7 days or longer"],
+  ]) {
+    const item=el("div",undefined,"insight");
+    item.append(el("strong",state.ready ? value : "—"),el("span",label),el("small",note));
+    $("resolution-insights").append(item);
+  }
+  $("priority-chart").replaceChildren();
+  const max=Math.max(1,...priorities.map(p=>summary.pending.filter(i=>i.priority===p).length));
+  for(const priority of [...priorities].reverse()) {
+    const count=summary.pending.filter(i=>i.priority===priority).length;
+    const row=el("div",undefined,"department-row");
+    const head=el("div"); head.append(badge(priority,"priority"),el("strong",String(count)));
+    const track=el("div",undefined,"bar-track"); const bar=el("div");
+    bar.style.width=`${count/max*100}%`; bar.dataset.priority=priority;
+    track.append(bar); row.append(head,track); $("priority-chart").append(row);
+  }
+  $("priority-empty").hidden = summary.pending.length > 0;
 }
 function filtered() {
   return filterIssues(scopedIssues(), {
@@ -717,29 +736,11 @@ function renderSettings() {
     const controls = el("td"),
       edit = el("button", "Edit", "text-button"),
       toggle = el("button", u.active ? "Deactivate" : "Restore", "text-button");
-    edit.onclick = () => {
-      const username = window
-        .prompt(t("Username"), u.username)
-        ?.trim()
-        .toLowerCase();
-      if (!username) return;
-      if (!safeUsername(username) || username === "hpham") {
-        showStatus("settings-status", "Enter a valid username.");
-        return;
-      }
-      run("settings-status", edit, async () => {
-        if (state.preview) {
-          u.username = username;
-        } else
-          await callable("manageUser", {
-            operation: "update",
-            uid: u.id,
-            username,
-          });
-        renderDirectories();
-        showStatus("settings-status", "User updated.");
-      });
-    };
+    edit.onclick = () => openUserAdmin(u);
+    const nameButton = el("button", u.displayName, "text-button account-name");
+    nameButton.onclick = () => openUserAdmin(u);
+    nameButton.disabled = ["mes-owner", "mes-tester"].includes(u.id);
+    row.firstChild.replaceChildren(nameButton);
     toggle.onclick = () =>
       run("settings-status", toggle, async () => {
         if (state.preview) u.active = !u.active;
@@ -758,6 +759,8 @@ function renderSettings() {
       run("settings-status", reset, async () => {
         if (state.preview) { toast("Preview only. No activation link was issued."); return; }
         displayActivation(await callable("resetUserActivation", { uid: u.id }));
+        await refreshAccounts();
+        $("activation-result").scrollIntoView({block:"center",behavior:matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth"});
         showStatus("settings-status", "Activation link ready. Share it privately with the user.");
       });
     };
@@ -769,6 +772,54 @@ function renderSettings() {
     $("user-rows").append(row);
   }
 }
+let editingUser;
+function openUserAdmin(user) {
+  if (!state.isOwner || ["mes-owner", "mes-tester"].includes(user.id)) return;
+  editingUser = user;
+  for (const [id, key] of [["admin-username","username"],["admin-name","displayName"],["admin-email","email"],["admin-phone","phone"],["admin-title","jobTitle"]]) $(id).value = user[key] || "";
+  $("admin-toggle").textContent = user.active ? "Deactivate" : "Restore";
+  $("admin-reset").disabled = !user.active;
+  $("admin-activation").hidden = true;
+  $("admin-activation-link").value = "";
+  $("user-admin-status").textContent = "";
+  $("user-admin-dialog").showModal();
+}
+async function refreshAccounts() {
+  if (!state.preview) state.users = (await callable("read", {path:"users"})).rows;
+  renderSettings();
+}
+$("user-admin-form").onsubmit = e => {
+  e.preventDefault();
+  run("user-admin-status", e.currentTarget.querySelector("button"), async () => {
+    const data = {operation:"update", uid:editingUser.id, username:$("admin-username").value.trim().toLowerCase(), displayName:$("admin-name").value.trim(), email:$("admin-email").value.trim(), phone:$("admin-phone").value.trim(), jobTitle:$("admin-title").value.trim()};
+    if (state.preview) Object.assign(editingUser,data); else await callable("manageUser",data);
+    await refreshAccounts(); showStatus("user-admin-status","Account saved.");
+  });
+};
+$("admin-reset").onclick = () => {
+  if (!confirm(t("Reset this account? Its current password and sessions will be revoked."))) return;
+  run("user-admin-status",$("admin-reset"),async () => {
+    if (state.preview) { toast("Preview only. No activation link was issued."); return; }
+    const result = await callable("resetUserActivation",{uid:editingUser.id});
+    displayActivation(result);
+    $("admin-activation-link").value = $("activation-link").value;
+    $("admin-activation").hidden = false;
+    await refreshAccounts(); showStatus("user-admin-status","New activation link ready.");
+  });
+};
+$("admin-copy").onclick = () => run("user-admin-status",$("admin-copy"),async () => { await navigator.clipboard.writeText($("admin-activation-link").value); toast("Activation link copied."); });
+$("admin-toggle").onclick = () => run("user-admin-status",$("admin-toggle"),async () => {
+  if (!state.preview) await callable("manageUser",{operation:"deactivate",uid:editingUser.id,active:!editingUser.active});
+  editingUser.active=!editingUser.active; await refreshAccounts(); $("user-admin-dialog").close();
+});
+$("admin-delete").onclick = () => {
+  if (!confirm(`Delete account ${editingUser.username}? This cannot be undone. Historical feedback will be preserved.`)) return;
+  run("user-admin-status",$("admin-delete"),async () => {
+    if (!state.preview) await callable("manageUser",{operation:"delete",uid:editingUser.id});
+    else state.users=state.users.filter(u=>u.id!==editingUser.id);
+    await refreshAccounts(); $("user-admin-dialog").close(); showStatus("settings-status","Account deleted. Historical feedback preserved.");
+  });
+};
 async function loadDevices() {
   if (!state.isOwner) return;
   try {
@@ -1195,7 +1246,7 @@ $("user-form").onsubmit = (e) => {
         operation: "create", username, displayName,
       }));
     $("user-form").reset();
-    renderDirectories();
+    await refreshAccounts();
     showStatus("settings-status", "User created.");
   });
 };
@@ -1492,6 +1543,9 @@ async function handleAuth(user) {
   state.issues = [];
   state.myIssues = [];
   state.users = [];
+  $("user-admin-dialog").close();
+  $("admin-activation-link").value = "";
+  editingUser = undefined;
   state.leaders = [];
   state.departments = [];
   state.devices = [];
