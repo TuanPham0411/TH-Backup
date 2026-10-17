@@ -81,3 +81,13 @@ sudo systemctl restart th-app
 ```
 
 For backups, retain PostgreSQL dumps **together with** `/var/lib/th-app/files` and `/etc/th-app/runtime.env` on another device. Stop the app while taking the dump/file snapshot if a consistent maintenance backup is required. Monitor `df -h /` and attachment growth on the 32 GB card; failed/crashed uploads can leave temporary files and unattached uploads for administrator cleanup. Never delete live linked attachments by age alone.
+
+## Credential rotation
+
+Rotate credentials if they have been shared in a screenshot or other unintended location. Enter replacements directly on Pi using `sudoedit /etc/th-app/runtime.env`; do not put them in Git or CI logs.
+
+- **Google OAuth:** add a new client secret in Google Auth Platform → Clients, update `GOOGLE_CLIENT_SECRET`, restart `th-app`, test a fresh login, then delete the old client secret.
+- **Gmail SMTP:** create a replacement App Password, update the password in `SMTP_URL`, then revoke the old App Password. Remove display spaces from the App Password. For an initial Gmail delivery test, set `MAIL_FROM` to the authenticated Gmail address; a custom sender needs the provider's verified sender configuration.
+- **PostgreSQL:** stop only `th-app`, open `sudo -u postgres psql -d th_app`, run `\password th_api` and enter the new password at the hidden prompts, then `\q`. Update the password component of `DATABASE_URL` to match; percent-encode reserved URL characters. Restart `th-app` and check `/api/health`. Keep the existing database, tables, files and role name.
+
+Apply environment changes with `sudo systemctl restart th-app`. This does not restart SSH or Cloudflare Tunnel. OAuth callback requests must begin from a fresh Google login after a deployment or secret change; an old callback URL may have an expired state or authorization code.
