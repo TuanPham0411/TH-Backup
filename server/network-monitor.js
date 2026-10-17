@@ -58,11 +58,10 @@ export function monitorURL(value) {
     url.username ||
     url.password ||
     url.hash ||
-    url.href.length > 1500 ||
-    (url.port && !["80", "443"].includes(url.port))
+    url.href.length > 1500
   )
     throw Object.assign(
-      new Error("Use HTTP(S) without credentials on port 80 or 443"),
+      new Error("Use an HTTP(S) URL without credentials or fragments"),
       { status: 400 },
     );
   return url;

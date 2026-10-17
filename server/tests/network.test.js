@@ -18,12 +18,12 @@ test("network probes reject private, loopback, metadata and credential URLs", as
     "3fff::1",
   ])
     assert.equal(publicAddress(ip), false, ip);
+  assert.equal(monitorURL("http://example.com:8080/health").port,"8080");
   assert.equal(publicAddress("1.1.1.1"), true);
   assert.equal(publicAddress("2606:4700:4700::1111"), true);
   for (const url of [
     "file:///etc/passwd",
     "https://user:secret@example.com/",
-    "http://example.com:3000/",
     "http://example.com/#secret",
   ])
     assert.throws(() => monitorURL(url));
