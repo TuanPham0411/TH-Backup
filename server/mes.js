@@ -1,3 +1,4 @@
+import {publishFile} from './publish.js';
 import {filePath,deleteEverywhere,storageQuota} from './storage.js';
 import {displayPath} from './media.js';
 import {Router} from 'express';
@@ -43,7 +44,7 @@ export function mesRouter(pool,filesRoot) {
    await pipeline(req,limiter,createWriteStream(temporary,{flags:'wx',mode:0o600}));
    if(!size)throw Object.assign(new Error('Empty file'),{status:400});
    // link is atomic and never overwrites an existing slot.
-   const {link}=await import('node:fs/promises');await link(temporary,path);
+   await publishFile(temporary,path);
    try {await pool.query('insert into public.files(path,size,type) values($1,$2,$3)',[grant.path,size,type]);}
    catch(e){await rm(path,{force:true});throw e;}
    res.json({ok:true});

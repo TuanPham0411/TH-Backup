@@ -1,3 +1,4 @@
+import {publishFile} from './publish.js';
 import {Router} from 'express';
 import {createWriteStream} from 'node:fs';
 import {access,rm,link} from 'node:fs/promises';
@@ -31,7 +32,7 @@ export function previewRouter(pool,root){
   try{
    const limiter=new Transform({transform(chunk,_encoding,cb){size+=chunk.length;if(first){first=false;if(chunk.length<2||chunk[0]!==255||chunk[1]!==216)return cb(Object.assign(new Error('JPEG preview required'),{status:400}));}cb(size>256*1024?Object.assign(new Error('Preview too large'),{status:413}):null,chunk);}});
    await pipeline(req,limiter,createWriteStream(temporary,{flags:'wx',mode:0o600}));if(!size)return res.sendStatus(400);
-   try{await link(temporary,dest);}catch(e){if(e.code!=='EEXIST')throw e;}res.json({ok:true});
+   try{await publishFile(temporary,dest);}catch(e){if(e.code!=='EEXIST')throw e;}res.json({ok:true});
   }finally{await rm(temporary,{force:true});}
  });return router;
 }

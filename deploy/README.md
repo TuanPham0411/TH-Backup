@@ -125,7 +125,10 @@ Upgrades now stop the app briefly, take a verified pre-migration snapshot under
 ticket and timeline row before/after migration. A failed snapshot aborts deployment
 and restarts the prior app. No existing tickets or accounts are reset. Local
 snapshots use hardlinks for immutable originals where possible; these are rollback
-protection, not protection from card failure. They are not automatically deleted.
+protection, not protection from card failure. External USB files which cannot be
+hardlinked are recorded as unchanged external references in these rollback
+manifests instead of copying a full drive onto the SD card; only the explicit
+USB backup operation makes a complete portable copy. They are not automatically deleted.
 
 In **Administration → Storage and USB backup**:
 
@@ -134,9 +137,11 @@ In **Administration → Storage and USB backup**:
    adds a boot-safe fstab entry only if that UUID has no existing entry. The app
    never partitions or formats a drive. Unrecognised/blank drives require OS setup.
 2. Choose **New file storage → Use for new files**, or configure an overflow USB.
-   Active storage needs ext4/ext3/XFS/Btrfs with Linux ownership support (ext4 is
-   recommended). FAT/exFAT/NTFS can be backup destinations if the OS driver works,
-   but cannot be active application storage. Mount active storage under `/mnt`
+   Active storage supports ext4/ext3/XFS/Btrfs and FAT/exFAT/NTFS when the OS
+   driver works (ext4 is recommended). The mount action assigns portable filesystems
+   to thapp with a private umask; no format or content deletion is performed.
+   Filesystems without hardlinks publish by exclusive copy, so a final upload
+   briefly needs space for both the upload fragment and completed original. Mount active storage under `/mnt`
    or `/media`, accessible to `thapp`; mounts inside home directories are hidden
    by the app service's sandbox.
 3. Existing files stay in place and retain their URLs. New files go to the chosen

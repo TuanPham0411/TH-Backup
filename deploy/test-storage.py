@@ -30,6 +30,13 @@ class StorageTests(unittest.TestCase):
    pwd.return_value.pw_uid=1000;pwd.return_value.pw_gid=1000
    result=storage.snapshot(dest,storage.config(),storage.disks())
   self.assertTrue(result['complete']);self.assertEqual(result['files'],2);self.assertEqual((dest/'files/issues/a/slot').read_bytes(),original.read_bytes());self.assertEqual((dest/'files/media/video-id').read_bytes(),video.read_bytes());self.assertIn('database.dump',(dest/'files.sha256').read_text());self.assertTrue(original.exists())
+ def test_rollback_snapshot_keeps_external_original_references_without_copying_usb_onto_card(self):
+  original=self.root/'media'/'external-id';original.parent.mkdir();original.write_bytes(b'USB original stays in place')
+  dest=self.base/'rollback'
+  def dump(path):path.write_bytes(b'test database')
+  with patch.object(storage,'run',return_value='media/external-id\n'),patch.object(storage,'dump_database',side_effect=dump),patch('os.link',side_effect=OSError('cross-device')),patch('os.sync'):
+   result=storage.snapshot(dest,storage.config(),storage.disks(),hardlinks=True)
+  self.assertEqual(result['mode'],'deployment-rollback');self.assertEqual(result['externalMediaReferences']['media/external-id']['path'],str(original));self.assertFalse((dest/'files/media/external-id').exists());self.assertTrue(original.exists())
  def test_database_dump_writes_through_root_opened_stream(self):
   target=self.base/'database.dump'
   def execute(args,**kwargs):

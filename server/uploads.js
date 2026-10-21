@@ -1,3 +1,4 @@
+import {publishFile} from './publish.js';
 import {filePath,deleteEverywhere,storageQuota} from "./storage.js";
 import { Router } from "express";
 import { randomUUID } from "node:crypto";
@@ -224,7 +225,7 @@ export function uploadRouter(pool, root) {
             ? join(temporary,"../..", record.path)
             : join(temporary,"../..", "media", record.path);
         await mkdir(join(destination, ".."), { recursive: true });
-        await link(temporary, destination);
+        await publishFile(temporary, destination);
         linked = destination;
         if (record.kind === "ticket")
           await db.query(

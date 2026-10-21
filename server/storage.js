@@ -32,7 +32,8 @@ export function maintenanceGate(){
  const readNames=new Set(['read','readBundle','getSession','getDirectory','listDevices']);
  return {
   middleware(req,res,next){
-   const read=req.method==='GET'||req.method==='HEAD'||req.body?.action==='read'||readNames.has(req.body?.name);
+   const route=req.path.replace(/\/$/,'');
+   const read=req.method==='GET'||req.method==='HEAD'||(route==='/api/mes'&&readNames.has(req.body?.name))||(route==='/api/mes/workspace'&&req.body?.action==='read');
    if(read||req.path.startsWith('/api/mes/admin'))return next();
    if(blocked||backupActive()){res.set('Retry-After','10');return res.status(503).json({error:'Backup in progress. Please retry after it completes.',code:'backup-in-progress'});}
    active++;let done=false;const finish=()=>{if(!done){done=true;active--;}};res.once('finish',finish);res.once('close',finish);next();

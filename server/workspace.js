@@ -1,3 +1,4 @@
+import {publishFile} from './publish.js';
 import {filePath,deleteEverywhere,storageQuota} from "./storage.js";
 import {displayPath} from "./media.js";
 import { Router } from "express";
@@ -102,7 +103,7 @@ export function workspaceRouter(pool, filesRoot) {
         createWriteStream(temporary, { flags: "wx", mode: 0o600 }),
       );
       if (size !== Number(media.size)) throw fail(400, "Video incomplete");
-      await link(temporary, path);
+      await publishFile(temporary, path);
       try {
         await pool.query("update public.mes_media set ready=true where id=$1", [
           media.id,

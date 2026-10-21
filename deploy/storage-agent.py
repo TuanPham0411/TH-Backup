@@ -65,6 +65,7 @@ def resolve(data):
     for root in available:
         file=root/rel
         if file.exists():
+            if data.get('write') and os.statvfs(root).f_bavail*os.statvfs(root).f_frsize<64*1024*1024:raise ValueError('Selected storage is nearly full; retry on the configured USB drive')
             if file.is_symlink() or not file.resolve().is_relative_to(root.resolve()): raise ValueError('Invalid storage file')
             return {'path':str(file),'root':str(root)}
     if not data.get('write'):
@@ -96,7 +97,7 @@ def snapshot(destination, c, mounted, hardlinks=False):
     destination.mkdir(mode=0o700)
     dump_database(destination/'database.dump')
     target=destination/'files';target.mkdir(mode=0o700)
-    count=0;total=0
+    count=0;total=0;external={}
     with (destination/'files.sha256').open('w') as checksums:
         for root in active:
             for folder in ('issues','media'):
@@ -109,12 +110,15 @@ def snapshot(destination, c, mounted, hardlinks=False):
                     if dest.exists():raise ValueError('Conflicting storage paths; no data was overwritten')
                     if hardlinks:
                         try:os.link(source,dest)
-                        except OSError:shutil.copyfile(source,dest)
+                        except OSError:
+                            external[str(rel)]={'path':str(source),'bytes':source.stat().st_size,'modifiedNs':source.stat().st_mtime_ns}
+                            count+=1;total+=source.stat().st_size
+                            continue
                     else:shutil.copyfile(source,dest)
                     with dest.open('rb') as copied:digest=hashlib.file_digest(copied,'sha256').hexdigest()
                     checksums.write(digest+'  files/'+str(rel)+'\n');count+=1;total+=dest.stat().st_size
         with (destination/'database.dump').open('rb') as dump:checksums.write(hashlib.file_digest(dump,'sha256').hexdigest()+'  database.dump\n')
-    manifest={'version':1,'createdAt':int(time.time()*1000),'files':count,'bytes':total,'complete':True,'database':'database.dump','media':'files','urls':'Unchanged: restore the same database IDs and relative file paths.','excluded':'Runtime secrets and active upload fragments.','volumes':[v['id'] for v in c['volumes']]}
+    manifest={'version':1,'mode':'deployment-rollback' if hardlinks else 'full-usb-backup','externalMediaReferences':external,'createdAt':int(time.time()*1000),'files':count,'bytes':total,'complete':True,'database':'database.dump','media':'files','urls':'Unchanged: restore the same database IDs and relative file paths.','excluded':'Runtime secrets and active upload fragments.','volumes':[v['id'] for v in c['volumes']]}
     (destination/'manifest.json').write_text(json.dumps(manifest));os.sync()
     return manifest
 
@@ -142,7 +146,9 @@ def dispatch(action,data):
         mount.mkdir(mode=0o700,exist_ok=True)
         if any(mount.iterdir()):raise ValueError('Mount directory must be empty')
         options='nodev,nosuid,noexec,noatime'
-        if fs in ('exfat','vfat','ntfs','ntfs3'):options+=',umask=0077'
+        if fs in ('exfat','vfat','ntfs','ntfs3'):
+            import pwd
+            user=pwd.getpwnam('thapp');options+=',uid='+str(user.pw_uid)+',gid='+str(user.pw_gid)+',umask=0077'
         run(['mount','-o',options,'UUID='+id,str(mount)])
         # Keep an existing fstab entry intact. Otherwise persist this UUID for reboot.
         fstab=Path('/etc/fstab');text=fstab.read_text()
@@ -165,17 +171,20 @@ def dispatch(action,data):
         if id not in ('internal',None):
             disk=next((d for d in mounted if d['id']==id),None)
             if not disk:raise ValueError('Select a mounted USB drive')
-            # Linux permissions are required for private application data.
-            if disk['filesystem'] not in ('ext4','ext3','xfs','btrfs'):raise ValueError('Storage needs a Linux filesystem (ext4 recommended); no drive is formatted by this application')
+            # Portable filesystems use the mount-level private uid/gid and umask.
+            if disk['filesystem'] not in ('ext4','ext3','xfs','btrfs','exfat','vfat','ntfs','ntfs3'):raise ValueError('Unsupported filesystem; no drive is formatted by this application')
             root=Path(disk['mount'])/'th-mes-storage'
             if root.is_symlink():raise ValueError('Invalid storage directory')
             if root.exists() and not (root/'.th-mes-volume').exists() and any(root.iterdir()):raise ValueError('Directory already contains unrelated files')
             root.mkdir(mode=0o700,exist_ok=True)
             import pwd
-            user=pwd.getpwnam('thapp');os.chown(root,user.pw_uid,user.pw_gid);root.chmod(0o700)
+            user=pwd.getpwnam('thapp')
+            portable=disk['filesystem'] in ('exfat','vfat','ntfs','ntfs3')
+            if not portable:os.chown(root,user.pw_uid,user.pw_gid);root.chmod(0o700)
             marker=root/'.th-mes-volume'
             if marker.is_symlink() or (marker.exists() and marker.read_text().strip()!=id):raise ValueError('Volume marker differs')
-            marker.write_text(id);marker.chmod(0o444)
+            marker.write_text(id)
+            if not portable:marker.chmod(0o444)
             run(['runuser','-u','thapp','--','test','-w',str(root)])
             if not any(v['id']==id for v in c['volumes']):c['volumes'].append({'id':id})
         if mode=='primary' and id is None:raise ValueError('Choose a primary drive')
