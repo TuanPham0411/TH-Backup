@@ -88,7 +88,7 @@ function toast(message) {
 }
 function errorMessage(e) {
   const c = String(e?.code || "");
-  if (["invalid-credentials", "rate-limited", "password-policy"].includes(c)) return e.message;
+  if (["invalid-credentials", "rate-limited", "password-policy", "P0099"].includes(c)) return e.message;
   if (c === "owner-required") return "This Google account is not accepted as the MES owner. Use eric.scorp93@gmail.com. Reset sign-in session to switch accounts.";
   if (c === "backend-not-ready") return "Account service update required. Deploy the MES accounts SQL installer and the matching API.";
   if (c.includes("unauthenticated"))
