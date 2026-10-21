@@ -1,3 +1,5 @@
+import {filePath,deleteEverywhere,storageQuota} from "./storage.js";
+import {displayPath} from "./media.js";
 import { Router } from "express";
 import { randomUUID } from "node:crypto";
 import { mkdir, rm, link } from "node:fs/promises";
@@ -18,7 +20,7 @@ export function workspaceRouter(pool, filesRoot) {
       [ids],
     );
     for (const item of rows)
-      await rm(join(filesRoot, "media", item.id), { force: true });
+      await deleteEverywhere(filesRoot, `media/${item.id}`);
   }
 
   async function session(actor, owner = false) {
@@ -54,9 +56,10 @@ export function workspaceRouter(pool, filesRoot) {
     }
     res.set({
       "Content-Type": media.type,
-      "Cache-Control": "private, no-store",
+      "Cache-Control": "private, max-age=0, must-revalidate",
     });
-    res.sendFile(join(filesRoot, "media", media.id), { dotfiles: "deny" });
+    const display=await displayPath(filesRoot, `media/${media.id}`,req.query.preview==='1'&&media.type.startsWith('image/'));
+    res.set('X-Media-Preview',display.endsWith('.preview.jpg')?'ready':'original');res.type(display.endsWith('.preview.jpg')?'image/jpeg':media.type);res.sendFile(display, { dotfiles: "deny" });
   });
   router.put("/media-upload/:grant", async (req, res) => {
     if (!/^[a-f0-9]{64}$/.test(req.params.grant)) return res.sendStatus(404);
@@ -77,9 +80,9 @@ export function workspaceRouter(pool, filesRoot) {
     if (!media) return res.sendStatus(404);
     if (req.headers["content-type"] !== media.type)
       throw fail(400, "Invalid media type");
-    await mkdir(join(filesRoot, "media"), { recursive: true });
-    const path = join(filesRoot, "media", media.id),
-      temporary = path + "." + token() + ".tmp";
+    const path = await filePath(filesRoot, `media/${media.id}`,true);
+    await mkdir(join(path,".."), { recursive: true });
+    const temporary = path + "." + token() + ".tmp";
     let size = 0;
     try {
       const limiter = new Transform({
@@ -269,8 +272,8 @@ export function workspaceRouter(pool, filesRoot) {
       );
       const id = randomUUID();
       const created = await pool.query(
-        "insert into public.mes_media(id,title,type,size,purpose) select $1,$2,$3,$4::bigint,$5 where (select count(*) from public.mes_media where purpose=$5)<(case when $5='playlist' then 20 else 150 end) and (select coalesce(sum(size),0) from public.mes_media)+(select coalesce(sum(size),0) from public.files)+(select coalesce(sum(size),0) from public.mes_uploads where kind='ticket' and not complete and expires>now())+$4::bigint<=2147483648 returning id",
-        [id, data.title.trim(), data.type, data.size, purpose],
+        "insert into public.mes_media(id,title,type,size,purpose) select $1,$2,$3,$4::bigint,$5 where (select count(*) from public.mes_media where purpose=$5)<(case when $5='playlist' then 20 else 150 end) and (select coalesce(sum(size),0) from public.mes_media)+(select coalesce(sum(size),0) from public.files)+(select coalesce(sum(size),0) from public.mes_uploads where kind='ticket' and not complete and expires>now())+$4::bigint<=$6::bigint returning id",
+        [id, data.title.trim(), data.type, data.size, purpose, storageQuota()],
       );
       if (!created.rowCount)
         throw fail(400, "Video count or storage quota reached");
@@ -307,7 +310,7 @@ export function workspaceRouter(pool, filesRoot) {
         "delete from public.mes_media where id=$1 returning id",
         [data.id],
       );
-      if (row) await rm(join(filesRoot, "media", row.id), { force: true });
+      if (row) await deleteEverywhere(filesRoot, `media/${row.id}`);
       return res.json({ ok: true });
     }
     throw fail(400, "Unknown workspace action");

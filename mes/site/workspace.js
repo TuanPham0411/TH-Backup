@@ -1,3 +1,4 @@
+import {uploadPreview} from './media-preview.js';
 import { uploadChunks } from "./uploads.js";
 import { issueTypeSummary } from "./analytics.js";
 import { t, getLanguage } from "./i18n.js";
@@ -280,7 +281,7 @@ export function initWorkspace({ state, toast, run, addEvidence }) {
             link.target = "_blank";
             link.rel = "noopener";
             const image = document.createElement("img");
-            image.src = url;
+            image.src = url+'?preview=1';
             image.alt = media.title;
             image.loading = "lazy";
             link.append(image);
@@ -474,6 +475,7 @@ export function initWorkspace({ state, toast, run, addEvidence }) {
             onProgress: (value) =>
               ($("announcement-upload-progress").value = value),
           });
+          await uploadPreview("media",media.id,file);
           announcementMedia.push({
             id: media.id,
             title: file.name,

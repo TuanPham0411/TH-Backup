@@ -1,0 +1,19 @@
+[Unit]
+Description=TH MES USB storage and backup broker
+After=postgresql.service
+Requires=postgresql.service
+[Service]
+ExecStart=/usr/bin/python3 /opt/th-app/current/deploy/storage-agent.py
+RuntimeDirectory=th-storage
+RuntimeDirectoryMode=0755
+Restart=on-failure
+UMask=0077
+Nice=10
+CPUWeight=20
+IOWeight=50
+MemoryMax=160M
+TasksMax=32
+# Mounts must be made in the host namespace so th-app sees existing USB partitions.
+NoNewPrivileges=true
+[Install]
+WantedBy=multi-user.target

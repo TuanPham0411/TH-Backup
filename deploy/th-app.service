@@ -1,6 +1,6 @@
 [Unit]
 Description=TH portfolio and MES API
-After=network.target postgresql.service
+After=network.target postgresql.service th-storage.service
 Requires=postgresql.service
 
 [Service]
@@ -21,7 +21,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/var/lib/th-app
+ReadWritePaths=/var/lib/th-app -/mnt -/media
 UMask=0077
 
 [Install]

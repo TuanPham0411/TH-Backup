@@ -1,3 +1,4 @@
+import {filePath,deleteEverywhere,storageQuota} from "./storage.js";
 import { Router } from "express";
 import { randomUUID } from "node:crypto";
 import { mkdir, rm, link, truncate } from "node:fs/promises";
@@ -112,7 +113,7 @@ export function uploadRouter(pool, root) {
         } = await db.query(
           "select (select coalesce(sum(size),0) from public.files)+(select coalesce(sum(size),0) from public.mes_media)+(select coalesce(sum(size),0) from public.mes_uploads where kind='ticket' and not complete and expires>now()) used",
         );
-        if (Number(quota.used) + size > 2147483648)
+        if (Number(quota.used) + size > storageQuota())
           throw fail(507, "Storage quota reached");
       }
       const id = randomUUID();
@@ -178,8 +179,8 @@ export function uploadRouter(pool, root) {
           .json({ error: "Upload offset differs", offset: current });
       if (req.headers["content-type"] !== "application/octet-stream")
         throw fail(400, "Use binary chunks");
-      await mkdir(join(root, ".uploads"), { recursive: true });
-      temporary = join(root, ".uploads", record.id + ".part");
+      temporary = await filePath(root, `.uploads/${record.id}.part`, true);
+      await mkdir(join(temporary,".."), { recursive: true });
       let received = 0;
       const limiter = new Transform({
         transform(chunk, encoding, callback) {
@@ -220,8 +221,8 @@ export function uploadRouter(pool, root) {
       if (complete) {
         const destination =
           record.kind === "ticket"
-            ? join(root, record.path)
-            : join(root, "media", record.path);
+            ? join(temporary,"../..", record.path)
+            : join(temporary,"../..", "media", record.path);
         await mkdir(join(destination, ".."), { recursive: true });
         await link(temporary, destination);
         linked = destination;
@@ -259,10 +260,12 @@ export function uploadRouter(pool, root) {
 }
 export async function cleanupUploads(pool, root) {
   const { rows } = await pool.query(
-    "delete from public.mes_uploads where expires<now() returning id",
+    "select id from public.mes_uploads where expires<now() limit 100",
   );
-  for (const row of rows)
-    await rm(join(root, ".uploads", row.id + ".part"), { force: true });
+  for (const row of rows) {
+    await deleteEverywhere(root, `.uploads/${row.id}.part`);
+    await pool.query("delete from public.mes_uploads where id=$1 and expires<now()",[row.id]);
+  }
   await pool.query(
     "delete from public.mes_media where not ready and created_at<now()-interval '1 day' and not exists(select 1 from public.mes_uploads u where u.kind='media' and u.path=mes_media.id)",
   );

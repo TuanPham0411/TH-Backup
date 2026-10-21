@@ -4,12 +4,12 @@ import { activitySeries, resolutionSummary, submissionCohort } from "./analytics
 import { createRichEditor } from "./rich-editor.js";
 import { documentText, renderDocument } from "./rich-document.js";
 import { t, initializeLanguage, getLanguage } from "./i18n.js";
-import "@fontsource/dm-sans/latin-400.css";
-import "@fontsource/dm-sans/latin-500.css";
-import "@fontsource/dm-sans/latin-600.css";
-import "@fontsource/dm-sans/latin-ext-400.css";
-import "@fontsource/dm-sans/latin-ext-500.css";
-import "@fontsource/dm-sans/latin-ext-600.css";
+import "@fontsource/carlito/latin-400.css";
+import "@fontsource/carlito/latin-700.css";
+import "@fontsource/carlito/latin-ext-400.css";
+import "@fontsource/carlito/latin-ext-700.css";
+import {initUpgrade,renderDetailedAnalytics} from './upgrade.js';
+import './upgrade.css';
 import { initializeBackend, setTesterMode, api, watchAuth, ownerLogin, managedLogin, logout, watchRecords, uploadAttachment, downloadAttachment as fetchAttachment } from "./backend.js";
 import { configured, previewMode } from "./config.js";
 import {
@@ -203,6 +203,8 @@ function navigate(page) {
   renderAll();
   if (page === "create") renderForm();
   workspace.navigate(page);
+  if(state.user && !state.preview) callable("logAccess",{page,...(page==="detail"?{ticketId:state.selected}:{})}).catch(()=>{});
+  document.dispatchEvent(new CustomEvent("mes:navigate",{detail:{page,isOwner:state.isOwner,user:state.user,preview:state.preview}}));
   revealPage($(`${section}-page`));
   if (section === "dashboard") animateDashboard($("dashboard-page"));
 }
@@ -267,6 +269,7 @@ function renderDashboard() {
   renderActivity(scopedIssues());
   renderOperations(issues);
   workspace.renderCharts(issues);
+  renderDetailedAnalytics(issues);
   renderDonut(issues);
   renderDepartments(issues);
   $("recent-issues").replaceChildren();
@@ -538,6 +541,7 @@ function renderDetail(issue) {
     ),
   );
   $("detail-heading").replaceChildren(heading, badge(issue.status));
+  document.dispatchEvent(new CustomEvent("mes:ticket",{detail:{issue,user:state.user,isOwner:state.isOwner,preview:state.preview}}));
   const data = el("div", undefined, "detail-data");
   for (const [label, value] of [
     ["Requester", issue.reporterName],
@@ -562,7 +566,7 @@ function renderDetail(issue) {
       image.alt = f.name; image.loading = "lazy";
       const hint = el("span", "Loading image…", "image-hint");
       button.append(image, hint);
-      imageUrl(f).then(url => { if (button.isConnected) { image.src = url; hint.textContent = t("Click to enlarge"); } }).catch(() => { hint.textContent = t("Image unavailable. Click to retry."); });
+      imageUrl(f).then(url => { if (button.isConnected) { image.src = url.startsWith('/api/')?url+'?preview=1':url; image.decoding="async"; hint.textContent = t("Click to enlarge"); } }).catch(() => { hint.textContent = t("Image unavailable. Click to retry."); });
       button.onclick = () => openImage(f);
       card.append(button);
     }
@@ -595,7 +599,7 @@ function renderDetail(issue) {
   ))
     control.disabled = !state.isOwner;
   $("save-handling").hidden = !state.isOwner;
-  $("comment-form").hidden = !state.isOwner;
+  $("comment-form").hidden = !state.user && !state.preview;
   $("admin-issue-actions").hidden = !state.isOwner;
   $("detail-meta").replaceChildren(
     el("small", "REPORTER"),
@@ -656,7 +660,7 @@ async function downloadAttachment(file) {
     return;
   }
   try {
-    if(file.type?.startsWith('video/')){const {url}=await callable('downloadUrl',{path:file.path});const link=el('a');link.href=url;link.download=file.name;link.click();return;}
+    if(file.type?.startsWith('video/')){const link=el('a');link.href=`/api/mes/attachments/${file.path.split('/').slice(1).map(encodeURIComponent).join('/')}`;link.target='_blank';link.rel='noopener';link.click();return;}
     const blob = await fetchAttachment(file.path);
     const url = URL.createObjectURL(blob),
       a = el("a");
@@ -1123,11 +1127,11 @@ $("handling-form").onsubmit = (e) => {
 };
 $("comment-form").onsubmit = (e) => {
   e.preventDefault();
-  if (!ownerOnly()) return;
+  if (!requireMember()) return;
   run("comment-status", $("comment-form").querySelector("button"), async () => {
     const text = $("comment-input").value.trim();
     if (!text) {
-      showStatus("comment-status", "Enter a handling note.");
+      showStatus("comment-status", "Enter a comment.");
       return;
     }
     if (state.preview)
@@ -1659,14 +1663,7 @@ function clearImages() {
 async function imageUrl(file) {
   if (file.previewUrl) return file.previewUrl;
   if (state.preview) throw new Error("No preview image");
-  if (imageCache.has(file.path)) return imageCache.get(file.path).promise;
-  if (imageCache.size >= 12) { const [key, entry] = imageCache.entries().next().value; if (entry.url) URL.revokeObjectURL(entry.url); imageCache.delete(key); }
-  const entry = {}; imageCache.set(file.path, entry);
-  entry.promise = fetchAttachment(file.path).then(blob => {
-    if (imageCache.get(file.path) !== entry) throw new Error("Session changed");
-    entry.url = URL.createObjectURL(blob); return entry.url;
-  }).catch(error => { if (imageCache.get(file.path) === entry) imageCache.delete(file.path); throw error; });
-  return entry.promise;
+  return `/api/mes/attachments/${file.path.split('/').slice(1).map(encodeURIComponent).join('/')}`;
 }
 async function openImage(file) {
   const generation = sessionGeneration;
@@ -1702,7 +1699,7 @@ function inlineImage(issue, slot) {
   const button=el("button",undefined,"inline-report-image");button.type="button";
   button.setAttribute("aria-label",`${t("View image")}: ${file.name}`);
   const image=document.createElement("img");image.alt=file.name;image.loading="lazy";button.append(image);
-  imageUrl(file).then(url=>{if(button.isConnected)image.src=url;}).catch(()=>{button.append(el("span",t("Image unavailable. Click to retry.")));});
+  imageUrl(file).then(url=>{if(button.isConnected){image.src=url.startsWith('/api/')?url+'?preview=1':url;image.decoding='async';}}).catch(()=>{button.append(el("span",t("Image unavailable. Click to retry.")));});
   button.onclick=()=>openImage(file);return button;
 }
 const feedbackEditor = createRichEditor($("description-input"), {
@@ -1726,6 +1723,7 @@ const workspace = initWorkspace({state,toast,run,addEvidence(files) {
   state.files.push(...files); renderFiles(); return true;
 }});
 document.querySelector(".topbar .brand").onclick = event => { event.preventDefault(); navigate("dashboard"); };
+initUpgrade();
 initializeLanguage(() => { workspace.render(); feedbackEditor.setLanguage(); editEditor.setLanguage(); renderAll(); renderTimeline(); updateIdentity(); if (state.selected) { const issue = state.issues.find(i => i.id === state.selected); if (issue) renderDetail(issue); } });
 selectOptions($("issue-status"), [
   { id: "All", name: "All statuses" },

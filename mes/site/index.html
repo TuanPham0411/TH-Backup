@@ -109,7 +109,7 @@
           <div id="metrics" class="metrics"></div>
           <div class="workspace-board">
             <article class="broadcast-panel"><div class="section-heading"><div><p class="eyebrow">WORKSPACE / UPDATES</p><h2>Notice board</h2></div><span class="live-tag">● LIVE</span></div><div id="notice-board"></div></article>
-            <article class="video-panel"><div class="section-heading"><div><p class="eyebrow">ON AIR / WORKSPACE TV</p><h2 id="workspace-video-title" data-user-content>Workspace video</h2></div><span id="video-position" class="helper"></span></div><div class="video-stage"><video id="workspace-video" controls autoplay muted playsinline preload="metadata"></video><div id="video-empty"><span>▷</span><p>Videos published by your administrator will play here.</p></div></div><div class="video-navigation"><button id="video-previous" class="button" type="button" aria-label="Previous video">← Previous</button><span id="video-state" role="status"></span><button id="video-next" class="button" type="button" aria-label="Next video">Next →</button></div></article>
+            <article class="video-panel"><div class="section-heading"><div><p class="eyebrow">ON AIR / WORKSPACE TV</p><h2 id="workspace-video-title" data-user-content>Workspace video</h2></div><span id="video-position" class="helper"></span></div><div class="video-stage"><video id="workspace-video" controls autoplay muted playsinline preload="auto"></video><div id="video-empty"><span>▷</span><p>Videos published by your administrator will play here.</p></div></div><div class="video-navigation"><button id="video-previous" class="button" type="button" aria-label="Previous video">← Previous</button><span id="video-state" role="status"></span><button id="video-next" class="button" type="button" aria-label="Next video">Next →</button></div></article>
           </div>
 
           <div class="chart-grid">
@@ -340,18 +340,18 @@
                 <div id="issue-timeline" class="timeline"></div>
                 <form id="comment-form" hidden>
                   <label for="comment-input"
-                    >Owner response / handling note</label
+                    >Comment / additional information</label
                   ><textarea
                     id="comment-input"
                     rows="4"
                     maxlength="3000"
                     required
-                    placeholder="Describe the action taken, request information or add an assessment."
+                    placeholder="Add details, ask a question or share an update about this ticket."
                   ></textarea>
                   <div class="form-footer">
                     <span></span
                     ><button class="button primary" type="submit">
-                      Post update
+                      Post comment
                     </button>
                   </div>
                 </form>

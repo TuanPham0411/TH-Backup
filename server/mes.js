@@ -1,3 +1,5 @@
+import {filePath,deleteEverywhere,storageQuota} from './storage.js';
+import {displayPath} from './media.js';
 import {Router} from 'express';
 import {mkdir,rm,stat} from 'node:fs/promises';
 import {createWriteStream} from 'node:fs';
@@ -23,7 +25,7 @@ export function mesRouter(pool,filesRoot) {
   const {rows:[grant]}=await pool.query('delete from public.file_grants where hash=$1 and action=$2 and expires>now() returning *',[hash(value),action]);
   if(!grant)return res.sendStatus(403);
   await dispatch(action,{path:grant.path},grant.actor);
-  const path=join(filesRoot,grant.path);
+  const path=await filePath(filesRoot,grant.path,action!=='downloadUrl');
   if(action==='downloadUrl') {
    const {rows:[meta]}=await pool.query('select * from public.files where path=$1',[grant.path]);
    if(!meta)return res.sendStatus(404);
@@ -33,8 +35,8 @@ export function mesRouter(pool,filesRoot) {
   const type=req.headers['content-type'];
   if(!types.has(type))return res.status(400).json({error:'Unsupported file type'});
   const {rows:[quota]}=await pool.query('select (select coalesce(sum(size),0) from public.files)+(select coalesce(sum(size),0) from public.mes_media) used');
-  if(Number(quota.used)+(type.startsWith('video/')?209715200:10485760)>2147483648)throw Object.assign(new Error('Storage quota reached'),{status:507,code:'resource-exhausted',expose:true});
-  await mkdir(join(filesRoot,'issues',grant.path.split('/')[1]),{recursive:true});
+  if(Number(quota.used)+(type.startsWith('video/')?209715200:10485760)>storageQuota())throw Object.assign(new Error('Storage quota reached'),{status:507,code:'resource-exhausted',expose:true});
+  await mkdir(join(path,'..'),{recursive:true});
   const temporary=path+'.'+token()+'.tmp';let size=0;
   try {
    const limiter=new Transform({transform(chunk,encoding,callback){size+=chunk.length;callback(size>(type.startsWith('video/')?209715200:10485760)?Object.assign(new Error('File too large'),{status:413}):null,chunk);}});
@@ -47,10 +49,23 @@ export function mesRouter(pool,filesRoot) {
    res.json({ok:true});
   } finally {await rm(temporary,{force:true});}
  });
+ // Stable authenticated URLs allow byte-range video playback and browser cache reuse.
+ router.get('/attachments/:issue/:slot',async(req,res)=>{
+  const path=`issues/${req.params.issue}/${req.params.slot}`;
+  if(!validPath(path))return res.sendStatus(404);
+  const actor=actorFor(req.cookies.th_mes,req.headers['x-mes-tester']);
+  await dispatch('downloadUrl',{path},actor);
+  const {rows:[meta]}=await pool.query('select * from public.files where path=$1',[path]);
+  if(!meta)return res.sendStatus(404);
+  res.set({'Content-Type':req.query.preview==='1'&&meta.type.startsWith('image/')?'image/jpeg':meta.type,'Cache-Control':'private, max-age=0, must-revalidate','Content-Security-Policy':"sandbox; default-src 'none'"});
+  if(!meta.type.startsWith('image/')&&!meta.type.startsWith('video/'))res.attachment(meta.name||'attachment');
+  const display=await displayPath(filesRoot,path,req.query.preview==='1'&&meta.type.startsWith('image/'));
+  res.set('X-Media-Preview',display.endsWith('.preview.jpg')?'ready':'original');res.type(display.endsWith('.preview.jpg')?'image/jpeg':meta.type);res.sendFile(display,{dotfiles:'deny'});
+ });
  router.post('/',async(req,res)=>{
   const {name,data={}}=req.body||{};
   if(typeof name!=='string'||!data||typeof data!=='object'||Array.isArray(data)||name==='finishDelete')return res.sendStatus(400);
-  const actor=actorFor(req.cookies.th_mes,req.headers['x-mes-tester']);
+  const actor={...actorFor(req.cookies.th_mes,req.headers['x-mes-tester']),ip:req.ip,agent:String(req.headers['user-agent']||'').slice(0,240)};
   if(!publicActions.has(name)&&!actor.session)return res.status(401).json({code:'unauthenticated',error:'Sign in first'});
   if((name==='createIssue'||(name==='updateIssue'&&data.operation==='edit'))&&data.richDocument!==undefined){data.richDocument=normalizeDocument(data.richDocument);data.description=documentText(data.richDocument);}
   if(name==='uploadUrl'||name==='downloadUrl') {
@@ -68,7 +83,7 @@ export function mesRouter(pool,filesRoot) {
     if(!validPath(path))return res.sendStatus(400);
     const {rows:[info]}=await pool.query('select size,type from public.files where path=$1',[path]);
     if(!info)return res.sendStatus(400);
-    await stat(join(filesRoot,path));files.push({slot:f.slot,path,name:f.name,size:Number(info.size),type:info.type});
+    await stat(await filePath(filesRoot,path));files.push({slot:f.slot,path,name:f.name,size:Number(info.size),type:info.type});
    }
    const result=await dispatch(name,{...data,files},actor);
    for(const f of files)await pool.query('update public.files set name=$2 where path=$1',[f.path,f.name]);
@@ -77,7 +92,7 @@ export function mesRouter(pool,filesRoot) {
   if(name==='deleteIssue') {
    if(!/^[a-zA-Z0-9_-]{1,128}$/.test(data.id||''))return res.sendStatus(400);
    await dispatch(name,data,actor);
-   await rm(join(filesRoot,'issues',data.id),{recursive:true,force:true});
+   await deleteEverywhere(filesRoot,`issues/${data.id}`,{recursive:true,force:true});
    await pool.query('delete from public.files where path like $1',[`issues/${data.id}/%`]);
    return res.json(await dispatch('finishDelete',data,actor));
   }

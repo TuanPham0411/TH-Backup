@@ -1,10 +1,11 @@
 import Quill from 'quill';
 import 'quill/dist/quill.core.css';
-import { normalizeDocument, documentText, FONT_SIZES } from './rich-document.js';
+import { normalizeDocument, documentText, FONT_SIZES, FONT_FAMILIES } from './rich-document.js';
 import { t } from './i18n.js';
 const Size = Quill.import('attributors/style/size'); Size.whitelist = FONT_SIZES; Quill.register(Size,true);
+const Font = Quill.import('formats/font'); Font.whitelist=Object.keys(FONT_FAMILIES); Quill.register(Font,true);
 const BaseImage = Quill.import('formats/image');
-class LocalImage extends BaseImage { static sanitize(value) { return typeof value === 'string' && value.startsWith('blob:') ? value : '//:0'; } }
+class LocalImage extends BaseImage { static sanitize(value) { return typeof value === 'string' && (value.startsWith('blob:') || /^\/api\/mes\/attachments\/[a-zA-Z0-9_-]{1,128}\/[a-zA-Z0-9_-]{1,128}$/.test(value)) ? value : '//:0'; } }
 Quill.register(LocalImage,true);
 const Delta = Quill.import('delta');
 export function createRichEditor(textarea, { files, addImages, slotForFile, imageForSlot, notice }) {
@@ -30,7 +31,7 @@ export function createRichEditor(textarea, { files, addImages, slotForFile, imag
     for(const [value,text] of values){const option=document.createElement('option');option.value=value;option.textContent=text;select.append(option);}
     select.onchange=()=>{focus();apply(select.value);};toolbar.append(select);return select;
   }
-  const font=select('Font',[['','Sans serif'],['serif','Serif'],['monospace','Monospace']],v=>q.format('font',v||false));
+  const font=select('Font',[['','Calibri (default)'],['arial','Arial'],['cambria','Cambria'],['georgia','Georgia'],['times','Times New Roman'],['tahoma','Tahoma'],['verdana','Verdana'],['trebuchet','Trebuchet MS'],['segoe','Segoe UI'],['courier','Courier New'],['consolas','Consolas'],['serif','Serif'],['monospace','Monospace']],v=>q.format('font',v||false));
   const size=select('Font size',[['','Default size'],...FONT_SIZES.map(v=>[v,v.replace('px','')])],v=>q.format('size',v||false));
   const style=select('Text style',[['','Paragraph'],['1','Heading 1'],['2','Heading 2'],['3','Heading 3']],v=>q.format('header',v?Number(v):false));
   for(const [key,label,text] of [['bold','Bold','B'],['italic','Italic','I'],['underline','Underline','U'],['strike','Strikethrough','S']]) {
@@ -40,6 +41,10 @@ export function createRichEditor(textarea, { files, addImages, slotForFile, imag
   button('Numbered list','1. List',()=>q.format('list',q.getFormat().list==='ordered'?false:'ordered'));
   button('Align left','⇤',()=>q.format('align',false)); button('Align center','↔',()=>q.format('align','center'));button('Align right','⇥',()=>q.format('align','right'));
   const color=document.createElement('input');color.type='color';color.value='#263a56';color.title='Text color';color.setAttribute('aria-label','Text color');color.oninput=()=>{focus();q.format('color',color.value);};toolbar.append(color);
+  const highlight=document.createElement('input');highlight.type='color';highlight.value='#fff1a8';highlight.title='Highlight color';highlight.setAttribute('aria-label','Highlight color');highlight.oninput=()=>{focus();q.format('background',highlight.value);};toolbar.append(highlight);
+  button('Align justify','☰',()=>q.format('align','justify'));
+  button('Indent','→',()=>q.format('indent','+1'));button('Outdent','←',()=>q.format('indent','-1'));
+  button('Quote','❝',()=>q.format('blockquote',!q.getFormat().blockquote));
   button('Clear formatting','Tx',()=>q.removeFormat(range.index,range.length));
   button('Undo','↶',()=>q.history.undo());button('Redo','↷',()=>q.history.redo());
   const picker=document.createElement('input');picker.type='file';picker.accept='.jpg,.jpeg,.png,.webp';picker.multiple=true;picker.hidden=true;

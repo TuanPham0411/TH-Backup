@@ -1,7 +1,7 @@
 import {test,before,after} from 'node:test';
 import assert from 'node:assert/strict';
 import {spawnSync} from 'node:child_process';
-import {mkdtemp,rm} from 'node:fs/promises';
+import {mkdtemp,rm,readFile,readdir} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import pg from 'pg';
@@ -13,8 +13,21 @@ const pool=new pg.Pool({connectionString:url,max:4});
 let server,base,files,runtimePool;
 before(async()=>{
  await pool.query("do $$ begin if not exists(select 1 from pg_roles where rolname='th_api') then create role th_api; end if; end $$;");
+ // Exercise the upgrade against data written by the previous release.
+ await pool.query('create table if not exists public.schema_migrations(name text primary key)');
+ for(const name of (await readdir('server/migrations')).filter(n=>n.endsWith('.sql')&&n<'202610210001_workspace_upgrade.sql').sort()) {
+  if((await pool.query('select 1 from public.schema_migrations where name=$1',[name])).rowCount)continue;
+  await pool.query(await readFile('server/migrations/'+name,'utf8'));
+  await pool.query('insert into public.schema_migrations values($1)',[name]);
+ }
+ const historical={subject:'Lịch sử trước nâng cấp',description:'Nội dung và liên kết gốc',attachments:[{path:'issues/preserved/slot-original'}],status:'In progress',createdAt:1700000000000,progress:47};
+ const event={kind:'handling',text:'Ghi chú cũ giữ nguyên',author:'Existing user',createdAt:1700000001000};
+ await pool.query("insert into mes_private.records(collection,id,data) values('issues','preserved-upgrade-test',$1),('issues/preserved-upgrade-test/timeline','old-event',$2)",[historical,event]);
+ const beforeUpgrade=(await pool.query("select collection,id,data from mes_private.records where id in ('preserved-upgrade-test','old-event') order by collection,id")).rows;
  const result=spawnSync(process.execPath,['server/migrate.js'],{env:{...process.env,DATABASE_URL:url},encoding:'utf8'});assert.equal(result.status,0,result.stderr);
  const twice=spawnSync(process.execPath,['server/migrate.js'],{env:{...process.env,DATABASE_URL:url},encoding:'utf8'});assert.equal(twice.status,0,twice.stderr);
+ assert.deepEqual((await pool.query("select collection,id,data from mes_private.records where id in ('preserved-upgrade-test','old-event') order by collection,id")).rows,beforeUpgrade,'Upgrade must preserve existing ticket data and history exactly');
+ await pool.query("delete from mes_private.records where id in ('preserved-upgrade-test','old-event')");
  files=await mkdtemp(join(tmpdir(),'th-api-'));runtimePool=new pg.Pool({connectionString:url,options:'-c role=th_api'});server=createApp(runtimePool,files).listen(0,'127.0.0.1');await new Promise(resolve=>server.once('listening',resolve));base=`http://127.0.0.1:${server.address().port}`;
 });
 after(async()=>{await new Promise(resolve=>server.close(resolve));await runtimePool.end();await pool.end();await rm(files,{recursive:true,force:true});});
@@ -229,4 +242,61 @@ test('Google OAuth validates state and verified identity, sets local owner sessi
   assert.equal((await api('session',{},ownerCookie,'th.io.vn')).body.user.isAdmin,true);
 
  }finally{globalThis.fetch=originalFetch;delete process.env.GOOGLE_CLIENT_ID;delete process.env.GOOGLE_CLIENT_SECRET;}
+});
+
+test('users comment across tickets; access history is administrator-only and redacts secrets',async()=>{
+ const owner=(await api('passwordLogin',{username:'hpham',password:'test-owner-password'})).cookie;
+ const a=await api('manageUser',{operation:'create',username:'comment.a',displayName:'Comment A'},owner);
+ const b=await api('manageUser',{operation:'create',username:'comment.b',displayName:'Comment B'},owner);
+ const userA=(await api('activateAccount',{username:'comment.a',activationCode:a.body.activationCode,password:'test-comment-password'})).cookie;
+ const userB=(await api('activateAccount',{username:'comment.b',activationCode:b.body.activationCode,password:'test-comment-password'})).cookie;
+ const dept=await api('manageDirectory',{type:'departments',operation:'create',name:'Comment team'},owner);
+ const leader=await api('manageDirectory',{type:'teamLeaders',operation:'create',name:'Comment leader'},owner);
+ const issue=await api('createIssue',{reporterUid:a.body.uid,teamLeaderId:leader.body.id,subject:'Shared comments',process:'Station B',description:'Existing content must remain unchanged.',departmentId:dept.body.id},userA);
+ assert.equal(issue.status,200,JSON.stringify(issue.body));
+ const before=(await api('readTicket',{id:issue.body.id},userA)).body;
+ const comment=await api('addComment',{issueId:issue.body.id,text:'Bổ sung từ một user khác',author:'forged',authorUid:'mes-owner'},userB);
+ assert.equal(comment.status,200,JSON.stringify(comment.body));
+ const after=(await api('readTicket',{id:issue.body.id},userA)).body;
+ for(const field of ['subject','description','status','priority','createdBy','attachments'])assert.deepEqual(after[field],before[field]);
+ const timeline=(await api('read',{path:`issues/${issue.body.id}/timeline`},userA)).body.rows;
+ const added=timeline.find(e=>e.text==='Bổ sung từ một user khác');assert.equal(added.author,'Comment B');assert.equal(added.authorUid,b.body.uid);
+ assert.equal((await api('updateIssue',{id:issue.body.id,operation:'handling',status:'Closed',priority:'Low'},userB)).status,403);
+ assert.equal((await api('getAccessLog',{},userB)).status,403);
+ await api('logAccess',{page:'detail',ticketId:issue.body.id,password:'never-log-this'},userB);
+ const log=(await api('getAccessLog',{username:'comment.b'},owner)).body.rows;
+ assert.ok(log.some(e=>e.event==='page'&&e.ticket_id===issue.body.id));assert.ok(log.some(e=>e.event==='activateAccount'));
+ assert.ok(!JSON.stringify(log).includes('never-log-this'));assert.ok(!JSON.stringify(log).includes(b.body.activationCode));assert.ok(!JSON.stringify(log).includes('test-comment-password'));
+ const fetchAdmin=(path,cookie)=>fetch(base+'/api/mes/admin/'+path,{headers:{'x-forwarded-host':'mes.th.io.vn',cookie}});
+ assert.equal((await fetchAdmin('access-log',userB)).status,403);assert.equal((await fetchAdmin('storage',userB)).status,403);
+ const storage=await fetchAdmin('storage',owner);assert.equal(storage.status,200);assert.equal((await storage.json()).primary,'internal');
+ const mediaPath=`issues/${issue.body.id}/${issue.body.uploadSlots[0]}`;
+ const grant=(await api('uploadUrl',{path:mediaPath},userA)).body;
+ const payload='0123456789'.repeat(1024);
+ const uploaded=await fetch(base+grant.url,{method:'PUT',headers:{'x-forwarded-host':'mes.th.io.vn','Content-Type':'video/mp4'},body:payload});assert.equal(uploaded.status,200);
+ await api('attachFiles',{issueId:issue.body.id,files:[{slot:issue.body.uploadSlots[0],name:'evidence.mp4'}]},userA);
+ const url=base+`/api/mes/attachments/${issue.body.id}/${issue.body.uploadSlots[0]}`;
+ const range=await fetch(url,{headers:{'x-forwarded-host':'mes.th.io.vn',cookie:userB,range:'bytes=2-7'}});assert.equal(range.status,206);assert.equal(await range.text(),'234567');assert.match(range.headers.get('cache-control'),/private/);assert.match(range.headers.get('accept-ranges'),/bytes/);
+ assert.equal((await fetch(url,{headers:{'x-forwarded-host':'mes.th.io.vn'}})).status,401);
+ const translated=await fetch(base+'/api/mes/translation',{method:'POST',headers:{'x-forwarded-host':'mes.th.io.vn','Content-Type':'application/json',cookie:userB},body:JSON.stringify({id:issue.body.id})});assert.equal(translated.status,403);
+});
+test('translation is explicit, cached and leaves original title, formatted content and history unchanged',async()=>{
+ const owner=(await api('passwordLogin',{username:'hpham',password:'test-owner-password'})).cookie;
+ const user=(await api('passwordLogin',{username:'comment.a',password:'test-comment-password'})).cookie;
+ // Find the ticket through the same authorised collection the UI reads.
+ const ticket=(await api('read',{path:'issues'},user)).body.rows.find(i=>i.reporterUsername==='comment.a');assert.ok(ticket);
+ const before=(await api('readTicket',{id:ticket.id},user)).body;
+ const originalFetch=globalThis.fetch,oldKey=process.env.GOOGLE_TRANSLATE_API_KEY;let calls=0;
+ process.env.GOOGLE_TRANSLATE_API_KEY='test-key-not-a-secret';
+ globalThis.fetch=async(url,options)=>{
+  if(String(url).startsWith('https://translation.googleapis.com/')){
+   calls++;const sent=JSON.parse(options.body);assert.deepEqual(sent.q,[before.subject,before.description]);assert.equal(sent.source,'vi');assert.equal(sent.target,'en');assert.equal(sent.format,'text');
+   return new Response(JSON.stringify({data:{translations:[{translatedText:'English title'},{translatedText:'English feedback body'}]}}),{status:200,headers:{'Content-Type':'application/json'}});
+  }return originalFetch(url,options);
+ };
+ try{
+  const translate=()=>fetch(base+'/api/mes/translation',{method:'POST',headers:{'x-forwarded-host':'mes.th.io.vn','Content-Type':'application/json',cookie:user},body:JSON.stringify({id:ticket.id})});
+  const first=await translate();assert.equal(first.status,200,await first.clone().text());assert.equal((await first.json()).subject,'English title');assert.equal((await translate()).status,200);assert.equal(calls,1,'Unchanged content should reuse cached translation');
+  assert.deepEqual((await api('readTicket',{id:ticket.id},user)).body,before);
+ }finally{globalThis.fetch=originalFetch;if(oldKey===undefined)delete process.env.GOOGLE_TRANSLATE_API_KEY;else process.env.GOOGLE_TRANSLATE_API_KEY=oldKey;}
 });

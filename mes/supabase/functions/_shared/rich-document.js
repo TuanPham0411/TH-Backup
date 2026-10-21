@@ -1,4 +1,5 @@
 // Stored content is a bounded Delta, never HTML or external image URLs.
+export const FONT_FAMILIES = {calibri:'Calibri, Carlito, Arial, sans-serif',arial:'Arial, sans-serif',cambria:'Cambria, Georgia, serif',georgia:'Georgia, serif',times:'"Times New Roman", serif',tahoma:'Tahoma, Arial, sans-serif',verdana:'Verdana, sans-serif',trebuchet:'"Trebuchet MS", sans-serif',segoe:'"Segoe UI", sans-serif',courier:'"Courier New", monospace',consolas:'Consolas, monospace',serif:'Georgia, serif',monospace:'ui-monospace, monospace'};
 export const FONT_SIZES = ['12px','14px','16px','18px','24px','32px'];
 export function normalizeDocument(value) {
   if (!value || value.version !== 1 || !Array.isArray(value.ops) || value.ops.length > 256) throw new Error('Invalid formatted feedback.');
@@ -12,7 +13,7 @@ export function normalizeDocument(value) {
     for (const [key,v] of Object.entries(op.attributes || {})) {
       if (['bold','italic','underline','strike','blockquote'].includes(key) && v === true) attributes[key] = true;
       else if (key === 'size' && FONT_SIZES.includes(v)) attributes[key] = v;
-      else if (key === 'font' && ['serif','monospace'].includes(v)) attributes[key] = v;
+      else if (key === 'font' && Object.hasOwn(FONT_FAMILIES,v)) attributes[key] = v;
       else if (key === 'header' && [1,2,3].includes(v)) attributes[key] = v;
       else if (key === 'list' && ['ordered','bullet'].includes(v)) attributes[key] = v;
       else if (key === 'align' && ['center','right','justify'].includes(v)) attributes[key] = v;
@@ -53,7 +54,8 @@ export function renderDocument(document, imageNode) {
         const a = op.attributes || {};
         if (a.bold) span.style.fontWeight = '700'; if (a.italic) span.style.fontStyle = 'italic';
         if (a.underline || a.strike) span.style.textDecoration = [a.underline?'underline':'',a.strike?'line-through':''].filter(Boolean).join(' ');
-        if (a.font) span.style.fontFamily = a.font === 'serif' ? 'Georgia, serif' : 'ui-monospace, monospace';
+        if (a.font) span.style.fontFamily = FONT_FAMILIES[a.font];
+        if (a.color && !a.background) { const rgb=a.color.slice(1).match(/../g).map(v=>parseInt(v,16)); const light=(rgb[0]*299+rgb[1]*587+rgb[2]*114)/1000; span.style.setProperty('--night-text',light<135?'#dce5ec':a.color); span.classList.add('rich-ink'); }
         if (a.size) span.style.fontSize = a.size; if (a.color) span.style.color = a.color; if (a.background) span.style.backgroundColor = a.background;
         runs.push(span);
       }

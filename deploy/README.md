@@ -117,3 +117,88 @@ Notice-board attachments are owner-published JPEG/PNG/WEBP images (10 MB) and MP
 All video paths now accept up to 200 MiB per file for owners and ordinary users. Browser uploads use authenticated 4 MiB chunks, persisted offsets and automatic retry/resume during an upload. This keeps each Cloudflare request small even on a plan with a lower per-request body limit. The Pi streams each chunk to disk without holding a database connection for the transfer, atomically publishes the complete file, rechecks access on each chunk and expires abandoned sessions after two hours. A shared 2 GiB application quota remains in force. The service cleanup removes expired partial files hourly. Existing single-request upload endpoints remain available for compatibility, with the same per-video limit; new clients always use chunks.
 
 MES Nginx accepts up to 201 MiB bodies; the normal browser chunk size remains 4 MiB. Cloudflare Tunnel and SSH configuration are unchanged.
+
+## MES update: USB storage, backup, access history and translation
+
+Upgrades now stop the app briefly, take a verified pre-migration snapshot under
+`/var/lib/th-app/backups/pre-deploy-*`, and compare a fingerprint of every existing
+ticket and timeline row before/after migration. A failed snapshot aborts deployment
+and restarts the prior app. No existing tickets or accounts are reset. Local
+snapshots use hardlinks for immutable originals where possible; these are rollback
+protection, not protection from card failure. They are not automatically deleted.
+
+In **Administration → Storage and USB backup**:
+
+1. Refresh drives. For an existing unmounted USB partition, select it and choose
+   **Mount existing partition**. This mounts by UUID under `/mnt/th-usb-<UUID>` and
+   adds a boot-safe fstab entry only if that UUID has no existing entry. The app
+   never partitions or formats a drive. Unrecognised/blank drives require OS setup.
+2. Choose **New file storage → Use for new files**, or configure an overflow USB.
+   Active storage needs ext4/ext3/XFS/Btrfs with Linux ownership support (ext4 is
+   recommended). FAT/exFAT/NTFS can be backup destinations if the OS driver works,
+   but cannot be active application storage. Mount active storage under `/mnt`
+   or `/media`, accessible to `thapp`; mounts inside home directories are hidden
+   by the app service's sandbox.
+3. Existing files stay in place and retain their URLs. New files go to the chosen
+   drive. An internal primary switches new writes to the configured overflow USB
+   below 512 MiB free. USB selection never moves PostgreSQL off the SD card.
+   Keep the card from filling with other OS files. An unplugged selected drive
+   rejects uploads instead of silently writing into its empty mount directory.
+4. Select a backup destination and **Back up now**. Keep all registered storage
+   drives connected. Writes are blocked until active uploads finish and the
+   database plus originals have been copied. Read-only viewing continues. The
+   result includes `database.dump`, `files/`, SHA-256 checksums and a completion
+   manifest in `th-mes-backups/<timestamp-id>/`. A failed/incomplete backup has
+   no completion manifest. Nothing is removed from the live system. Prefer a
+   different USB for backups. The UI does not delete or restore live data.
+5. Optional: **Create previews for existing images** creates display thumbnails
+   in the admin's browser, uploads them alongside originals and reports failures.
+   Keep that browser tab open until finished. New image uploads create previews
+   automatically. Originals, attachment metadata and ticket history are unchanged.
+
+Private media uses stable authenticated URLs, byte ranges, ETags and browser
+revalidation. Thumbnails are limited to 256 KiB and have a separate URL. Videos
+stream through the authenticated endpoint and can start without downloading the
+whole file; source encoding and upstream bandwidth still affect startup time.
+Calibri is the default; bundled open-source Carlito is the fallback on devices
+without Calibri. Optional feedback fonts use the device's installed families.
+
+**User access history** is admin-only, with username filtering and pagination. It
+records sign-in attempts, activation, sign-out and application page visits from
+this update onward. It never stores passwords, activation codes, session tokens,
+OAuth secrets or feedback bodies. Only loopback Cloudflare Tunnel connections may
+supply the real client IP to Nginx; other clients cannot forge forwarded addresses.
+Users can comment on visible tickets; author identity comes from their session.
+Handling fields remain owner-only. Old timeline entries are unchanged.
+
+For Vietnamese → English translation, enable Google Cloud Translation API (v2)
+and billing in your Google Cloud project, create an API key restricted to that API,
+then edit `/etc/th-app/runtime.env` using `sudoedit` and add:
+
+```dotenv
+GOOGLE_TRANSLATE_API_KEY=<your-private-key>
+# Optional aggregate original media quota; default 64 GiB, not preallocated.
+STORAGE_QUOTA_BYTES=68719476736
+```
+
+Restart with `sudo systemctl restart th-app`. The key stays server-side. Users
+press **Translate my feedback to English** on their ticket and confirm sending
+only the title and feedback text to Google. Attachments/account details are not
+sent. Translations are cached against the source text and shown separately;
+the original content, formatting and history are never overwritten. No API key
+means the UI reports that translation is not configured.
+
+### Recovery reference (operator only)
+
+Keep the existing runtime environment securely; backups intentionally exclude
+OAuth/SMTP/API keys and OS configuration. Do not run restore on the live database
+until a replacement database has been restored and checked separately. Verify
+`sha256sum -c files.sha256` from a completed backup directory. Restore
+`database.dump` with PostgreSQL `pg_restore` into a new database using matching
+roles/privileges; restore `files/` under the configured file root with `thapp`
+ownership. Relative `issues/<ticket>/<slot>` and `media/<id>` paths plus the
+unchanged database IDs preserve dashboard links. In the replacement database,
+discard uncompleted `mes_uploads` rows, expired grants and old sessions, then run
+the migration runner to reapply runtime grants. Test sign-in and representative
+attachments before switching the service to that replacement. Restoring is an
+explicit operator procedure; deployment never invokes it automatically.

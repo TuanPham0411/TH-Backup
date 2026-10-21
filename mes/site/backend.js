@@ -1,3 +1,4 @@
+import {uploadPreview} from './media-preview.js';
 import {uploadChunks} from "./uploads.js";
 
 let listener;
@@ -52,6 +53,7 @@ export function watchRecords(path, onData, onError, order) {
 }
 export async function uploadAttachment(path, file, type) {
   await uploadChunks({kind:'ticket',path,file,type,headers:tester?{'X-MES-Tester':'true'}:{}});
+  await uploadPreview('ticket',path,file,tester?{'X-MES-Tester':'true'}:{});
 }
 export async function downloadAttachment(path) {
   const { url } = await api('downloadUrl', { path });

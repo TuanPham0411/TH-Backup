@@ -7,6 +7,10 @@ import {uploadRouter,cleanupUploads} from './uploads.js';
 import {workspaceRouter} from './workspace.js';
 import {mesRouter} from './mes.js';
 import {portfolioRouter} from './portfolio.js';
+import {previewRouter} from './media.js';
+import {adminRouter} from './admin.js';
+import {translationRouter} from './translation.js';
+import {maintenanceGate,backupActive} from './storage.js';
 import {oauthRouter} from './oauth.js';
 export function createApp(pool,filesRoot) {
  const app=express();app.disable('x-powered-by');app.set('trust proxy','loopback');
@@ -16,11 +20,14 @@ export function createApp(pool,filesRoot) {
  const authLimit=rateLimit({windowMs:900000,limit:30,standardHeaders:'draft-7',legacyHeaders:false});
  app.use('/api/oauth',authLimit,oauthRouter(pool));
  app.use(express.json({limit:'1mb'}));
+ const gate=maintenanceGate();app.locals.maintenance=gate;app.use(gate.middleware);
  app.use('/api/mes/uploads',rateLimit({windowMs:60000,limit:600,standardHeaders:'draft-7',legacyHeaders:false}));
  app.use('/api/mes/media',rateLimit({windowMs:60000,limit:600,standardHeaders:'draft-7',legacyHeaders:false}));
  app.use('/api/portfolio',(req,res,next)=>req.hostname==='th.io.vn'?next():res.sendStatus(404));
  app.use('/api/mes',(req,res,next)=>req.hostname==='mes.th.io.vn'?next():res.sendStatus(404));
  app.use((req,res,next)=>['login','register','reset','consumeToken'].includes(req.body?.action)||['passwordLogin','activateAccount'].includes(req.body?.name)?authLimit(req,res,next):next());
+ app.use('/api/mes',previewRouter(pool,filesRoot));
+ app.use('/api/mes/admin',adminRouter(pool,filesRoot,gate));app.use('/api/mes',translationRouter(pool));
  app.use('/api/portfolio',portfolioRouter(pool));app.use('/api/mes/uploads',uploadRouter(pool,filesRoot));app.use('/api/mes',workspaceRouter(pool,filesRoot));app.use('/api/mes',mesRouter(pool,filesRoot));
  app.use((err,req,res,next)=>{
   const code=err.code;
@@ -36,6 +43,6 @@ if(process.env.NODE_ENV!=='test') {
  const filesRoot=process.env.FILES_ROOT||'/var/lib/th-app/files';
  const app=createApp(pool,process.env.FILES_ROOT||'/var/lib/th-app/files');
  const server=app.listen(Number(process.env.PORT||3000),'127.0.0.1');server.requestTimeout=180000;
- const cleanup=setInterval(()=>cleanupUploads(pool,filesRoot).then(()=>pool.query("delete from public.file_grants where expires<now(); delete from portfolio.sessions where expires<now(); delete from portfolio.tokens where expires<now()")).catch(()=>{}),3600000);cleanup.unref();
+ const cleanup=setInterval(()=>{if(app.locals.maintenance.blocked||backupActive())return;return cleanupUploads(pool,filesRoot).then(()=>pool.query("delete from public.file_grants where expires<now(); delete from portfolio.sessions where expires<now(); delete from portfolio.tokens where expires<now()")).catch(()=>{});},3600000);cleanup.unref();
  process.on('SIGTERM',()=>{clearInterval(cleanup);server.close(()=>pool.end().then(()=>process.exit(0)));});
 }

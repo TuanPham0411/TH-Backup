@@ -34,7 +34,7 @@ release_id=${2:?Pass a release ID}
 [[ $release_id =~ ^[a-zA-Z0-9_-]+$ ]] || exit 1
 [[ $(uname -m) == aarch64 ]] || { echo 'ARM64 is required'; exit 1; }
 systemctl is-active --quiet postgresql nginx
-for required in runtime/bin/node server/app.cjs server/migrate.cjs web/index.html mes/index.html deploy/th-app.service deploy/nginx.conf deploy/entrypoint.sh deploy/check-nginx.py; do
+for required in runtime/bin/node server/app.cjs server/migrate.cjs web/index.html mes/index.html deploy/th-app.service deploy/nginx.conf deploy/entrypoint.sh deploy/check-nginx.py deploy/storage-agent.py deploy/th-storage.service; do
  [[ -f "$release_source/$required" ]] || { echo "Missing $required"; exit 1; }
 done
 # Refuse overlapping host configuration; leave the existing sites untouched.
@@ -64,11 +64,28 @@ install -d -m 755 "$target"
 cp -a "$release_source/." "$target/"
 chown -R root:root "$target"
 chmod -R a+rX "$target"
+# Preserve live data before any migration. Files are immutable, so same-volume
+# hardlinks preserve originals even when a live attachment is later deleted.
+[[ ! -f /run/th-storage/backup-active ]] || { echo "USB backup is running; retry deployment after it finishes."; exit 1; }
+was_running=false
+if systemctl is-active --quiet th-app; then was_running=true; fi
+trap 'if [[ $was_running == true ]]; then systemctl start th-app || true; fi' ERR
+if [[ -f /opt/th-app/current/server/app.cjs ]]; then
+ systemctl stop th-app
+ python3 "$target/deploy/storage-agent.py" --pre-deploy
+ before_records=$(sudo -u postgres psql -d th_app -At -c "select count(*)::text||':'||md5(coalesce(string_agg(collection||':'||id||':'||data::text,E'\n' order by collection,id),'')) from mes_private.records where collection='issues' or collection like 'issues/%/timeline'")
+fi
 sudo -u postgres env DATABASE_URL=postgresql:///th_app?host=/var/run/postgresql "$target/runtime/bin/node" "$target/server/migrate.cjs"
+if [[ -n ${before_records:-} ]]; then
+ after_records=$(sudo -u postgres psql -d th_app -At -c "select count(*)::text||':'||md5(coalesce(string_agg(collection||':'||id||':'||data::text,E'\n' order by collection,id),'')) from mes_private.records where collection='issues' or collection like 'issues/%/timeline'")
+ [[ $before_records == "$after_records" ]] || { echo 'Ticket/history integrity check failed'; false; }
+ echo 'Existing ticket content and timeline verified unchanged.'
+fi
 old_target=$(readlink -f /opt/th-app/current || true)
 backup=$(mktemp -d /opt/th-app/.deploy-backup.XXXXXX)
 [[ ! -f /etc/nginx/sites-available/th-app ]] || cp -a /etc/nginx/sites-available/th-app "$backup/nginx"
 [[ ! -f /etc/systemd/system/th-app.service ]] || cp -a /etc/systemd/system/th-app.service "$backup/service"
+[[ ! -f /etc/systemd/system/th-storage.service ]] || cp -a /etc/systemd/system/th-storage.service "$backup/storage-service"
 rollback() {
  if [[ -n $old_target && $old_target != /opt/th-app/current ]]; then
   ln -s "$old_target" /opt/th-app/.rollback
@@ -76,12 +93,15 @@ rollback() {
  else rm -f /opt/th-app/current; fi
  if [[ -f $backup/nginx ]]; then cp -a "$backup/nginx" /etc/nginx/sites-available/th-app; else rm -f /etc/nginx/sites-enabled/th-app /etc/nginx/sites-available/th-app; fi
  if [[ -f $backup/service ]]; then cp -a "$backup/service" /etc/systemd/system/th-app.service; else systemctl stop th-app || true; rm -f /etc/systemd/system/th-app.service; fi
+ if [[ -f $backup/storage-service ]]; then cp -a "$backup/storage-service" /etc/systemd/system/th-storage.service; else systemctl stop th-storage || true; rm -f /etc/systemd/system/th-storage.service; fi
  systemctl daemon-reload
+ if [[ -f $backup/storage-service ]]; then systemctl restart th-storage || true; fi
  if [[ -n $old_target && -f $backup/service ]]; then systemctl restart th-app || true; fi
  nginx -t && systemctl reload nginx
  echo 'Deployment failed; prior application configuration restored. Migrations were retained.' >&2
 }
 trap rollback ERR
+install -m 644 "$target/deploy/th-storage.service" /etc/systemd/system/th-storage.service
 install -m 644 "$target/deploy/th-app.service" /etc/systemd/system/th-app.service
 install -m 644 "$target/deploy/nginx.conf" /etc/nginx/sites-available/th-app
 ln -sfn /etc/nginx/sites-available/th-app /etc/nginx/sites-enabled/th-app
@@ -89,7 +109,8 @@ ln -s "$target" /opt/th-app/.next
 mv -Tf /opt/th-app/.next /opt/th-app/current
 nginx -t
 systemctl daemon-reload
-systemctl enable th-app
+systemctl enable th-app th-storage
+systemctl restart th-storage
 systemctl restart th-app
 healthy=false
 for _ in {1..20}; do
@@ -117,4 +138,6 @@ current=Path('/opt/th-app/current').resolve()
 others=sorted((p for p in Path('/opt/th-app/releases').iterdir() if p.is_dir() and p!=current),key=lambda p:p.stat().st_mtime,reverse=True)
 for p in others[2:]: shutil.rmtree(p)
 PY
+lsblk -o NAME,TYPE,TRAN,RM,FSTYPE,SIZE,MOUNTPOINTS
+python3 "$target/deploy/storage-agent.py" --status
 echo 'Deployment healthy. Configure Google OAuth and SMTP in /etc/th-app/runtime.env if this is the first installation.'
