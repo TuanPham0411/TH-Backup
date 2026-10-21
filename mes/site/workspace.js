@@ -277,7 +277,10 @@ export function initWorkspace({ state, toast, run, addEvidence }) {
       article.querySelector('.notice-text').tabIndex=0;
       if (item.media?.length) {
         const gallery = node("div", undefined, "notice-media-gallery");
+        let mediaIndex=0;
+        const slides=[];
         for (const media of item.media) {
+          const slide=node('div',undefined,'notice-media-slide');slide.hidden=slides.length>0;slides.push(slide);gallery.append(slide);
           const url = `/api/mes/media/${media.id}`;
           if (media.type.startsWith("image/")) {
             const link = document.createElement("a");
@@ -289,7 +292,7 @@ export function initWorkspace({ state, toast, run, addEvidence }) {
             image.alt = media.title;
             image.loading = "lazy";
             link.append(image);
-            gallery.append(link);
+            slide.append(link);
           } else {
             const video = document.createElement("video");
             video.src = url;
@@ -297,8 +300,14 @@ export function initWorkspace({ state, toast, run, addEvidence }) {
             video.playsInline = true;
             video.preload = "metadata";
             video.setAttribute("aria-label", media.title);
-            gallery.append(video);
+            slide.append(video);
           }
+        }
+        if(slides.length>1){
+          const controls=node('div',undefined,'notice-media-navigation'),previous=node('button','←'),next=node('button','→'),counter=node('small');
+          previous.type=next.type='button';previous.setAttribute('aria-label',t('Previous image'));next.setAttribute('aria-label',t('Next image'));controls.append(previous,counter,next);gallery.append(controls);
+          const show=()=>{slides.forEach((slide,index)=>{slide.hidden=index!==mediaIndex;if(slide.hidden)slide.querySelector('video')?.pause();});previous.disabled=mediaIndex===0;next.disabled=mediaIndex===slides.length-1;counter.textContent=`${mediaIndex+1} / ${slides.length}`;};
+          previous.onclick=()=>{mediaIndex--;show();};next.onclick=()=>{mediaIndex++;show();};show();
         }
         article.insertBefore(gallery, article.lastChild);
       }

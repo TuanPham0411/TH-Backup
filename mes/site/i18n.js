@@ -1,5 +1,6 @@
 // UI-only localization. Feedback, names, filenames and audit content are never translated.
 export const vi = {
+"Previous image":"Ảnh trước","Next image":"Ảnh tiếp theo",
 "View video":"Xem video",
 "Replace":"Thay tệp","Filename":"Tên tệp","Add attachments":"Thêm tệp đính kèm","Add, rename, replace or remove attachments. Changes apply when you save. Removed originals remain in history and backups.":"Thêm, đổi tên, thay hoặc gỡ tệp. Thay đổi có hiệu lực khi lưu. Bản gốc được giữ trong lịch sử và backup.","This ticket changed while you were editing. Reopen the editor and try again.":"Ticket đã thay đổi trong lúc bạn sửa. Hãy mở lại phần chỉnh sửa và thử lại.",
 "Copy ticket link":"Sao chép link ticket","Ticket link copied.":"Đã sao chép link ticket.","Copy the ticket URL from the address bar.":"Hãy sao chép đường dẫn ticket trên thanh địa chỉ.","Ticket unavailable.":"Không tìm thấy ticket hoặc ticket đã bị xóa.","Previous page":"Trang trước","Next page":"Trang tiếp","View":"Xem","This month has reached the limit of 99 tickets. Please try again next month.":"Tháng này đã đủ 99 ticket. Bạn có thể tạo ticket mới vào tháng tiếp theo.",

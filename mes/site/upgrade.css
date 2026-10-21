@@ -48,25 +48,35 @@ main,.app-footer {max-width:none;width:100%}
 .storage-manager {margin:28px 0;padding:24px;border:1px solid var(--line);border-radius:14px;background:var(--soft)}
 .storage-plan {padding:18px;margin:16px 0;border:1px solid var(--accent);border-radius:10px;white-space:pre-wrap;overflow-wrap:anywhere}
 .storage-location-list p {padding:12px;border-bottom:1px solid var(--line);overflow-wrap:anywhere}.folder-browser {width:min(680px,94vw);padding:26px;max-height:85vh;overflow:auto;background:var(--card);color:var(--ink)}#folder-browser-list {display:grid;gap:8px;margin:20px 0}
-/* Compact broadcast widgets: only notice text scrolls; media keeps its own shape. */
-.workspace-board {align-items:start}
-.broadcast-panel,.video-panel {height:400px;padding:20px;display:flex;flex-direction:column;gap:8px}
+/* Fixed media ratios; notice text scrolls independently of its illustration. */
+.workspace-board {align-items:stretch}
+.broadcast-panel,.video-panel {height:auto;min-height:0;padding:20px;display:flex;flex-direction:column;gap:12px}
+.broadcast-panel {min-height:320px}
 .broadcast-panel .section-heading,.video-panel .section-heading {flex:0 0 auto}
-.broadcast-panel h2 {font-size:22px;margin:0 0 6px}
+.broadcast-panel .section-heading .eyebrow,.video-panel .section-heading .eyebrow {margin:0 0 4px;line-height:1.3}
+.broadcast-panel .section-heading h2,.video-panel .section-heading h2 {line-height:1.2;margin:0}
+.broadcast-panel h2 {font-size:22px}
 #notice-board {max-height:none;overflow:visible;padding:0;min-height:0;flex:1}
-.notice-item {padding:0;border:0;display:flex;flex-direction:column;height:100%;gap:5px;min-height:0}
-.notice-item h3 {font-size:16px;margin:0;flex-shrink:0}
-.notice-item .notice-text {overflow:auto;max-height:220px;min-height:30px;margin:0;padding-right:6px;flex:1}
-.notice-item:has(.notice-media-gallery) .notice-text {max-height:80px}
-.notice-media-gallery {display:grid;grid-template-columns:repeat(auto-fit,minmax(0,1fr));gap:10px;margin:3px 0;flex:0 0 170px;min-height:0;overflow:visible}
-.notice-media-gallery a {display:flex;justify-content:flex-start;align-items:center;min-width:0;min-height:0}
-.notice-media-gallery img,.notice-media-gallery video {width:auto;height:auto;max-width:100%;max-height:170px;object-fit:contain;background:transparent;border:0;border-radius:8px;box-shadow:0 5px 18px #0003}
-.notice-author {flex-shrink:0}
+.notice-item {padding:0;border:0;display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:auto auto minmax(60px,1fr) auto;gap:8px;height:100%;min-height:0}
+.notice-item:has(.notice-media-gallery) {grid-template-columns:minmax(0,1fr) minmax(0,1fr);column-gap:18px}
+.notice-item>small,.notice-item h3,.notice-item .notice-text,.notice-author {grid-column:1;min-width:0}
+.notice-item>small,.notice-author {line-height:1.2}
+.notice-item h3 {font-size:16px;margin:0;line-height:1.3}
+.notice-item .notice-text {overflow:auto;max-height:clamp(140px,18vw,320px);min-height:60px;margin:0;padding-right:6px;align-self:stretch;grid-row:3}
+.notice-author {grid-row:4}
+.notice-media-gallery {grid-column:2;grid-row:1/5;align-self:center;position:relative;display:block;aspect-ratio:4/3;width:100%;height:auto;max-height:none;min-width:0;min-height:0;margin:0;border-radius:10px;overflow:hidden;background:transparent;box-shadow:0 5px 18px #0003}
+.notice-media-slide {position:absolute;inset:0;width:100%;height:100%}
+.notice-media-gallery a {display:block;width:100%;height:100%}
+.notice-media-gallery img,.notice-media-gallery video {display:block;width:100%;height:100%;max-width:none;max-height:none;border:0;border-radius:0;background:transparent;box-shadow:none}
+.notice-media-gallery img {object-fit:cover}.notice-media-gallery video {object-fit:contain}
+.notice-media-navigation {position:absolute;left:8px;right:8px;bottom:8px;display:flex;align-items:center;justify-content:space-between;gap:8px;pointer-events:none}
+.notice-media-navigation button,.notice-media-navigation small {pointer-events:auto;background:#172025dc;color:#fff;border:1px solid #ffffff60;border-radius:7px;padding:3px 9px;font-size:11px}
+.notice-media-gallery:has(.notice-media-slide:not([hidden]) video) .notice-media-navigation {top:8px;bottom:auto}
 #notice-navigation {padding:0;flex-shrink:0}#notice-navigation button {padding:3px 9px}
-.video-stage {aspect-ratio:auto;flex:1;min-height:0;background:var(--soft);border:1px solid var(--line)}
-.video-stage video {height:100%;max-height:100%;background:transparent}
+.video-stage {aspect-ratio:16/9;flex:0 0 auto;min-height:0;position:relative;width:100%;max-width:960px;margin-inline:auto;background:var(--soft);border:1px solid var(--line)}
+.video-stage video {position:absolute;inset:0;width:100%;height:100%;max-height:none;background:transparent;object-fit:contain}
 .video-stage #video-empty,.video-stage #video-empty>span {color:var(--muted)}
-.video-panel .section-heading h2 {margin:0}.video-navigation {padding-top:4px}
+.video-panel .section-heading h2 {margin:0}.video-navigation {padding-top:0}
 .attachment-gallery {display:flex;flex-wrap:wrap;gap:8px}
 .attachment-card {display:flex;align-items:center;gap:9px;max-width:100%;padding:8px 10px;border-radius:9px;flex:0 1 320px}
 .attachment-card>img {width:40px;height:40px;object-fit:cover;border-radius:5px}
@@ -78,14 +88,6 @@ main,.app-footer {max-width:none;width:100%}
 #image-viewer,#image-stage {background:var(--card)}
 .access-history-scroll {max-height:420px;overflow:auto;overscroll-behavior:contain}
 .access-history-scroll thead {position:sticky;top:0;z-index:1}.access-history-scroll th {background:var(--soft)}
-@media(max-width:600px){.broadcast-panel,.video-panel {height:380px;padding:16px}.notice-media-gallery,.notice-media-gallery img,.notice-media-gallery video {max-height:160px}.notice-media-gallery {flex-basis:160px}.access-history-scroll {max-height:340px}}
-.notice-item:has(.notice-media-gallery) {display:grid;grid-template-rows:auto auto minmax(28px,1fr) minmax(0,150px) auto}
-.notice-item:has(.notice-media-gallery) .notice-text {max-height:100%;min-height:0}
-.notice-media-gallery {margin:0;min-height:0}.notice-media-gallery a {height:100%}
-.notice-media-gallery img,.notice-media-gallery video {max-height:100%}
-.broadcast-panel .section-heading .eyebrow,.video-panel .section-heading .eyebrow {margin:0 0 4px;line-height:1.3}
-.broadcast-panel .section-heading h2,.video-panel .section-heading h2 {line-height:1.2;margin:0}
-.notice-item>small,.notice-author {line-height:1.2}.notice-item h3 {line-height:1.3}
-.notice-item:has(.notice-media-gallery) {grid-template-rows:auto auto minmax(55px,1fr) minmax(0,150px) auto}
+@media(max-width:600px){.broadcast-panel,.video-panel {padding:16px}.notice-item:has(.notice-media-gallery) {column-gap:12px}.access-history-scroll {max-height:340px}}
 .ticket-title-line {display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}.ticket-number {display:inline-block;color:var(--accent);background:var(--surface);border:1px solid var(--line);border-radius:7px;padding:3px 8px;font-size:13px;font-weight:700;white-space:nowrap;letter-spacing:.03em}h1 .ticket-number {font-size:clamp(17px,2vw,25px);padding:5px 10px}.attachment-download {white-space:nowrap}.attachment-card {flex-basis:390px}.edit-fields-grid {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}#edit-dialog {width:min(1000px,96vw);max-height:92dvh;overflow:auto}#edit-form label {display:block;margin:12px 0 5px}.edit-evidence {margin:20px 0}.edit-attachment-row {display:flex;align-items:center;gap:9px;margin:10px 0;padding:8px;border:1px solid var(--line);border-radius:9px}.edit-attachment-row>img {width:48px;height:48px;object-fit:cover;border-radius:5px}.edit-attachment-row>input {min-width:0;flex:1}.edit-attachment-row label.button {margin:0!important;cursor:pointer}#edit-attachment-input {max-width:100%}@media(max-width:600px){.edit-fields-grid {grid-template-columns:1fr}.edit-attachment-row {flex-wrap:wrap}.edit-attachment-row>input {min-width:160px}}
 .ticket-title-line {display:grid;grid-template-columns:max-content minmax(0,1fr);align-items:baseline}.ticket-title-line>span,.ticket-title-line>.issue-title-button {min-width:0;overflow-wrap:anywhere}.ticket-number {max-width:200px;overflow:hidden;text-overflow:ellipsis}
