@@ -87,6 +87,8 @@ export function createRichEditor(textarea, { files, addImages, slotForFile, imag
       if(generation!==serial)return;q.setContents({ops});q.history.clear();sync();
     },
     reset(){serial++;q.setText('');q.history.clear();images.clear();for(const url of ownUrls)URL.revokeObjectURL(url);ownUrls.clear();textarea.value='';},
+    removeSlot(slot){const ops=q.getContents().ops.filter(op=>{const entry=images.get(op.insert?.image);return !entry||((entry.file?slotForFile(entry.file):entry.slot)!==slot);});q.setContents({ops},'user');sync();},
+    replaceSlot(slot,file){const url=URL.createObjectURL(file);ownUrls.add(url);images.set(url,{slot});const ops=q.getContents().ops.map(op=>{const entry=images.get(op.insert?.image);return entry&&(entry.file?slotForFile(entry.file):entry.slot)===slot?{...op,insert:{image:url}}:op;});q.setContents({ops},'user');sync();},
     removeFile(file){const ops=q.getContents().ops.filter(op=>!(op.insert?.image && images.get(op.insert.image)?.file===file));q.setContents({ops},'user');sync();},
     setLanguage(){q.root.dataset.placeholder=t('Write feedback…');q.root.setAttribute('aria-label',t('Feedback'));},
   };

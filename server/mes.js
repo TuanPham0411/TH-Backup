@@ -73,7 +73,7 @@ export function mesRouter(pool,filesRoot) {
   const {rows:[meta]}=await pool.query('select * from public.files where path=$1',[path]);
   if(!meta)return res.sendStatus(404);
   res.set({'Content-Type':req.query.preview==='1'&&meta.type.startsWith('image/')?'image/jpeg':meta.type,'Cache-Control':'private, max-age=0, must-revalidate','Content-Security-Policy':"sandbox; default-src 'none'"});
-  if(!meta.type.startsWith('image/')&&!meta.type.startsWith('video/'))res.attachment(meta.name||'attachment');
+  if(req.query.download==='1'||(!meta.type.startsWith('image/')&&!meta.type.startsWith('video/')))res.attachment(meta.name||'attachment');
   if(await serveCloudMedia(pool,filesRoot,path,req,res,meta.type))return;
   res.set('X-Accel-Buffering','no');
   const display=await displayPath(filesRoot,path,req.query.preview==='1'&&meta.type.startsWith('image/'));
@@ -84,7 +84,7 @@ export function mesRouter(pool,filesRoot) {
   if(typeof name!=='string'||!data||typeof data!=='object'||Array.isArray(data)||name==='finishDelete')return res.sendStatus(400);
   const actor={...actorFor(req.cookies.th_mes,req.headers['x-mes-tester']),ip:req.ip,agent:String(req.headers['user-agent']||'').slice(0,240)};
   if(!publicActions.has(name)&&!actor.session)return res.status(401).json({code:'unauthenticated',error:'Sign in first'});
-  if((name==='createIssue'||(name==='updateIssue'&&data.operation==='edit'))&&data.richDocument!==undefined){data.richDocument=normalizeDocument(data.richDocument);data.description=documentText(data.richDocument);}
+  if((name==='createIssue'||name==='saveTicketEdit'||(name==='updateIssue'&&data.operation==='edit'))&&data.richDocument!==undefined){data.richDocument=normalizeDocument(data.richDocument);data.description=documentText(data.richDocument);}
   if(name==='uploadUrl'||name==='downloadUrl') {
    if(!validPath(data.path))return res.sendStatus(400);
    await dispatch(name,data,actor);

@@ -372,3 +372,34 @@ test('monthly ticket numbers, direct public API and the 99-ticket limit preserve
  try{await pool.query('update mes_private.ticket_months set allocated=99 where month_key=$1',[currentMonth]);const denied=await api('createIssue',{reporterUid:'mes-owner',departmentId:department,process:'Full month',description:'Must not create ticket 100'},owner);assert.equal(denied.status,409,JSON.stringify(denied.body));assert.equal(denied.body.code,'P0099');assert.match(denied.body.error,/99 tickets/);}finally{await pool.query('update mes_private.ticket_months set allocated=$2 where month_key=$1',[currentMonth,allocated]);}
  }finally{base=previousBase;await new Promise(r=>isolated.close(r));}
 });
+test('admin fully edits old tickets and replaces/removes files atomically; downloads preserve originals and history',async()=>{
+ const previousBase=base,isolated=createApp(runtimePool,files).listen(0,'127.0.0.1');await new Promise(r=>isolated.once('listening',r));base=`http://127.0.0.1:${isolated.address().port}`;
+ try{
+ const owner='th_mes='+(await pool.query("select mes_private.open_account_session('mes-owner') result")).rows[0].result.sessionToken;
+ const person=(await pool.query("select id from mes_private.records where collection='users' and data->>'username'='comment.b'")).rows[0].id;
+ const user='th_mes='+(await pool.query('select mes_private.open_account_session($1) result',[person])).rows[0].result.sessionToken;
+ const department=(await pool.query("select id from mes_private.records where collection='departments' limit 1")).rows[0].id;
+ const created=await api('createIssue',{reporterUid:'mes-owner',departmentId:department,process:'Original process',description:'Original feedback with image'},owner);assert.equal(created.status,200,JSON.stringify(created.body));const id=created.body.id,path=`issues/${id}/${created.body.uploadSlots[0]}`;
+ const grant=await api('uploadUrl',{path},owner);const original=Buffer.from('Original image bytes');assert.equal((await fetch(base+grant.body.url,{method:'PUT',headers:{'x-forwarded-host':'mes.th.io.vn','content-type':'image/png'},body:original})).status,200);
+ assert.equal((await api('attachFiles',{issueId:id,files:[{slot:created.body.uploadSlots[0],name:'old.png'}]},owner)).status,200);
+ await pool.query("update mes_private.records set data=jsonb_set(data,'{createdAt}',to_jsonb((extract(epoch from now()-interval '2 days')*1000)::bigint)) where collection='issues' and id=$1",[id]);
+ const previous=(await api('readTicket',{id},owner)).body;const history=(await pool.query('select id,data from mes_private.records where collection=$1 order by seq',[`issues/${id}/timeline`])).rows;
+ assert.equal((await api('reserveTicketFiles',{id,indices:[0]},user)).status,403);assert.equal((await api('reserveTicketFiles',{id,indices:[0]})).status,401);
+ const reserve=await api('reserveTicketFiles',{id,indices:[0,1]},owner);assert.equal(reserve.status,200,JSON.stringify(reserve.body));
+ const headers={'x-forwarded-host':'mes.th.io.vn',cookie:owner,'Content-Type':'application/json'};
+ for(const file of reserve.body.files){
+  const start=await fetch(base+'/api/mes/uploads',{method:'POST',headers,body:JSON.stringify({kind:'ticket',path:file.path,type:'image/png',size:8})});assert.equal(start.status,200);const info=await start.json();assert.equal((await fetch(base+'/api/mes/uploads/'+info.id,{method:'PATCH',headers:{...headers,'Content-Type':'application/octet-stream','Upload-Offset':'0'},body:'newimage'})).status,200);
+  const preview=await fetch(base+`/api/mes/previews/ticket/${id}/${file.slot}`,{method:'PUT',headers:{...headers,'Content-Type':'image/jpeg'},body:Buffer.from([255,216,255,217])});assert.equal(preview.status,200,await preview.text());
+ }
+ const edit={id,baseUpdatedAt:previous.updatedAt,subject:'Complete admin edit',process:'New process',description:'New content',departmentId:department,issueTypeId:'general',reporterUid:person,status:'In progress',priority:'High',progress:55,assessment:'Assessment edited',occurrences:[],richDocument:{version:1,ops:[{insert:'New content '},{insert:{image:0}},{insert:{image:1}},{insert:'\n'}]},files:reserve.body.files.map((f,i)=>({path:f.path,slotIndex:i,name:`edited-${i}.png`}))};
+ assert.equal((await api('saveTicketEdit',edit,user)).status,403);assert.equal((await api('saveTicketEdit',{...edit,files:[{path:'issues/other/unrelated',slotIndex:0,name:'bad.png'}]},owner)).status,403);
+ const invalidHandling=await api('saveTicketEdit',{...edit,priority:'Forged'},owner);assert.equal(invalidHandling.status,403);assert.equal((await api('readTicket',{id},owner)).body.subject,previous.subject,'A late validation error rolls back text edits and timeline writes');
+ const saved=await api('saveTicketEdit',edit,owner);assert.equal(saved.status,200,JSON.stringify(saved.body));const current=(await api('readTicket',{id},owner)).body;
+ assert.equal(current.subject,'Complete admin edit');assert.equal(current.reporterUid,person);assert.equal(current.status,'In progress');assert.equal(current.progress,55);assert.equal(current.attachments.length,2);assert.equal(current.id,id);assert.equal(current.ticketNumber,created.body.ticketNumber);
+ assert.deepEqual(await readFile(join(files,path)),original,'Replaced original bytes stay available for backups');assert.equal((await fetch(base+'/api/mes/attachments/'+path.split('/').slice(1).join('/'),{headers:{'x-forwarded-host':'mes.th.io.vn'}})).status,403);
+ const afterHistory=(await pool.query('select id,data from mes_private.records where collection=$1 order by seq',[`issues/${id}/timeline`])).rows;assert.deepEqual(afterHistory.slice(0,history.length),history);assert.ok(afterHistory.some(h=>h.data.before?.attachments?.some(f=>f.path===path)));
+ const attachment=current.attachments[0];const download=await fetch(base+'/api/mes/attachments/'+attachment.path.split('/').slice(1).join('/')+'?download=1',{headers:{'x-forwarded-host':'mes.th.io.vn'}});assert.equal(download.status,200);assert.match(download.headers.get('content-disposition'),/attachment;.*edited-0.png/);assert.equal(await download.text(),'newimage');
+ assert.equal((await api('saveTicketEdit',edit,owner)).status,409,'A stale edit cannot overwrite a newer version');
+ const removal={...edit,baseUpdatedAt:current.updatedAt,richDocument:{version:1,ops:[{insert:'Keep one image '},{insert:{image:0}},{insert:'\n'}]},files:[{...edit.files[0],name:'renamed.png'}]};const removed=await api('saveTicketEdit',removal,owner);assert.equal(removed.status,200,JSON.stringify(removed.body));assert.equal((await api('readTicket',{id},owner)).body.attachments.length,1);assert.equal((await readFile(join(files,edit.files[1].path))).toString(),'newimage');
+ }finally{base=previousBase;await new Promise(r=>isolated.close(r));}
+});

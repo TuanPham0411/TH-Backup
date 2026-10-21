@@ -33,7 +33,7 @@ export function createApp(pool,filesRoot) {
  app.use('/api/portfolio',portfolioRouter(pool));app.use('/api/mes/uploads',uploadRouter(pool,filesRoot,gate));app.use('/api/mes',workspaceRouter(pool,filesRoot));app.use('/api/mes',mesRouter(pool,filesRoot));
  app.use((err,req,res,next)=>{
   const code=err.code;
-  if(code==='P0099'){err.status=409;err.expose=true;}
+  if(['P0099','P0409'].includes(code)){err.status=409;err.expose=true;}
   const status=err.status||(['28000','invalid-credentials'].includes(code)?401:code==='rate-limited'?429:code==='P0001'?403:code==='password-policy'?400:503);
   if(status===503)console.error('API request failed',{code:code||'internal'});
   if(res.headersSent)return next(err);

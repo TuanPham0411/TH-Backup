@@ -22,7 +22,7 @@ export function previewRouter(pool,root){
   if(kind==='ticket'){
    relative=`issues/${id}/${slot}`;if(!validPath(relative))return res.sendStatus(400);
    const session=await dispatch('getSession',{});
-   await dispatch(session.isOwner?'downloadUrl':'uploadUrl',{path:relative});
+   if(session.isOwner){try{await dispatch('downloadUrl',{path:relative});}catch{await dispatch('uploadUrl',{path:relative});}}else await dispatch('uploadUrl',{path:relative});
    const {rows:[f]}=await pool.query('select type from public.files where path=$1',[relative]);if(!f?.type.startsWith('image/'))return res.sendStatus(400);
   }else if(kind==='media'){
    if(!/^[a-f0-9-]{36}$/.test(id)||slot!=='image')return res.sendStatus(400);

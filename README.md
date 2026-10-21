@@ -82,3 +82,11 @@ Tickets have public references such as `TH2610-01` (`TH` + two-digit year + mont
 - Use **Copy ticket link** in ticket details. Ticket numbers are shown in the list, detail heading and CSV export, and can be searched.
 
 Notice board and Workspace video use compact 400 px desktop panels. Multiple notices have Previous/Next controls; only notice text scrolls. Images keep their proportions without a black frame. Feedback images can be inserted at the cursor with **+ Image**, pasted or dropped into the text editor. Existing attached images also display directly below their feedback text. Attachments use compact rows and the image viewer shows a preview immediately while loading the original. Access history has a bounded scroll area and cursor-based Previous/Next pages of 100 entries.
+
+## Complete administrator ticket edits
+
+**Edit feedback** lets administrators change the title, process, requester, department, issue type, incident times, formatted text, assessment, priority, status and progress in one save. The attachment section supports Add, Rename, Replace and Remove; inline images update with their attachment slots. Up to five active attachments remain supported, with the existing image/file and 200 MB video limits. Fresh immutable upload paths permit replacing files even when all five original slots are occupied or the ticket is old.
+
+A save validates all attachments and fields, then commits ticket metadata and timeline records atomically. A ticket changed by someone else while the dialog was open produces a conflict instead of overwriting their changes. Canceling the dialog does not modify the published ticket. Removed/replaced originals remain stored for historical audit and backups; the normal ticket links no longer expose them. This operation does not change the internal ticket ID, public ticket number, creation time or prior timeline rows.
+
+Each attachment has separate **View** and **Download** controls. Download streams the original using `?download=1` with its filename, including media stored in Drive. Public ticket numbers are shown as distinct badges beside titles in lists, recent feedback and ticket details.

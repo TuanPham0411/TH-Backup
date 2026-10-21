@@ -88,7 +88,7 @@ function toast(message) {
 }
 function errorMessage(e) {
   const c = String(e?.code || "");
-  if (["invalid-credentials", "rate-limited", "password-policy", "P0099"].includes(c)) return e.message;
+  if (["invalid-credentials", "rate-limited", "password-policy", "P0099", "P0409"].includes(c)) return e.message;
   if (c === "owner-required") return "This Google account is not accepted as the MES owner. Use eric.scorp93@gmail.com. Reset sign-in session to switch accounts.";
   if (c === "backend-not-ready") return "Account service update required. Deploy the MES accounts SQL installer and the matching API.";
   if (c.includes("unauthenticated"))
@@ -285,7 +285,7 @@ function renderDashboard() {
     row.type = "button";
     const content = el("div");
     content.append(
-      userEl("h3", issue.subject),
+      ticketTitle(issue,'h3'),
       el("p", `${issue.departmentName} · ${issue.process}`),
       progressView(issue, true),
     );
@@ -452,7 +452,7 @@ function renderIssues() {
     const title = el("td");
     const link = userEl("button", i.subject, "issue-title-button");
     link.onclick = () => openIssue(i.id);
-    title.append(link, el("small", (i.ticketNumber||i.id.slice(0, 12).toUpperCase())));
+    const label=el('div',undefined,'ticket-title-line');label.append(el('strong',i.ticketNumber||i.id.slice(0,12).toUpperCase(),'ticket-number'),link);title.append(label);
     const department = el("td");
     department.append(userEl("strong", i.departmentName), userEl("small", i.process));
     const reporter = userEl("td", i.reporterName),
@@ -541,11 +541,11 @@ function openIssue(id,updateUrl=true) {
     }, (e) => showStatus("comment-status", errorMessage(e)), "asc");
   }
 }
+function ticketTitle(issue,tag){const title=el(tag,undefined,'ticket-title-line'),number=el('strong',issue.ticketNumber||issue.id.toUpperCase(),'ticket-number');number.title=issue.ticketNumber||issue.id;title.append(number,userEl('span',issue.subject));return title;}
 function renderDetail(issue) {
   const heading = el("div");
   heading.append(
-    el("p", issue.ticketNumber||issue.id.toUpperCase(), "eyebrow"),
-    userEl("h1", issue.subject),
+    ticketTitle(issue,'h1'),
     el(
       "p",
       `${t("Submitted")} ${date(issue.createdAt)} · ${issue.reporterName}`,
@@ -575,9 +575,10 @@ function renderDetail(issue) {
       const image=document.createElement('img');image.alt='';image.loading='lazy';image.decoding='async';imageUrl(f).then(url=>{image.src=url.startsWith('/api/')?url+'?preview=1':url;}).catch(()=>{});card.append(image);
     }
     const row = el("div", undefined, "file-row"), button = el("button", state.preview ? "Preview file" : "View", "text-button");
-    if (f.type?.startsWith("video/")) { button.textContent = `↗ ${t("Download video")}`; button.classList.add("video-evidence-link"); }
+    if (f.type?.startsWith("video/")) { button.textContent = `↗ ${t("View video")}`; button.classList.add("video-evidence-link"); }
     button.onclick = () => f.type?.startsWith('image/')?openImage(f):downloadAttachment(f);
-    row.append(userEl("span", `${f.name} · ${(f.size / 1024).toFixed(0)} KB`), button);
+    const download=el('a','Download','text-button');download.href=f.previewUrl||('/api/mes/attachments/'+f.path?.split('/').slice(1).map(encodeURIComponent).join('/')+'?download=1');download.download=f.name;download.classList.add('attachment-download');
+    row.append(userEl("span", `${f.name} · ${(f.size / 1024).toFixed(0)} KB`), button,download);
     card.append(row); gallery.append(card);
   }
   attachments.append(gallery);
@@ -1145,64 +1146,38 @@ $("comment-form").onsubmit = (e) => {
     showStatus("comment-status", "Update recorded in the timeline.");
   });
 };
+let editingTicket=null,editRetained=[],editDrafts=new Map();
+function editSlot(file,index){const found=file.slotIndex??editingTicket.uploadSlots?.indexOf(file.path?.split('/').at(-1));return found>=0?found:index;}
+function editorOptions(id,items,selected,label){selectOptions($(id),items.map(x=>({id:x.id,name:x.displayName||x.name||x.id})),{selected});if(![...$(id).options].some(o=>o.value===selected)){const option=new Option(label||selected||'Unclassified',selected||'');$(id).append(option);}$(id).value=selected||'';}
+function addEditOccurrence(kind,item={}){const row=el('div',undefined,'occurrence-row');row.dataset.kind=kind;for(const name of kind==='range'?['start','end']:['start']){const input=document.createElement('input');input.type='datetime-local';input.step='1';input.name=name;input.required=true;if(item[name]){const d=new Date(item[name]);input.value=new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,19);input.dataset.original=item[name];input.dataset.initial=input.value;}row.append(input);}const remove=el('button','Remove','text-button');remove.type='button';remove.onclick=()=>row.remove();row.append(remove);$('edit-occurrences').append(row);}
+$('edit-add-moment').onclick=()=>addEditOccurrence('point');$('edit-add-range').onclick=()=>addEditOccurrence('range');
+function renderEditAttachments(){const box=$('edit-attachments');box.replaceChildren();for(const file of [...editRetained,...editImageFiles]){const fresh=editImageFiles.includes(file),slot=fresh?editSlots.get(file):file.slotIndex,row=el('div',undefined,'edit-attachment-row');
+ if(attachmentType(file).startsWith('image/')){const image=document.createElement('img');image.alt=file.name;image.src=fresh?previewFileUrl(file):('/api/mes/attachments/'+file.path.split('/').slice(1).join('/')+'?preview=1');row.append(image);}
+ const name=document.createElement('input');name.value=editNames.get(file)||file.name;name.maxLength=180;name.required=true;name.setAttribute('aria-label',t('Filename'));name.oninput=()=>editNames.set(file,name.value);row.append(name);
+ const replace=el('label','Replace','button');const picker=document.createElement('input');picker.type='file';picker.accept=$('edit-attachment-input').accept;picker.hidden=true;replace.append(picker);picker.onchange=()=>{const next=picker.files[0];if(!next)return;try{const others=[...editRetained,...editImageFiles].filter(f=>f!==file);const invalid=validateFiles([...others,next]);if(invalid)throw new Error(invalid);if(!fresh)editRetained=editRetained.filter(f=>f!==file);else{editImageFiles.splice(editImageFiles.indexOf(file),1);}editSlots.set(next,slot);editImageFiles.push(next);if(attachmentType(next).startsWith('image/'))editEditor.replaceSlot(slot,next);else editEditor.removeSlot(slot);if(fresh)editSlots.delete(file);renderEditAttachments();}catch(e){toast(e.message);}};
+ const remove=el('button','Remove','text-button');remove.type='button';remove.onclick=()=>{editEditor.removeSlot(slot);if(fresh){editImageFiles.splice(editImageFiles.indexOf(file),1);editSlots.delete(file);}else editRetained=editRetained.filter(f=>f!==file);renderEditAttachments();};row.append(replace,remove);box.append(row);
+ }}
+function addEditFiles(files){const invalid=validateFiles([...editRetained,...editImageFiles,...files]);if(invalid)throw new Error(invalid);for(const file of files){const used=[...editRetained.map(f=>f.slotIndex),...editSlots.values()];const slot=[0,1,2,3,4].find(i=>!used.includes(i));if(slot===undefined)throw new Error('Attach no more than 5 files.');editSlots.set(file,slot);editImageFiles.push(file);}renderEditAttachments();return files;}
+$('edit-attachment-input').onchange=event=>{try{addEditFiles([...event.target.files]);}catch(e){toast(e.message);}event.target.value='';};
 $("edit-issue").onclick = async () => {
-  if (!ownerOnly()) return;
-  const issue = state.issues.find((x) => x.id === state.selected);
-  $("edit-subject").value = issue.subject;
-  $("edit-process").value = issue.process;
-  editImageFiles.length = 0; editSlots.clear(); editUploaded.clear();
-  $("edit-dialog").showModal();
-  $("edit-form").querySelector('button[type="submit"]').disabled = true;
-  try { await editEditor.setDocument(issue.richDocument, issue.description); }
-  catch { toast("Could not load formatted feedback."); }
-  finally { $("edit-form").querySelector('button[type="submit"]').disabled = false; }
+ if(!ownerOnly())return;
+ try{editingTicket=structuredClone(state.preview?state.issues.find(x=>x.id===state.selected):await callable('readTicket',{id:state.selected}));const issue=editingTicket;
+ $('edit-title').textContent=t('Edit feedback')+' · '+(issue.ticketNumber||issue.id);$('edit-subject').value=issue.subject;$('edit-process').value=issue.process;$('edit-assessment').value=issue.assessment||'';$('edit-progress').value=ticketProgress(issue);
+ editorOptions('edit-reporter',state.users,issue.reporterUid,issue.reporterName);editorOptions('edit-department',state.departments,issue.departmentId,issue.departmentName);editorOptions('edit-type',workspace.types,issue.issueTypeId||'general',issue.issueTypeName);
+ selectOptions($('edit-ticket-status'),statuses.map(id=>({id,name:id})),{selected:issue.status});selectOptions($('edit-priority'),priorities.map(id=>({id,name:id})),{selected:issue.priority});
+ $('edit-occurrences').replaceChildren();for(const item of issue.occurrences||[])addEditOccurrence(item.kind,item);
+ editImageFiles.length=0;editSlots.clear();editUploaded.clear();editDrafts.clear();editNames.clear();editRetained=(issue.attachments||[]).map((f,i)=>({...f,slotIndex:editSlot(f,i)}));renderEditAttachments();$('edit-status').textContent='';$('edit-dialog').showModal();const save=$('edit-form').querySelector('button[type="submit"]');save.disabled=true;try{await editEditor.setDocument(issue.richDocument,issue.description);}finally{save.disabled=false;}
+ }catch(e){toast(errorMessage(e));}
 };
-$("edit-form").onsubmit = (e) => {
-  e.preventDefault();
-  if (!ownerOnly()) return;
-  run("edit-status", $("edit-form").querySelector('button[type="submit"]'), async () => {
-    const data = {
-      id: state.selected,
-      operation: "edit",
-      subject: $("edit-subject").value.trim(),
-      process: $("edit-process").value.trim(),
-      richDocument: editEditor.getDocument(),
-    };
-    data.description = documentText(data.richDocument);
-    if (state.preview) {
-      const issue = state.issues.find((x) => x.id === state.selected);
-      for (const file of editImageFiles) issue.attachments.push({name:file.name,size:file.size,type:attachmentType(file),slotIndex:editSlots.get(file),preview:true,previewUrl:previewFileUrl(file)});
-      const before = {
-        subject: issue.subject,
-        process: issue.process,
-        description: issue.description,
-        richDocument: issue.richDocument || null,
-      };
-      Object.assign(issue, data);
-      demoEvent(issue, "edit", "Owner edited feedback details (preview).", {
-        before,
-        after: {
-          subject: data.subject,
-          process: data.process,
-          description: data.description,
-          richDocument: data.richDocument,
-        },
-      });
-    } else {
-      const issue = state.issues.find(x => x.id === state.selected);
-      const files = [];
-      for (const file of editImageFiles) {
-        const slot = issue.uploadSlots[editSlots.get(file)];
-        if (!editUploaded.has(file)) { await uploadAttachment(`issues/${issue.id}/${slot}`,file,attachmentType(file)); editUploaded.add(file); }
-        files.push({slot,name:file.name});
-      }
-      if (files.length) await callable("attachFiles",{issueId:issue.id,files});
-      await callable("updateIssue", data);
-    }
-    editEditor.reset(); editImageFiles.length = 0; editSlots.clear(); editUploaded.clear();
-    $("edit-dialog").close();
-    toast("Feedback updated.");
-  });
+$('edit-form').onsubmit=event=>{event.preventDefault();if(!ownerOnly()||!editingTicket)return;
+ run('edit-status',$('edit-form').querySelector('button[type="submit"]'),async()=>{
+ const issue=editingTicket,data={id:issue.id,baseUpdatedAt:issue.updatedAt,subject:$('edit-subject').value.trim(),process:$('edit-process').value.trim(),departmentId:$('edit-department').value,issueTypeId:$('edit-type').value,reporterUid:$('edit-reporter').value,status:$('edit-ticket-status').value,priority:$('edit-priority').value,progress:Number($('edit-progress').value),assessment:$('edit-assessment').value,richDocument:editEditor.getDocument(),occurrences:[...$('edit-occurrences').children].map(row=>({kind:row.dataset.kind,...Object.fromEntries([...row.querySelectorAll('input')].map(i=>[i.name,i.dataset.original&&i.value===i.dataset.initial?i.dataset.original:new Date(i.value).toISOString()]))}))};
+ data.description=documentText(data.richDocument);const invalid=validateIssue(data);if(invalid)throw Object.assign(new Error(invalid),{code:'invalid-argument'});
+ const files=editRetained.map(f=>({path:f.path,slotIndex:f.slotIndex,name:editNames.get(f)||f.name}));
+ if(!state.preview){for(const file of editImageFiles){let reserved=editDrafts.get(file);if(!reserved){reserved=(await callable('reserveTicketFiles',{id:issue.id,indices:[editSlots.get(file)]})).files[0];editDrafts.set(file,reserved);}if(!editUploaded.has(file)){await uploadAttachment(reserved.path,file,attachmentType(file));editUploaded.add(file);}files.push({path:reserved.path,slotIndex:reserved.slotIndex,name:editNames.get(file)||file.name});}data.files=files;await callable('saveTicketEdit',data);}
+ else{const live=state.issues.find(i=>i.id===issue.id);Object.assign(live,data);live.attachments=[...editRetained,...editImageFiles.map(f=>({name:editNames.get(f)||f.name,type:attachmentType(f),slotIndex:editSlots.get(f),size:f.size,previewUrl:previewFileUrl(f)}))];demoEvent(live,'edit','Administrator updated feedback and attachments (preview).');}
+ editEditor.reset();editImageFiles.length=0;editSlots.clear();editUploaded.clear();editDrafts.clear();$('edit-dialog').close();toast('Feedback updated.');
+ });
 };
 $("delete-issue").onclick = () => {
   if (
@@ -1674,6 +1649,7 @@ async function openImage(file) {
   try {
     const url = await imageUrl(file);
     if (generation !== sessionGeneration) return;
+    $('image-download').href=url.startsWith('/api/')?url+'?download=1':url;$('image-download').download=file.name;
     $("image-name").textContent = file.name;const display=$('image-full'),preview=url.startsWith('/api/')?url+'?preview=1':url;display.alt=file.name;display.dataset.original=url;
     display.onload=async()=>{display.onload=null;if(!url.startsWith('/api/'))return;
       try{const cached=await fetch(preview,{cache:'force-cache'});const ready=cached.headers.get('X-Media-Preview')==='ready';await cached.body?.cancel();if(!ready||generation!==sessionGeneration||display.dataset.original!==url)return;
@@ -1693,6 +1669,7 @@ $("image-full").ondblclick = () => $("image-stage").classList.toggle("natural-si
 $("image-viewer").addEventListener("click", event => { if (event.target === $("image-viewer")) $("image-viewer").close(); });
 window.addEventListener("beforeunload", clearImages);
 
+const editNames=new Map();
 const editImageFiles = [], editSlots = new Map(), editUploaded = new Set();
 function findImage(issue, slot) {
   return (issue.attachments || []).find(file => file.slotIndex === slot || file.path === `issues/${issue.id}/${issue.uploadSlots?.[slot]}`);
@@ -1723,13 +1700,8 @@ const feedbackEditor = createRichEditor($("description-input"), {
 });
 const editEditor = createRichEditor($("edit-description"), {
   files:()=>editImageFiles,
-  addImages:files=>{
-    const issue=state.issues.find(x=>x.id===state.selected);
-    const invalid=validateFiles([...(issue?.attachments||[]),...editImageFiles,...files]);if(invalid)throw new Error(invalid);
-    if(files.some(file=>!["image/jpeg","image/png","image/webp"].includes(attachmentType(file))))throw new Error("Use JPG, PNG or WEBP images.");
-    for(const file of files){const slot=Array.from({length:5},(_,i)=>i).find(i=>!findImage(issue,i)&&![...editSlots.values()].includes(i));if(slot===undefined)throw new Error("Attach no more than 5 files.");editSlots.set(file,slot);editImageFiles.push(file);}return files;
-  },
-  slotForFile:file=>editSlots.get(file), imageForSlot:slot=>{const issue=state.issues.find(x=>x.id===state.selected),file=findImage(issue,slot);return file?imageUrl(file):Promise.reject();},notice:toast,
+  addImages:files=>{if(files.some(file=>!attachmentType(file).startsWith('image/')))throw new Error('Use JPG, PNG or WEBP images.');return addEditFiles(files);},
+  slotForFile:file=>editSlots.get(file), imageForSlot:slot=>{const issue=editingTicket||state.issues.find(x=>x.id===state.selected),file=(editRetained||[]).find(f=>f.slotIndex===slot)||findImage(issue,slot);return file?imageUrl(file):Promise.reject();},notice:toast,
 });
 const workspace = initWorkspace({state,toast,run,addEvidence(files) {
   const invalid = validateFiles([...state.files,...files]);

@@ -642,6 +642,9 @@
       </button>
       <h2 id="edit-title">Edit feedback</h2>
       <form id="edit-form">
+        <div class="edit-fields-grid"><label>Requester<select id="edit-reporter"></select></label><label>Department<select id="edit-department"></select></label><label>Issue type<select id="edit-type"></select></label><label>Status<select id="edit-ticket-status"></select></label><label>Priority<select id="edit-priority"></select></label><label>Ticket progress<input type="number" id="edit-progress" min="0" max="100" required /></label></div>
+        <label>Assessment<textarea id="edit-assessment" maxlength="3000" rows="2"></textarea></label>
+        <fieldset><legend>Incident times</legend><div id="edit-occurrences"></div><button type="button" id="edit-add-moment" class="button">Add moment</button><button type="button" id="edit-add-range" class="button">Add time range</button></fieldset>
         <label for="edit-subject">Title</label
         ><input id="edit-subject" maxlength="160" required /><label
           for="edit-process"
@@ -656,12 +659,12 @@
           required
           rows="6"
         ></textarea
-        ><button type="submit" class="button primary full">Save feedback changes</button>
+        ><section class="edit-evidence"><h3>Attachments</h3><p class="helper">Add, rename, replace or remove attachments. Changes apply when you save. Removed originals remain in history and backups.</p><div id="edit-attachments"></div><label class="button">Add attachments<input id="edit-attachment-input" type="file" multiple accept=".jpg,.jpeg,.png,.webp,.mp4,.webm,.mov,.pdf,.txt,.csv,.xlsx" /></label></section><button type="submit" class="button primary full">Save feedback changes</button>
         <p id="edit-status" role="status"></p>
       </form>
     </dialog>
     <dialog id="image-viewer" class="image-viewer" aria-label="Image viewer">
-      <div class="image-toolbar"><strong id="image-name" data-user-content></strong><div><button id="image-fit" class="button small">Fit</button><button id="image-zoom" class="button small">100%</button><button id="image-close" class="button small" aria-label="Close image">✕</button></div></div>
+      <div class="image-toolbar"><strong id="image-name" data-user-content></strong><div><a id="image-download" class="button small" download>Download</a><button id="image-fit" class="button small">Fit</button><button id="image-zoom" class="button small">100%</button><button id="image-close" class="button small" aria-label="Close image">✕</button></div></div>
       <div id="image-stage" class="image-stage"><img id="image-full" alt="" /></div>
     </dialog>
     <div id="toast" class="toast" role="status" hidden></div>
