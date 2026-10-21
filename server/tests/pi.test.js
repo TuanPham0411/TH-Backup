@@ -410,14 +410,23 @@ test('appearance preferences are bounded, private per account, and persistent ac
  const other='th_mes='+(await pool.query('select mes_private.open_account_session($1) result',[uid])).rows[0].result.sessionToken;
  for(const name of ['getAppearancePreferences','saveAppearancePreferences'])assert.notEqual((await pref(name,{font:'arial',size:18})).status,200);
  assert.notEqual((await pref('read',{path:'appearancePreferences'},owner)).status,200);
- assert.deepEqual((await pref('getAppearancePreferences',{},other)).body,{font:'calibri',size:14});
+ assert.deepEqual((await pref('getAppearancePreferences',{},other)).body,{font:'calibri',size:14,custom:false});
  assert.equal((await pref('saveAppearancePreferences',{font:'georgia',size:18,uid:'mes-owner'},other)).status,200);
- assert.deepEqual((await pref('getAppearancePreferences',{},owner)).body,{font:'calibri',size:14});
+ assert.deepEqual((await pref('getAppearancePreferences',{},owner)).body,{font:'calibri',size:14,custom:false});
  const fresh='th_mes='+(await pool.query('select mes_private.open_account_session($1) result',[uid])).rows[0].result.sessionToken;
- assert.deepEqual((await pref('getAppearancePreferences',{},fresh)).body,{font:'georgia',size:18});
+ assert.deepEqual((await pref('getAppearancePreferences',{},fresh)).body,{font:'georgia',size:18,custom:true});
  for(const data of [{font:'url(evil)',size:14},{font:'arial',size:999},{font:'arial',size:'18'},{font:'arial'},{size:14}])assert.notEqual((await pref('saveAppearancePreferences',data,other)).status,200);
- assert.deepEqual((await pref('getAppearancePreferences',{},other)).body,{font:'georgia',size:18});
- assert.equal((await pref('saveAppearancePreferences',{font:'calibri',size:14},other)).status,200);
+ assert.deepEqual((await pref('getAppearancePreferences',{},other)).body,{font:'georgia',size:18,custom:true});
+ assert.deepEqual((await pref('getAppearanceDefaults',{})).body,{font:'calibri',size:14});
+ for(const cookie of ['',other])assert.notEqual((await pref('saveAppearanceDefaults',{font:'arial',size:16},cookie)).status,200);
+ assert.notEqual((await pref('saveAppearanceDefaults',{font:'evil',size:16},owner)).status,200);
+ assert.equal((await pref('saveAppearanceDefaults',{font:'arial',size:16},owner)).status,200);
+ assert.deepEqual((await pref('getAppearanceDefaults',{})).body,{font:'arial',size:16});
+ assert.deepEqual((await pref('getAppearancePreferences',{},owner)).body,{font:'arial',size:16,custom:false});
+ assert.deepEqual((await pref('getAppearancePreferences',{},other)).body,{font:'georgia',size:18,custom:true});
+ assert.deepEqual((await pref('resetAppearancePreferences',{uid:'mes-owner'},other)).body,{font:'arial',size:16,custom:false});
+ assert.equal((await pref('saveAppearanceDefaults',{font:'calibri',size:14},owner)).status,200);
+ assert.deepEqual((await pref('getAppearancePreferences',{},other)).body,{font:'calibri',size:14,custom:false});
 });
 test('content tabs publish bounded widgets and documents with owner/member/viewer permissions, revisions and retained history',async()=>{
  const previousBase=base,isolated=createApp(runtimePool,files).listen(0,'127.0.0.1');await new Promise(r=>isolated.once('listening',r));base=`http://127.0.0.1:${isolated.address().port}`;

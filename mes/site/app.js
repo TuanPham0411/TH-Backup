@@ -1713,7 +1713,7 @@ document.querySelector(".topbar .brand").onclick = event => { event.preventDefau
 initUpgrade();
 initDriveStorage();
 initContentTabs({state,navigate,toast});
-initAppearancePreferences(()=>({user:state.user,preview:state.preview}));
+initAppearancePreferences(()=>({user:state.user,preview:state.preview,isOwner:state.isOwner}));
 initDashboardPreferences(()=>({user:state.user,preview:state.preview}));
 initializeLanguage(() => { workspace.render(); feedbackEditor.setLanguage(); editEditor.setLanguage(); renderAll(); renderTimeline(); updateIdentity(); if (state.selected) { const issue = state.issues.find(i => i.id === state.selected); if (issue) renderDetail(issue); } });
 selectOptions($("issue-status"), [
