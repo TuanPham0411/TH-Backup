@@ -83,7 +83,7 @@ export function filterIssues(
       (status === "All" || i.status === status) &&
       (department === "All" || i.departmentId === department) &&
       (priority === "All" || i.priority === priority) &&
-      `${i.id} ${i.subject} ${i.description} ${i.process} ${i.reporterName} ${i.teamLeaderName} ${i.departmentName}`
+      `${i.id} ${i.ticketNumber||""} ${i.subject} ${i.description} ${i.process} ${i.reporterName} ${i.teamLeaderName} ${i.departmentName}`
         .toLowerCase()
         .includes(term),
   );

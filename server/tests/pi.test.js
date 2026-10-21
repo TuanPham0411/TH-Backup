@@ -23,11 +23,14 @@ before(async()=>{
  const historical={subject:'Lịch sử trước nâng cấp',description:'Nội dung và liên kết gốc',attachments:[{path:'issues/preserved/slot-original'}],status:'In progress',createdAt:1700000000000,progress:47};
  const event={kind:'handling',text:'Ghi chú cũ giữ nguyên',author:'Existing user',createdAt:1700000001000};
  await pool.query("insert into mes_private.records(collection,id,data) values('issues','preserved-upgrade-test',$1),('issues/preserved-upgrade-test/timeline','old-event',$2)",[historical,event]);
+ await pool.query("insert into mes_private.records(collection,id,data) values('issues','boundary-before',$1),('issues','boundary-after',$2)",[{createdAt:Date.parse('2025-12-31T16:59:59Z'),description:'Before VN new year'},{createdAt:Date.parse('2025-12-31T17:00:00Z'),description:'After VN new year'}]);
  const beforeUpgrade=(await pool.query("select collection,id,data from mes_private.records where id in ('preserved-upgrade-test','old-event') order by collection,id")).rows;
  const result=spawnSync(process.execPath,['server/migrate.js'],{env:{...process.env,DATABASE_URL:url},encoding:'utf8'});assert.equal(result.status,0,result.stderr);
  const twice=spawnSync(process.execPath,['server/migrate.js'],{env:{...process.env,DATABASE_URL:url},encoding:'utf8'});assert.equal(twice.status,0,twice.stderr);
  assert.deepEqual((await pool.query("select collection,id,data from mes_private.records where id in ('preserved-upgrade-test','old-event') order by collection,id")).rows,beforeUpgrade,'Upgrade must preserve existing ticket data and history exactly');
- await pool.query("delete from mes_private.records where id in ('preserved-upgrade-test','old-event')");
+ const boundary=(await pool.query("select issue_id,code from public.mes_ticket_codes where issue_id in ('boundary-before','boundary-after') order by issue_id")).rows;
+ assert.deepEqual(boundary,[{issue_id:'boundary-after',code:'TH2601-01'},{issue_id:'boundary-before',code:'TH2512-01'}],'Backfill uses Vietnam calendar months and resets across December/January');
+ await pool.query("delete from mes_private.records where id in ('preserved-upgrade-test','old-event','boundary-before','boundary-after')");
  files=await mkdtemp(join(tmpdir(),'th-api-'));runtimePool=new pg.Pool({connectionString:url,options:'-c role=th_api'});server=createApp(runtimePool,files).listen(0,'127.0.0.1');await new Promise(resolve=>server.once('listening',resolve));base=`http://127.0.0.1:${server.address().port}`;
 });
 after(async()=>{await new Promise(resolve=>server.close(resolve));await runtimePool.end();await pool.end();await rm(files,{recursive:true,force:true});});
@@ -344,4 +347,28 @@ test('Drive uploads finish asynchronously and private cloud video supports publi
   const response=await oldFetch(base+`/api/mes/attachments/${issue.body.id}/${slot}`,{headers:{'x-forwarded-host':'mes.th.io.vn',range:'bytes=0-3'}});assert.equal(response.status,206);assert.equal(await response.text(),'1234');assert.equal(response.headers.get('content-range'),'bytes 0-3/8');
   assert.equal((await pool.query('select drive_id from public.mes_cloud_files where path=$1',[path])).rows[0].drive_id,'test-cloud-video');
  }finally{await pool.query("update public.mes_storage_settings set provider='local' where id='main'");global.fetch=oldFetch;if(oldToken===undefined)delete process.env.DRIVE_TOKEN_FILE;else process.env.DRIVE_TOKEN_FILE=oldToken;}
+});
+test('monthly ticket numbers, direct public API and the 99-ticket limit preserve original IDs and history',async()=>{
+ const previousBase=base,isolated=createApp(runtimePool,files).listen(0,'127.0.0.1');await new Promise(r=>isolated.once('listening',r));base=`http://127.0.0.1:${isolated.address().port}`;
+ try {
+ const owner='th_mes='+(await pool.query("select mes_private.open_account_session('mes-owner') result")).rows[0].result.sessionToken;
+ const department=(await pool.query("select id from mes_private.records where collection='departments' limit 1")).rows[0].id;
+ const created=await Promise.all(Array.from({length:4},()=>api('createIssue',{reporterUid:'mes-owner',departmentId:department,process:'Numbered ticket',description:'Ticket number concurrency test'},owner)));
+ for(const value of created)assert.equal(value.status,200,JSON.stringify(value.body));
+ const codes=created.map(r=>r.body.ticketNumber);assert.equal(new Set(codes).size,4);for(const code of codes)assert.match(code,/^TH\d{4}-\d{2}$/);
+ const item=created[0].body;const response=await fetch(base+'/api/mes/tickets/'+item.ticketNumber,{headers:{'x-forwarded-host':'mes.th.io.vn'}});assert.equal(response.status,200);const publicIssue=await response.json();assert.equal(publicIssue.id,item.id);assert.equal(publicIssue.ticketNumber,item.ticketNumber);assert.equal(publicIssue.uploadSlots,undefined);
+ assert.equal((await fetch(base+'/api/mes/tickets/TH0000-99',{headers:{'x-forwarded-host':'mes.th.io.vn'}})).status,404);
+ const listing=await api('readBundle',{paths:[{path:'issues'}]});assert.ok(listing.body.snapshots.issues.rows.some(i=>i.id===item.id&&i.ticketNumber===item.ticketNumber));
+ const db=await pool.connect();try{
+  await db.query('begin');const month=(await db.query("select to_char(now() at time zone 'Asia/Ho_Chi_Minh','YYMM') period")).rows[0].period;
+  await db.query('update mes_private.ticket_months set allocated=98 where month_key=$1',[month]);
+  await db.query("insert into mes_private.records(collection,id,data) values('issues','month-limit-test','{}')");assert.equal((await db.query("select code from public.mes_ticket_codes where issue_id='month-limit-test'")).rows[0].code,'TH'+month+'-99');
+  await db.query('savepoint full_month');await assert.rejects(db.query("insert into mes_private.records(collection,id,data) values('issues','month-limit-overflow','{}')"),e=>e.code==='P0099');await db.query('rollback to savepoint full_month');
+  assert.equal((await db.query("select count(*)::int n from mes_private.records where collection='issues' and id='month-limit-overflow'")).rows[0].n,0);
+  await db.query('rollback');
+ }finally{db.release();}
+ const currentMonth=(await pool.query("select to_char(now() at time zone 'Asia/Ho_Chi_Minh','YYMM') period")).rows[0].period;
+ const allocated=(await pool.query('select allocated from mes_private.ticket_months where month_key=$1',[currentMonth])).rows[0].allocated;
+ try{await pool.query('update mes_private.ticket_months set allocated=99 where month_key=$1',[currentMonth]);const denied=await api('createIssue',{reporterUid:'mes-owner',departmentId:department,process:'Full month',description:'Must not create ticket 100'},owner);assert.equal(denied.status,409,JSON.stringify(denied.body));assert.equal(denied.body.code,'P0099');assert.match(denied.body.error,/99 tickets/);}finally{await pool.query('update mes_private.ticket_months set allocated=$2 where month_key=$1',[currentMonth,allocated]);}
+ }finally{base=previousBase;await new Promise(r=>isolated.close(r));}
 });

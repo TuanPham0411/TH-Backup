@@ -22,6 +22,13 @@ export function mesRouter(pool,filesRoot) {
   if(r.result?.errorCode)throw Object.assign(new Error('Account request denied'),{code:r.result.errorCode});
   return r.result;
  }
+ router.get('/tickets/:reference',async(req,res)=>{
+  const reference=req.params.reference;
+  if(!/^(?:TH[0-9]{4}-[0-9]{2}|[a-zA-Z0-9_-]{1,128})$/.test(reference))return res.sendStatus(400);
+  const mapped=(await pool.query('select issue_id from public.mes_ticket_codes where code=$1',[reference])).rows[0];
+  const id=mapped?.issue_id||reference;
+  try{res.json(await dispatch('readTicket',{id},actorFor(req.cookies.th_mes,req.headers['x-mes-tester'])));}catch(error){if(error.code==='P0001')return res.status(404).json({error:'Ticket unavailable'});throw error;}
+ });
  router.all('/files/:grant',async(req,res)=>{
   const action=req.method==='PUT'?'uploadUrl':req.method==='GET'?'downloadUrl':null;
   if(!action)return res.sendStatus(405);

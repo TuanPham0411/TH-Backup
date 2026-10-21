@@ -70,3 +70,15 @@ Setup (no secrets in GitHub or tickets):
 6. Use **Back up database and media to Drive** for an on-demand full backup. Use **Copy Drive media back locally** to return to a registered SD/USB folder, retaining Drive originals. Backups are not automatically scheduled.
 
 The refresh token is stored only in `/var/lib/th-app/drive-credentials.json` with mode `0600` (override with `DRIVE_TOKEN_FILE`). It is excluded from media backups. Do not manually delete/move files inside the managed Drive folders. Keep the same Google account while cloud files are in use; MES prevents switching accounts until cloud mappings have been removed. After an interrupted server process, an administrator can clear the interrupted Drive operation in the storage panel and retry. A backup is usable only after the operation reports completion; restore requires an operator to restore `database.dump`, restore media at their manifest paths, and reconnect the same Drive account if the restored database retains cloud mappings.
+
+
+## Ticket numbers and direct links
+
+Tickets have public references such as `TH2610-01` (`TH` + two-digit year + month + `-01`…`-99`). Allocation is atomic, resets by calendar month in `Asia/Ho_Chi_Minh`, and stops new ticket creation after 99 allocations in that month. Deleting a ticket never reuses its number. Old issue IDs, attachment paths, ticket JSON and timelines remain unchanged; a separate mapping assigns references to existing tickets chronologically within each original creation month. If a historical month already contains more than 99 records, overflow historical records retain their existing IDs and links; the upgrade never deletes or rewrites them.
+
+- Open a ticket: `https://mes.th.io.vn/ticket/TH2610-01`.
+- Read ticket JSON: `GET https://mes.th.io.vn/api/mes/tickets/TH2610-01`.
+- Both routes also accept the original internal issue ID, and preserve the same viewer/authentication rules as the dashboard. Deleted/unknown tickets return HTTP 404 from the API.
+- Use **Copy ticket link** in ticket details. Ticket numbers are shown in the list, detail heading and CSV export, and can be searched.
+
+Notice board and Workspace video use compact 400 px desktop panels. Multiple notices have Previous/Next controls; only notice text scrolls. Images keep their proportions without a black frame. Feedback images can be inserted at the cursor with **+ Image**, pasted or dropped into the text editor. Existing attached images also display directly below their feedback text. Attachments use compact rows and the image viewer shows a preview immediately while loading the original. Access history has a bounded scroll area and cursor-based Previous/Next pages of 100 entries.

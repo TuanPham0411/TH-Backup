@@ -174,6 +174,7 @@ function ownerOnly() {
   return true;
 }
 function navigate(page) {
+  if(page!=='detail'&&/^\/ticket\//.test(location.pathname)&&!linkedTicketPending)history.pushState(null,'','/');
   if (page === "settings" && !state.isOwner) {
     toast("Owner access is required.");
     return;
@@ -451,7 +452,7 @@ function renderIssues() {
     const title = el("td");
     const link = userEl("button", i.subject, "issue-title-button");
     link.onclick = () => openIssue(i.id);
-    title.append(link, el("small", i.id.slice(0, 12).toUpperCase()));
+    title.append(link, el("small", (i.ticketNumber||i.id.slice(0, 12).toUpperCase())));
     const department = el("td");
     department.append(userEl("strong", i.departmentName), userEl("small", i.process));
     const reporter = userEl("td", i.reporterName),
@@ -512,10 +513,18 @@ function renderAll() {
     else if (state.page === "detail") navigate("issues");
   }
 }
-function openIssue(id) {
+let linkedTicketPending=/^\/ticket\/([^/]+)\/?$/.exec(location.pathname)?.[1],linkedTicketLoading=false;
+async function openLinkedTicket(){
+ if(!linkedTicketPending||linkedTicketLoading||!state.ready)return;
+ const reference=linkedTicketPending;linkedTicketLoading=true;
+ try{const response=await fetch('/api/mes/tickets/'+encodeURIComponent(decodeURIComponent(reference)));if(!response.ok)throw new Error('Ticket unavailable');const issue=await response.json();if(linkedTicketPending!==reference)return;if(!state.issues.some(i=>i.id===issue.id))state.issues.push(issue);linkedTicketPending=null;openIssue(issue.id,false);}catch{linkedTicketPending=null;toast('Ticket unavailable.');}finally{linkedTicketLoading=false;}
+}
+window.addEventListener('popstate',()=>{linkedTicketPending=/^\/ticket\/([^/]+)\/?$/.exec(location.pathname)?.[1];if(linkedTicketPending)openLinkedTicket();else navigate('dashboard');});
+function openIssue(id,updateUrl=true) {
   state.selected = id;
   const issue = state.issues.find((i) => i.id === id);
   if (!issue) return;
+  if(updateUrl&&!state.preview)history.pushState(null,'','/ticket/'+encodeURIComponent(issue.ticketNumber||id));
   navigate("detail");
   renderDetail(issue);
   if (timelineUnsubscribe) timelineUnsubscribe();
@@ -535,7 +544,7 @@ function openIssue(id) {
 function renderDetail(issue) {
   const heading = el("div");
   heading.append(
-    el("p", issue.id.toUpperCase(), "eyebrow"),
+    el("p", issue.ticketNumber||issue.id.toUpperCase(), "eyebrow"),
     userEl("h1", issue.subject),
     el(
       "p",
@@ -543,7 +552,8 @@ function renderDetail(issue) {
       "subtitle",
     ),
   );
-  $("detail-heading").replaceChildren(heading, badge(issue.status));
+  const share=el('button','Copy ticket link','button');share.type='button';share.onclick=async()=>{try{await navigator.clipboard.writeText(new URL('/ticket/'+encodeURIComponent(issue.ticketNumber||issue.id),location.origin).href);toast('Ticket link copied.');}catch{toast('Copy the ticket URL from the address bar.');}};
+  $("detail-heading").replaceChildren(heading, badge(issue.status),share);
   document.dispatchEvent(new CustomEvent("mes:ticket",{detail:{issue,user:state.user,isOwner:state.isOwner,preview:state.preview}}));
   const data = el("div", undefined, "detail-data");
   for (const [label, value] of [
@@ -561,21 +571,12 @@ function renderDetail(issue) {
   const gallery = el("div", undefined, "attachment-gallery");
   for (const f of issue.attachments || []) {
     const card = el("article", undefined, "attachment-card");
-    if (["image/jpeg", "image/png", "image/webp"].includes(f.type)) {
-      const button = el("button", undefined, "image-thumbnail");
-      button.type = "button";
-      button.setAttribute("aria-label", `${t("View image")}: ${f.name}`);
-      const image = document.createElement("img");
-      image.alt = f.name; image.loading = "lazy";
-      const hint = el("span", "Loading image…", "image-hint");
-      button.append(image, hint);
-      imageUrl(f).then(url => { if (button.isConnected) { image.src = url.startsWith('/api/')?url+'?preview=1':url; image.decoding="async"; hint.textContent = t("Click to enlarge"); } }).catch(() => { hint.textContent = t("Image unavailable. Click to retry."); });
-      button.onclick = () => openImage(f);
-      card.append(button);
+    if(f.type?.startsWith('image/')){
+      const image=document.createElement('img');image.alt='';image.loading='lazy';image.decoding='async';imageUrl(f).then(url=>{image.src=url.startsWith('/api/')?url+'?preview=1':url;}).catch(()=>{});card.append(image);
     }
-    const row = el("div", undefined, "file-row"), button = el("button", state.preview ? "Preview file" : "Download", "text-button");
+    const row = el("div", undefined, "file-row"), button = el("button", state.preview ? "Preview file" : "View", "text-button");
     if (f.type?.startsWith("video/")) { button.textContent = `↗ ${t("Download video")}`; button.classList.add("video-evidence-link"); }
-    button.onclick = () => downloadAttachment(f);
+    button.onclick = () => f.type?.startsWith('image/')?openImage(f):downloadAttachment(f);
     row.append(userEl("span", `${f.name} · ${(f.size / 1024).toFixed(0)} KB`), button);
     card.append(row); gallery.append(card);
   }
@@ -664,13 +665,7 @@ async function downloadAttachment(file) {
   }
   try {
     if(file.type?.startsWith('video/')){const link=el('a');link.href=`/api/mes/attachments/${file.path.split('/').slice(1).map(encodeURIComponent).join('/')}`;link.target='_blank';link.rel='noopener';link.click();return;}
-    const blob = await fetchAttachment(file.path);
-    const url = URL.createObjectURL(blob),
-      a = el("a");
-    a.href = url;
-    a.download = file.name.replace(/[\\/]/g, "_");
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 60000);
+    const a=el('a');a.href=await imageUrl(file);a.target='_blank';a.rel='noopener';a.click();
   } catch (e) {
     toast(errorMessage(e));
   }
@@ -915,7 +910,7 @@ function subscribeLive() {
   workspace.start();
   const add = (path, field, order) => unsubscribers.push(watchRecords(path, (rows) => {
     state[field] = rows;
-    if (["issues", "myIssues"].includes(field)) { state.ready = true; renderAll(); updateIdentity(); }
+    if (["issues", "myIssues"].includes(field)) { state.ready = true; renderAll(); updateIdentity();openLinkedTicket(); }
     else renderDirectories();
   }, onDataError, order));
   if(state.user) add("teamLeaders", "leaders");
@@ -1513,7 +1508,7 @@ $("export-issues").onclick = () => {
       "Incident times",
     ].map(t),
     ...filtered().map((i) => [
-      i.id,
+      i.ticketNumber||i.id,
       i.subject,
       i.departmentName,
       i.process,
@@ -1679,7 +1674,12 @@ async function openImage(file) {
   try {
     const url = await imageUrl(file);
     if (generation !== sessionGeneration) return;
-    $("image-name").textContent = file.name; $("image-full").src = url; $("image-full").alt = file.name;
+    $("image-name").textContent = file.name;const display=$('image-full'),preview=url.startsWith('/api/')?url+'?preview=1':url;display.alt=file.name;display.dataset.original=url;
+    display.onload=async()=>{display.onload=null;if(!url.startsWith('/api/'))return;
+      try{const cached=await fetch(preview,{cache:'force-cache'});const ready=cached.headers.get('X-Media-Preview')==='ready';await cached.body?.cancel();if(!ready||generation!==sessionGeneration||display.dataset.original!==url)return;
+        const full=new Image();full.decoding='async';full.onload=()=>{if(generation===sessionGeneration&&display.dataset.original===url)display.src=url;};full.src=url;
+      }catch{}
+    };display.src=preview;
     $("image-stage").classList.remove("natural-size");
     if (!$("image-viewer").open) $("image-viewer").showModal();
   } catch (error) { toast("Unable to load image. Try again."); }
@@ -1698,13 +1698,18 @@ function findImage(issue, slot) {
   return (issue.attachments || []).find(file => file.slotIndex === slot || file.path === `issues/${issue.id}/${issue.uploadSlots?.[slot]}`);
 }
 function reportBody(issue) {
-  if (!issue.richDocument) return userEl("p", issue.description, "feedback-body");
-  try { return renderDocument(issue.richDocument, slot => inlineImage(issue, slot)); }
-  catch { return userEl("p", issue.description, "feedback-body"); }
+  let body;const used=new Set();
+  if(issue.richDocument){try{body=renderDocument(issue.richDocument,slot=>{used.add(findImage(issue,slot));return inlineImage(issue,slot);});}catch{}}
+  if(!body){body=el('div',undefined,'rich-report');body.append(userEl('p',issue.description,'feedback-body'));}
+  for(const f of issue.attachments||[])if(f.type?.startsWith('image/')&&!used.has(f))body.append(inlineImageFile(f));
+  return body;
 }
 function inlineImage(issue, slot) {
   const file = findImage(issue,slot);
   if (!file || !["image/jpeg","image/png","image/webp"].includes(file.type)) return el("span", t("Inline image is not available yet."), "inline-image-missing");
+  return inlineImageFile(file);
+}
+function inlineImageFile(file){
   const button=el("button",undefined,"inline-report-image");button.type="button";
   button.setAttribute("aria-label",`${t("View image")}: ${file.name}`);
   const image=document.createElement("img");image.alt=file.name;image.loading="lazy";button.append(image);

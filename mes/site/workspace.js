@@ -245,12 +245,12 @@ export function initWorkspace({ state, toast, run, addEvidence }) {
     $("announcement-files").value = "";
     renderNoticeEditor();
   };
-  let noticeSignature = "";
+  let noticeSignature = "",noticeIndex=0;
   function renderNotices() {
     const signature = JSON.stringify([
       snapshot.announcements,
       getLanguage(),
-      !!state.user,
+      !!state.user,noticeIndex,
     ]);
     if (signature === noticeSignature) return;
     noticeSignature = signature;
@@ -262,7 +262,8 @@ export function initWorkspace({ state, toast, run, addEvidence }) {
         (a, b) =>
           Number(b.pinned) - Number(a.pinned) || b.updatedAt - a.updatedAt,
       );
-    for (const item of rows) {
+    noticeIndex=Math.min(noticeIndex,Math.max(0,rows.length-1));
+    for (const item of rows.slice(noticeIndex,noticeIndex+1)) {
       const article = node("article", undefined, "notice-item");
       article.append(
         node(
@@ -270,9 +271,10 @@ export function initWorkspace({ state, toast, run, addEvidence }) {
           `${item.pinned ? "★ " + t("Pinned") + " · " : ""}${date(item.updatedAt)}`,
         ),
         content("h3", item.title),
-        content("p", item.body),
+        content("p", item.body,"notice-text"),
         content("span", item.author, "notice-author"),
       );
+      article.querySelector('.notice-text').tabIndex=0;
       if (item.media?.length) {
         const gallery = node("div", undefined, "notice-media-gallery");
         for (const media of item.media) {
@@ -302,6 +304,10 @@ export function initWorkspace({ state, toast, run, addEvidence }) {
       }
       box.append(article);
     }
+    let navigation=document.getElementById('notice-navigation');
+    if(!navigation){navigation=node('div',undefined,'video-navigation');navigation.id='notice-navigation';box.after(navigation);}
+    navigation.replaceChildren();navigation.hidden=rows.length<2;
+    for(const [label,delta]of [['← Previous',-1],['Next →',1]]){const b=node('button',label,'button');b.type='button';b.disabled=noticeIndex+delta<0||noticeIndex+delta>=rows.length;b.onclick=()=>{noticeIndex+=delta;renderNotices();};navigation.append(b);if(delta===-1)navigation.append(node('small',`${noticeIndex+1} / ${rows.length}`));}
     if (!rows.length)
       box.append(
         node(

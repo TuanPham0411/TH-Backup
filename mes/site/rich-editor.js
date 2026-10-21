@@ -55,7 +55,7 @@ export function createRichEditor(textarea, { files, addImages, slotForFile, imag
       const allowed=await addImages([...chosen]);
       if(generation!==serial)return;
       focus();let index=q.getSelection()?.index ?? q.getLength()-1;
-      for(const file of allowed){const url=URL.createObjectURL(file);ownUrls.add(url);images.set(url,{file});q.insertEmbed(index,'image',url,'user');q.insertText(index+1,'\n','user');index+=2;}
+      for(const file of allowed){const url=URL.createObjectURL(file);ownUrls.add(url);images.set(url,{file});q.insertEmbed(index,'image',url,'user');index+=1;}
       q.setSelection(index,0,'silent');range={index,length:0};sync();
     }catch(e){notice(e.message);}
   }
