@@ -1,3 +1,4 @@
+import {initContentTabs} from './content-tabs.js';
 import {initDriveStorage} from './drive-storage.js';
 import {initDashboardPreferences,loadDashboardPreferences,applyDashboardPreferences} from './dashboard-preferences.js';
 import { initWorkspace, progressView, ticketProgress } from "./workspace.js";
@@ -12,7 +13,7 @@ import "@fontsource/carlito/latin-ext-400.css";
 import "@fontsource/carlito/latin-ext-700.css";
 import {initUpgrade,renderDetailedAnalytics} from './upgrade.js';
 import './upgrade.css';
-import { initializeBackend, setTesterMode, api, watchAuth, ownerLogin, managedLogin, logout, watchRecords, uploadAttachment, downloadAttachment as fetchAttachment } from "./backend.js";
+import { initializeBackend, refreshRecords, setTesterMode, api, watchAuth, ownerLogin, managedLogin, logout, watchRecords, uploadAttachment, downloadAttachment as fetchAttachment } from "./backend.js";
 import { configured, previewMode } from "./config.js";
 import {
   statuses,
@@ -174,13 +175,14 @@ function ownerOnly() {
   return true;
 }
 function navigate(page) {
+  if(!page.startsWith('content:')&&/^\/page\//.test(location.pathname))history.pushState(null,'','/');
   if(page!=='detail'&&/^\/ticket\//.test(location.pathname)&&!linkedTicketPending)history.pushState(null,'','/');
   if (page === "settings" && !state.isOwner) {
     toast("Owner access is required.");
     return;
   }
   if (["create", "profile", "my-dashboard", "my-issues"].includes(page) && !requireMember()) return;
-  const section = page === "my-dashboard" ? "dashboard" : page === "my-issues" ? "issues" : page;
+  const section = page.startsWith("content:") ? "content" : page === "my-dashboard" ? "dashboard" : page === "my-issues" ? "issues" : page;
   state.page = page;
   document
     .querySelectorAll("main>.page")
@@ -202,7 +204,7 @@ function navigate(page) {
   $("dashboard-title").textContent = page === "my-dashboard" ? "My dashboard" : "Dashboard";
   $("issues-title").textContent = page === "my-issues" ? "My tickets" : "Issue list";
   if (page === "profile") populateProfile();
-  $("data-scope").textContent = page === "my-dashboard" ? "Your feedback · updates every 15 seconds." : state.preview ? "Preview only · sample data, no production connection." : "All workspace feedback · updates every 15 seconds.";
+  $("data-scope").textContent = page === "my-dashboard" ? "Your feedback · refresh manually." : state.preview ? "Preview only · sample data, no production connection." : "All workspace feedback · refresh manually.";
   renderAll();
   if (page === "create") renderForm();
   workspace.navigate(page);
@@ -519,7 +521,7 @@ async function openLinkedTicket(){
  const reference=linkedTicketPending;linkedTicketLoading=true;
  try{const response=await fetch('/api/mes/tickets/'+encodeURIComponent(decodeURIComponent(reference)));if(!response.ok)throw new Error('Ticket unavailable');const issue=await response.json();if(linkedTicketPending!==reference)return;if(!state.issues.some(i=>i.id===issue.id))state.issues.push(issue);linkedTicketPending=null;openIssue(issue.id,false);}catch{linkedTicketPending=null;toast('Ticket unavailable.');}finally{linkedTicketLoading=false;}
 }
-window.addEventListener('popstate',()=>{linkedTicketPending=/^\/ticket\/([^/]+)\/?$/.exec(location.pathname)?.[1];if(linkedTicketPending)openLinkedTicket();else navigate('dashboard');});
+window.addEventListener('popstate',()=>{if(/^\/page\//.test(location.pathname))return;linkedTicketPending=/^\/ticket\/([^/]+)\/?$/.exec(location.pathname)?.[1];if(linkedTicketPending)openLinkedTicket();else navigate('dashboard');});
 function openIssue(id,updateUrl=true) {
   state.selected = id;
   const issue = state.issues.find((i) => i.id === id);
@@ -885,10 +887,11 @@ function updateIdentity() {
   $("connection-state").textContent = state.preview
     ? "Sample data · preview"
     : state.ready
-      ? "Live workspace"
+      ? "Workspace loaded"
       : "Connecting…";
   if (!state.isOwner && state.page === "settings") navigate("dashboard");
   renderForm();
+  document.dispatchEvent(new CustomEvent('mes:identity'));
 }
 function stopLive() {
   workspace.stop();
@@ -923,7 +926,7 @@ function subscribeLive() {
     state.requiresWindows = false;
     renderForm();
   }, onDataError));
-  $("data-scope").textContent = "All workspace feedback · updates every 15 seconds.";
+  $("data-scope").textContent = "All workspace feedback · refresh manually.";
 }
 function demoEvent(issue, kind, text, extra = {}) {
   issue.timeline ??= [];
@@ -1511,13 +1514,9 @@ $("refresh-button").onclick = async () => {
     toast("Preview data refreshed.");
     return;
   }
-  if (state.user) {
-    subscribeLive();
-    toast("Refreshing workspace…");
-  } else {
-    await loadDirectory();
-    openAccount();
-  }
+  await Promise.all([refreshRecords(),workspace.refresh()]);
+  document.dispatchEvent(new CustomEvent('mes:refresh'));
+  toast('Workspace refreshed.');
 };
 async function loadDirectory() {
   try {
@@ -1711,6 +1710,7 @@ const workspace = initWorkspace({state,toast,run,addEvidence(files) {
 document.querySelector(".topbar .brand").onclick = event => { event.preventDefault(); navigate("dashboard"); };
 initUpgrade();
 initDriveStorage();
+initContentTabs({state,navigate,toast});
 initDashboardPreferences(()=>({user:state.user,preview:state.preview}));
 initializeLanguage(() => { workspace.render(); feedbackEditor.setLanguage(); editEditor.setLanguage(); renderAll(); renderTimeline(); updateIdentity(); if (state.selected) { const issue = state.issues.find(i => i.id === state.selected); if (issue) renderDetail(issue); } });
 selectOptions($("issue-status"), [

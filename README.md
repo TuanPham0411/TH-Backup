@@ -90,3 +90,9 @@ Workspace video uses a responsive 16:9 frame. Notice board places scrollable tex
 A save validates all attachments and fields, then commits ticket metadata and timeline records atomically. A ticket changed by someone else while the dialog was open produces a conflict instead of overwriting their changes. Canceling the dialog does not modify the published ticket. Removed/replaced originals remain stored for historical audit and backups; the normal ticket links no longer expose them. This operation does not change the internal ticket ID, public ticket number, creation time or prior timeline rows.
 
 Each attachment has separate **View** and **Download** controls. Download streams the original using `?download=1` with its filename, including media stored in Drive. Public ticket numbers are shown as distinct badges beside titles in lists, recent feedback and ticket details.
+
+### MES dashboard and content tabs
+
+The default theme is night mode; an explicitly saved day/night choice is retained. Dashboard data has no periodic polling. Use **Refresh** to fetch current records, announcements, videos and tab content. Initial navigation and successful edits load the relevant data. Uploads and active storage/Drive jobs still report progress until complete.
+
+Administrators can select **Create tab** in navigation (also available in Settings), then **Add widget** to add headings, text, links, documents, images, videos, callouts or dividers. **Tab settings** controls title, order, publication and audience. New tabs are unpublished and restricted to members by default. Only explicitly published public tabs are visible to anonymous viewers. Documents have View/Download controls, and uploaded files use the active storage backend. Deleting a tab archives it and retains its files and revision history.

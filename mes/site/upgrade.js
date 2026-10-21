@@ -51,6 +51,7 @@ export function initUpgrade(){
   $('backup-list').replaceChildren();for(const backup of data.backups){const row=make('p');row.dataset.userContent='';row.textContent=`${date(backup.createdAt)} · ${backup.files} ${t('files')} · ${size(backup.bytes)} · ${backup.folder}`;$('backup-list').append(row);}
   if(!data.disks.length)$('storage-message').textContent=t('No mounted USB found. Ask the Pi administrator to mount the existing partition under /mnt or /media.');
   if(data.job){$('storage-message').textContent=data.job.state==='running'?t('Storage operation in progress. Keep the USB connected.'):data.job.state==='complete'?t('Storage operation complete.')+(data.job.result.folder?' '+data.job.result.folder:''):data.job.error;}
+  clearTimeout(timer);if(data.job?.state==='running')timer=setTimeout(()=>{if(context.page==='settings')loadStorage();},4000);
   const latest=data.operations?.[0];if(latest)$('storage-operation-status').textContent=[t(latest.kind==='database'?'Database move':'Media transfer'),t(latest.state),latest.phase,latest.copied!==undefined?`${latest.copied} / ${latest.count}`:'',latest.error||''].filter(Boolean).join(' · ');
  }catch(e){show('storage-message',e);}finally{storageBusy=false;}}
  let accessPages=[null],accessPage=0,accessUser='';
@@ -102,7 +103,8 @@ export function initUpgrade(){
  for(const [button,mode,select]of [['storage-save','primary','storage-primary'],['overflow-save','overflow','storage-overflow']])$(button).onclick=async()=>{try{await request('admin/storage','POST',{mode,id:$(select).value||null});$('storage-message').textContent=t('Storage selection saved. Existing files remain available.');await loadStorage();}catch(e){show('storage-message',e);}};
  $('backup-start').onclick=async()=>{if(!confirm(t('Start a complete backup to the selected USB? Writes pause until it finishes.')))return;try{await request('admin/backup','POST',{id:$('backup-drive').value});await loadStorage();}catch(e){show('storage-message',e);}};
  $('access-refresh').onclick=()=>logs();$('access-older').onclick=()=>{accessPage++;logs(true);};$('access-newer').onclick=()=>{if(accessPage>0){accessPage--;logs(true);}};
- document.addEventListener('mes:navigate',event=>{context=event.detail;clearInterval(timer);if(context.page==='settings'&&context.isOwner&&!context.preview){loadStorage();logs();timer=setInterval(loadStorage,5000);}});
+ document.addEventListener('mes:navigate',event=>{context=event.detail;clearInterval(timer);if(context.page==='settings'&&context.isOwner&&!context.preview){loadStorage();logs();}});
+ document.addEventListener('mes:refresh',()=>{if(context.page==='settings'&&context.isOwner){loadStorage();logs();}});
  const translated=new Map();let currentId;
  document.addEventListener('mes:ticket',event=>{
   const {issue,user,isOwner,preview}=event.detail;currentId=issue.id;

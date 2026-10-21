@@ -42,6 +42,7 @@ export function createRichEditor(textarea, { files, addImages, slotForFile, imag
   button('Align left','⇤',()=>q.format('align',false)); button('Align center','↔',()=>q.format('align','center'));button('Align right','⇥',()=>q.format('align','right'));
   const color=document.createElement('input');color.type='color';color.value='#263a56';color.title='Text color';color.setAttribute('aria-label','Text color');color.oninput=()=>{focus();q.format('color',color.value);};toolbar.append(color);
   const highlight=document.createElement('input');highlight.type='color';highlight.value='#fff1a8';highlight.title='Highlight color';highlight.setAttribute('aria-label','Highlight color');highlight.oninput=()=>{focus();q.format('background',highlight.value);};toolbar.append(highlight);
+  button('No highlight','◩',()=>q.format('background',false));
   button('Align justify','☰',()=>q.format('align','justify'));
   button('Indent','→',()=>q.format('indent','+1'));button('Outdent','←',()=>q.format('indent','-1'));
   button('Quote','❝',()=>q.format('blockquote',!q.getFormat().blockquote));

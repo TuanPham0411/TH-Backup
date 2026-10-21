@@ -4,8 +4,8 @@ import {uploadChunks} from "./uploads.js";
 let listener;
 let tester = sessionStorage.getItem('th-mes-tester') === 'true';
 const watchers = new Set();
-let timer, loading = false;
-async function refresh() {
+let loading = false;
+export async function refreshRecords() {
   if (loading || !watchers.size || document.hidden) return;
   loading = true;
   const active = [...watchers];
@@ -15,7 +15,6 @@ async function refresh() {
   } catch (error) { for (const w of active) if (watchers.has(w)) w.onError(error); }
   finally { loading = false; }
 }
-document.addEventListener("visibilitychange", () => { if (!document.hidden) refresh(); });
 export function initializeBackend() {}
 export async function api(name, data = {}) {
   const response = await fetch('/api/mes', {
@@ -27,7 +26,7 @@ export async function api(name, data = {}) {
   const body = await response.json();
   if (!response.ok) throw Object.assign(new Error(body.error || 'Request failed'), { code: body.code || 'unavailable' });
   if (!['read','readBundle','getDirectory','getSession','listDevices','downloadUrl','uploadUrl'].includes(name))
-    setTimeout(refresh, 0);
+    setTimeout(refreshRecords, 0);
   return body;
 }
 export function watchAuth(callback) { listener = callback; setTimeout(async () => { try { await api('getSession'); await callback({ id: 'local' }); } catch { await callback(null); } }, 0); }
@@ -44,11 +43,9 @@ export async function logout() {
 export function watchRecords(path, onData, onError, order) {
   const watcher = { path, onData, onError, order };
   watchers.add(watcher);
-  if (!timer) timer = setInterval(refresh, 15000);
-  setTimeout(refresh, 0);
+  setTimeout(refreshRecords, 0);
   return () => {
     watchers.delete(watcher);
-    if (!watchers.size) { clearInterval(timer); timer = undefined; }
   };
 }
 export async function uploadAttachment(path, file, type) {

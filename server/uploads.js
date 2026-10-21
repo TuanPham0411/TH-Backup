@@ -1,3 +1,4 @@
+import {PAGE_FILE_TYPES} from './page-types.js';
 import {prepareCloudOriginal,commitCloudRecord,mediaProvider} from './cloud-media.js';
 import {driveApi} from './drive-client.js';
 import {publishFile} from './publish.js';
@@ -64,7 +65,7 @@ export function uploadRouter(pool, root, gate) {
       !["ticket", "media"].includes(kind) ||
       typeof path !== "string" ||
       (kind === "ticket" ? !validPath(path) : !/^[a-f0-9-]{36}$/.test(path)) ||
-      !types.has(type) ||
+      (!types.has(type)&&!(kind==='media'&&PAGE_FILE_TYPES.has(type))) ||
       !Number.isSafeInteger(size) ||
       size < 1 ||
       size > (type.startsWith("video/") ? VIDEO_LIMIT : 10485760)

@@ -137,9 +137,7 @@ export function initWorkspace({ state, toast, run, addEvidence }) {
   function start() {
     stop();
     refresh();
-    timer = setInterval(() => {
-      if (!document.hidden) refresh();
-    }, 30000);
+
   }
   function stop() {
     clearInterval(timer);
@@ -734,7 +732,7 @@ export function initWorkspace({ state, toast, run, addEvidence }) {
       if (recorder?.state === "recording") recorder.stop();
       stopStream();
       $("workspace-video").pause();
-    } else if (state.user) refresh();
+    }
   });
   const originalReset = reset;
   reset = () => {

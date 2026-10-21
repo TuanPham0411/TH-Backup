@@ -403,3 +403,29 @@ test('admin fully edits old tickets and replaces/removes files atomically; downl
  const removal={...edit,baseUpdatedAt:current.updatedAt,richDocument:{version:1,ops:[{insert:'Keep one image '},{insert:{image:0}},{insert:'\n'}]},files:[{...edit.files[0],name:'renamed.png'}]};const removed=await api('saveTicketEdit',removal,owner);assert.equal(removed.status,200,JSON.stringify(removed.body));assert.equal((await api('readTicket',{id},owner)).body.attachments.length,1);assert.equal((await readFile(join(files,edit.files[1].path))).toString(),'newimage');
  }finally{base=previousBase;await new Promise(r=>isolated.close(r));}
 });
+test('content tabs publish bounded widgets and documents with owner/member/viewer permissions, revisions and retained history',async()=>{
+ const previousBase=base,isolated=createApp(runtimePool,files).listen(0,'127.0.0.1');await new Promise(r=>isolated.once('listening',r));base=`http://127.0.0.1:${isolated.address().port}`;
+ try{
+ const owner='th_mes='+(await pool.query("select mes_private.open_account_session('mes-owner') result")).rows[0].result.sessionToken,uid=(await pool.query("select id from mes_private.records where collection='users' and data->>'username'='comment.b'")).rows[0].id,user='th_mes='+(await pool.query('select mes_private.open_account_session($1) result',[uid])).rows[0].result.sessionToken;
+ const call=async(path,method='GET',data,cookie=owner)=>{const r=await fetch(base+'/api/mes/'+path,{method,headers:{'x-forwarded-host':'mes.th.io.vn',cookie,'Content-Type':'application/json'},...(data?{body:JSON.stringify(data)}:{})});let body;try{body=await r.json();}catch{}return {status:r.status,body,headers:r.headers};};
+ assert.equal((await call('pages','POST',{title:'Denied'},user)).status,403);assert.equal((await call('pages','POST',{title:'Denied'},'')).status,401);
+ const created=await call('pages','POST',{title:'Operations resources'});assert.equal(created.status,201,JSON.stringify(created.body));let p=created.body;assert.equal(p.active,false);assert.equal(p.visibility,'members');
+ assert.equal((await call('pages/'+p.id,'GET',null,'')).status,404);
+ const pdf=Buffer.from('%PDF-1.4\n% test document\n%%EOF');const reserved=await call('pages/media','POST',{name:'Training.pdf',type:'application/pdf',size:pdf.length});assert.equal(reserved.status,201);const id=reserved.body.id;
+ const upload=await fetch(base+'/api/mes/uploads',{method:'POST',headers:{'x-forwarded-host':'mes.th.io.vn',cookie:owner,'Content-Type':'application/json'},body:JSON.stringify({kind:'media',path:id,type:'application/pdf',size:pdf.length})});assert.equal(upload.status,200);const uploadId=(await upload.json()).id;assert.equal((await fetch(base+'/api/mes/uploads/'+uploadId,{method:'PATCH',headers:{'x-forwarded-host':'mes.th.io.vn',cookie:owner,'Content-Type':'application/octet-stream','Upload-Offset':'0'},body:pdf})).status,200);
+ assert.equal((await fetch(base+'/api/mes/media/'+id,{headers:{'x-forwarded-host':'mes.th.io.vn'}})).status,404,'Unpublished page documents stay private');
+ const make=(type,extra={})=>({id:crypto.randomUUID(),type,title:type,body:'Safe text',width:'half',tone:'default',links:[],media:[],...extra});const widgets=[make('heading'),make('links',{links:[{label:'Documentation',url:'https://example.com/manual'}]}),make('documents',{media:[id]})];
+ assert.equal((await call('pages/'+p.id,'PUT',{...p,active:true,widgets},user)).status,403);
+ assert.equal((await call('pages/'+p.id,'PUT',{...p,widgets:[make('links',{links:[{label:'Bad',url:'javascript:alert(1)'}]})]})).status,400);
+ assert.equal((await call('pages/'+p.id,'PUT',{...p,widgets:[make('image',{media:[id]})]})).status,400);
+ let saved=await call('pages/'+p.id,'PUT',{...p,active:true,widgets});assert.equal(saved.status,200,JSON.stringify(saved.body));p=saved.body;
+ assert.equal((await call('pages/'+p.id,'GET',null,user)).status,200);assert.equal((await call('pages/'+p.id,'GET',null,'')).status,404);assert.equal((await call('pages','GET',null,'')).body.pages.some(x=>x.id===p.id),false);
+ const memberDoc=await fetch(base+'/api/mes/media/'+id+'?inline=1',{headers:{'x-forwarded-host':'mes.th.io.vn',cookie:user}});assert.equal(memberDoc.status,200);assert.equal(memberDoc.headers.get('content-type'),'application/pdf');assert.equal(memberDoc.headers.get('content-disposition'),null);assert.deepEqual(Buffer.from(await memberDoc.arrayBuffer()),pdf);
+ assert.equal((await call('pages/'+p.id,'PUT',{...p,revision:1})).status,409);
+ saved=await call('pages/'+p.id,'PUT',{...p,visibility:'public'});assert.equal(saved.status,200);p=saved.body;assert.equal((await call('pages/'+p.id,'GET',null,'')).status,200);
+ const download=await fetch(base+'/api/mes/media/'+id+'?download=1',{headers:{'x-forwarded-host':'mes.th.io.vn'}});assert.equal(download.status,200);assert.match(download.headers.get('content-disposition'),/attachment;.*Training.pdf/);
+ assert.equal((await call('workspace','POST',{action:'videoDelete',data:{id}})).status,409,'Playlist operations cannot remove page documents');
+ assert.equal((await call('pages/'+p.id,'DELETE',{revision:p.revision},user)).status,403);assert.equal((await call('pages/'+p.id,'DELETE',{revision:p.revision})).status,200);assert.equal((await call('pages/'+p.id,'GET',null,'')).status,404);assert.equal((await fetch(base+'/api/mes/media/'+id,{headers:{'x-forwarded-host':'mes.th.io.vn'}})).status,404);
+ assert.deepEqual(await readFile(join(files,'media',id)),pdf);assert.equal((await pool.query('select count(*)::int n from public.mes_page_history where page_id=$1',[p.id])).rows[0].n,4);
+ }finally{base=previousBase;await new Promise(r=>isolated.close(r));}
+});

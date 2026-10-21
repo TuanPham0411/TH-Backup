@@ -4,6 +4,7 @@ import {rateLimit} from 'express-rate-limit';
 import pg from 'pg';
 import {sameOrigin} from './security.js';
 import {uploadRouter,cleanupUploads} from './uploads.js';
+import {pagesRouter} from './pages.js';
 import {workspaceRouter} from './workspace.js';
 import {mesRouter} from './mes.js';
 import {portfolioRouter} from './portfolio.js';
@@ -27,7 +28,7 @@ export function createApp(pool,filesRoot) {
  app.use('/api/portfolio',(req,res,next)=>req.hostname==='th.io.vn'?next():res.sendStatus(404));
  app.use('/api/mes',(req,res,next)=>req.hostname==='mes.th.io.vn'?next():res.sendStatus(404));
  app.use((req,res,next)=>['login','register','reset','consumeToken'].includes(req.body?.action)||['passwordLogin','activateAccount'].includes(req.body?.name)?authLimit(req,res,next):next());
- app.use('/api/mes',driveRouter(pool));
+ app.use('/api/mes',driveRouter(pool));app.use('/api/mes',pagesRouter(pool));
  app.use('/api/mes',previewRouter(pool,filesRoot));
  app.use('/api/mes/admin',adminRouter(pool,filesRoot,gate));app.use('/api/mes',translationRouter(pool));
  app.use('/api/portfolio',portfolioRouter(pool));app.use('/api/mes/uploads',uploadRouter(pool,filesRoot,gate));app.use('/api/mes',workspaceRouter(pool,filesRoot));app.use('/api/mes',mesRouter(pool,filesRoot));

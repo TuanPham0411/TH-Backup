@@ -57,6 +57,10 @@ export function workspaceRouter(pool, filesRoot) {
       );
       if (!rowCount) return res.sendStatus(404);
     }
+    if(media.purpose==='page'&&!current.isOwner){const allowed=await pool.query("select 1 from public.mes_pages p where not deleted and active and (visibility='public' or ($2::boolean and visibility='members')) and exists(select 1 from jsonb_array_elements(p.widgets) w where coalesce(w->'media','[]'::jsonb) ? $1)",[media.id,!current.isViewer]);if(!allowed.rowCount)return res.sendStatus(404);}
+    const documentFile=!media.type.startsWith('image/')&&!media.type.startsWith('video/');
+    if(req.query.download==='1'||(documentFile&&!(media.type==='application/pdf'&&req.query.inline==='1')))res.attachment(media.title);
+    if(documentFile)res.set('Content-Security-Policy',"frame-ancestors 'self'; base-uri 'none'; object-src 'none'");
     res.set({
       "Content-Type": media.type,
       "Cache-Control": "private, max-age=0, must-revalidate",
@@ -302,6 +306,7 @@ export function workspaceRouter(pool, filesRoot) {
       return res.json({ ok: true });
     }
     if (action === "videoDelete") {
+      if((await pool.query("select 1 from public.mes_media where id=$1 and purpose='page'",[data.id])).rowCount)throw fail(409,'Manage this file from its content tab.');
       const { rowCount } = await pool.query(
         "select 1 from public.mes_workspace where kind='announcements' and coalesce(data->'media','[]'::jsonb) ? $1",
         [data.id],
