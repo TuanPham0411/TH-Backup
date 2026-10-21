@@ -1,3 +1,5 @@
+import {prepareCloudOriginal,commitCloudRecord,mediaProvider} from './cloud-media.js';
+import {driveApi} from './drive-client.js';
 import {publishFile} from './publish.js';
 import {filePath,deleteEverywhere,storageQuota} from "./storage.js";
 import { Router } from "express";
@@ -24,7 +26,7 @@ const types = new Set([
 ]);
 const fail = (status, message) =>
   Object.assign(new Error(message), { status, expose: true });
-export function uploadRouter(pool, root) {
+export function uploadRouter(pool, root, gate) {
   const router = Router();
   const actor = (req) =>
     actorFor(req.cookies.th_mes, req.headers["x-mes-tester"]);
@@ -92,6 +94,7 @@ export function uploadRouter(pool, root) {
         if (new Date(previous.expires) < new Date())
           throw fail(410, "Upload expired. Please use a new file slot.");
         await db.query("commit");
+        cloudErrors.delete(previous.id);
         return res.json({
           id: previous.id,
           offset: Number(previous.offset_bytes),
@@ -132,6 +135,31 @@ export function uploadRouter(pool, root) {
     }
   });
   const active = new Set();
+  const cloudErrors = new Map();
+  async function finalizeCloud(record, req) {
+    if(active.has(record.id)) return;
+    active.add(record.id); cloudErrors.delete(record.id);
+    let cloud, db;
+    try {
+      const temporary=await filePath(root,`.uploads/${record.id}.part`);
+      cloud=await prepareCloudOriginal(pool,temporary,record.kind==='ticket'?record.path:'media/'+record.path,record.type,record.size);
+      if(!cloud)throw fail(409,'Storage changed. Retry the upload after selecting Drive.');
+      db=await pool.connect(); await db.query('begin');
+      const locked=(await db.query('select * from public.mes_uploads where id=$1 for update',[record.id])).rows[0];
+      if(!locked||locked.complete||Number(locked.offset_bytes)!==Number(record.size))throw fail(409,'Upload state changed');
+      await authorize(db,req,record); await commitCloudRecord(db,cloud);
+      if(record.kind==='ticket')await db.query('insert into public.files(path,type,size) values($1,$2,$3)',[record.path,record.type,record.size]);
+      else await db.query('update public.mes_media set ready=true where id=$1',[record.path]);
+      await db.query('update public.mes_uploads set complete=true where id=$1',[record.id]);
+      await db.query('commit'); cloud=null;
+      await rm(temporary,{force:true}).catch(()=>{});
+    }catch(error){
+      if(db)await db.query('rollback').catch(()=>{});
+      if(cloud)await driveApi(`files/${encodeURIComponent(cloud.drive_id)}`,{method:'DELETE'}).catch(()=>{});
+      if(cloudErrors.size>500)cloudErrors.clear();
+      cloudErrors.set(record.id,'Drive transfer failed. Your temporary file was kept. Retry the upload.');
+    }finally{db?.release();active.delete(record.id);}
+  }
   router.all("/:id", async (req, res) => {
     if (!["GET", "PATCH"].includes(req.method)) return res.sendStatus(405);
     if (!/^[a-f0-9-]{36}$/.test(req.params.id)) return res.sendStatus(404);
@@ -143,12 +171,16 @@ export function uploadRouter(pool, root) {
     );
     if (!initial) throw fail(410, "Upload expired or unavailable");
     await authorize(pool, req, initial);
-    if (req.method === "GET")
+    if (req.method === "GET") {
+      if(cloudErrors.has(initial.id))return res.status(502).json({error:cloudErrors.get(initial.id)});
+      if(!initial.complete&&Number(initial.offset_bytes)===Number(initial.size))void gate.background(()=>finalizeCloud(initial,req));
       return res.json({
         offset: Number(initial.offset_bytes),
         size: Number(initial.size),
         complete: initial.complete,
+        processing: active.has(initial.id),
       });
+    }
     if (active.has(initial.id))
       return res
         .status(409)
@@ -161,7 +193,7 @@ export function uploadRouter(pool, root) {
       originalOffset,
       linked,
       wrote = false,
-      db;
+      db,cloud;
     try {
       const {
         rows: [record],
@@ -207,6 +239,12 @@ export function uploadRouter(pool, root) {
       if (!received) throw fail(400, "Empty chunk");
       const next = current + received,
         complete = next === Number(record.size);
+      if(complete&&await mediaProvider(pool)==='drive'){
+        await pool.query("update public.mes_uploads set offset_bytes=$2,expires=now()+interval '2 hours' where id=$1",[record.id,next]);
+        wrote=false; active.delete(record.id);
+        void gate.background(()=>finalizeCloud({...record,offset_bytes:next},req));
+        return res.status(202).json({offset:next,complete:false,processing:true});
+      }
       // Never hold a database connection while the client streams a chunk.
       db = await pool.connect();
       await db.query("begin");
@@ -224,9 +262,8 @@ export function uploadRouter(pool, root) {
           record.kind === "ticket"
             ? join(temporary,"../..", record.path)
             : join(temporary,"../..", "media", record.path);
-        await mkdir(join(destination, ".."), { recursive: true });
-        await publishFile(temporary, destination);
-        linked = destination;
+        if(cloud)await commitCloudRecord(db,cloud);
+        else{await mkdir(join(destination, ".."), { recursive: true });await publishFile(temporary, destination);linked = destination;}
         if (record.kind === "ticket")
           await db.query(
             "insert into public.files(path,type,size) values($1,$2,$3)",
@@ -249,12 +286,13 @@ export function uploadRouter(pool, root) {
     } catch (error) {
       if (db) await db.query("rollback");
       if (linked) await rm(linked, { force: true });
+      if(cloud)await driveApi(`files/${encodeURIComponent(cloud.drive_id)}`,{method:"DELETE"}).catch(()=>{});
       if (wrote && temporary)
         await truncate(temporary, originalOffset).catch(() => {});
       throw error;
     } finally {
       db?.release();
-      active.delete(initial.id);
+      if(wrote || db || !temporary)active.delete(initial.id);
     }
   });
   return router;

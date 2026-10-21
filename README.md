@@ -38,3 +38,35 @@ Portfolio supports Google sign-in and email/password registration with email ver
 MES supports verified Google owner login or local `hpham` activation/password login, admin-issued single-use user activation links, profile updates and password changes. Sessions use Secure, HttpOnly, SameSite=Lax cookies, expire in 12 hours and are revoked by logout, credential changes or user deactivation. No passwords or session tokens are placed in browser storage.
 
 Attachments are private, up to 10 MB each and five per issue, with the existing allowed MIME types. Upload/download URLs expire in 60 seconds, work once and recheck the account and issue permission at use time. Uploads cannot overwrite an existing slot, and actual stored size/type are used when linking attachments. Files are always downloaded as attachments, never served as executable HTML.
+
+## Viewer access and saved dashboard layout
+
+Visitors can read the dashboard, published notices/videos, tickets and timelines without an account. The read-only SQL facade excludes account records, upload slots and private reporter IDs. Creating feedback, commenting, uploading, profile changes and administration still require a valid session. Ticket content and published media are visible to visitors; keep confidential material out of published tickets.
+
+**Customize dashboard** controls individual widgets. Signed-in users save their own selection in PostgreSQL; visitors save it in the current browser. This never changes ticket data.
+
+## Storage folders, USB transfers and PostgreSQL
+
+In **Administration → Storage**:
+
+1. Mount an existing USB partition if it appears under unmounted devices. MES never formats the USB.
+2. Select SD/USB, browse folders and enter a new/empty relative folder, then register it. The full path is displayed. Unrelated non-empty directories are rejected.
+3. Review a Copy/Move plan for existing media. Copy retains originals; Move deletes each original only after checksum verification. Ticket IDs, attachment URLs and history remain unchanged. An interrupted operation keeps remaining originals and can be retried.
+4. To move the running PostgreSQL cluster, select its device and a separate empty database folder, review the plan and start the operation. Writes pause, a logical dump is retained, the cluster stops, every database file is copied/verified and the cluster restarts. The original database directory remains as a rollback copy. Never unplug a drive hosting PostgreSQL while Pi is running.
+
+Linux filesystems hold PostgreSQL directly. On exFAT/NTFS, the broker creates a new private `pgdata.ext4` image inside the chosen folder and mounts it; it does **not** format the physical partition. Choose image capacity with room for future database growth. Boot checks the UUID, storage marker and PostgreSQL version before binding the database path; a missing drive prevents startup instead of creating an empty replacement database. Physical migration is an explicit administrator operation, never part of a routine deployment.
+
+## Google Drive active media and backups
+
+PostgreSQL runs on local SD/USB. Google Drive can store active image/video/file originals and complete backups containing a PostgreSQL custom-format dump, media with original relative paths, and a SHA-256 manifest. Backups stream to Drive without staging a full media archive on the SD card. A temporary database dump still needs local free space. Uploads use bounded 4 MiB buffers and verify Drive MD5 checksums. Final cloud transfer runs in the background, with browser polling to avoid proxy timeouts. Media files stay private in Drive and MES proxies permitted reads, including video byte ranges; existing MES links remain unchanged.
+
+Setup (no secrets in GitHub or tickets):
+
+1. Enable **Google Drive API** in the Google Cloud project used by MES Google login.
+2. In its Web OAuth client, add `https://mes.th.io.vn/api/mes/drive/callback` under authorized redirect URIs. Retain the existing login redirect URIs.
+3. The existing `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` are reused. Optionally set a separate `GOOGLE_DRIVE_CLIENT_ID`/`GOOGLE_DRIVE_CLIENT_SECRET` in `/etc/th-app/runtime.env` and restart `th-app` and `th-storage`. If the OAuth app is Testing, add the connecting Google account as a test user. Testing-mode refresh tokens can expire after seven days; reconnect when necessary or publish the OAuth app as appropriate.
+4. Sign in to MES as admin, open **Administration → Google Drive storage and backup → Connect Google Drive**, and approve offline access. MES creates private `TH MES/Media` and `TH MES/Backups` folders using the limited `drive.file` scope.
+5. Choose Drive for new uploads, or Copy/Move existing media to Drive. Copy keeps local originals. Move removes verified local originals after copying all media. Data migrations and backups pause writes for consistency; dashboard reads continue.
+6. Use **Back up database and media to Drive** for an on-demand full backup. Use **Copy Drive media back locally** to return to a registered SD/USB folder, retaining Drive originals. Backups are not automatically scheduled.
+
+The refresh token is stored only in `/var/lib/th-app/drive-credentials.json` with mode `0600` (override with `DRIVE_TOKEN_FILE`). It is excluded from media backups. Do not manually delete/move files inside the managed Drive folders. Keep the same Google account while cloud files are in use; MES prevents switching accounts until cloud mappings have been removed. After an interrupted server process, an administrator can clear the interrupted Drive operation in the storage panel and retry. A backup is usable only after the operation reports completion; restore requires an operator to restore `database.dump`, restore media at their manifest paths, and reconnect the same Drive account if the restored database retains cloud mappings.

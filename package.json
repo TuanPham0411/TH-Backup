@@ -23,7 +23,8 @@
     "express-rate-limit": "^8.7.1",
     "nodemailer": "^10.1.1",
     "pg": "^8.23.1",
-    "quill": "^2.0.3"
+    "quill": "^2.0.3",
+    "tar-stream": "^3.2.2"
   },
   "devDependencies": {
     "esbuild": "^0.28.2",

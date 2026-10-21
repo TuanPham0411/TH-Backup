@@ -7,6 +7,7 @@ import {uploadRouter,cleanupUploads} from './uploads.js';
 import {workspaceRouter} from './workspace.js';
 import {mesRouter} from './mes.js';
 import {portfolioRouter} from './portfolio.js';
+import {driveRouter} from './drive-routes.js';
 import {previewRouter} from './media.js';
 import {adminRouter} from './admin.js';
 import {translationRouter} from './translation.js';
@@ -26,9 +27,10 @@ export function createApp(pool,filesRoot) {
  app.use('/api/portfolio',(req,res,next)=>req.hostname==='th.io.vn'?next():res.sendStatus(404));
  app.use('/api/mes',(req,res,next)=>req.hostname==='mes.th.io.vn'?next():res.sendStatus(404));
  app.use((req,res,next)=>['login','register','reset','consumeToken'].includes(req.body?.action)||['passwordLogin','activateAccount'].includes(req.body?.name)?authLimit(req,res,next):next());
+ app.use('/api/mes',driveRouter(pool));
  app.use('/api/mes',previewRouter(pool,filesRoot));
  app.use('/api/mes/admin',adminRouter(pool,filesRoot,gate));app.use('/api/mes',translationRouter(pool));
- app.use('/api/portfolio',portfolioRouter(pool));app.use('/api/mes/uploads',uploadRouter(pool,filesRoot));app.use('/api/mes',workspaceRouter(pool,filesRoot));app.use('/api/mes',mesRouter(pool,filesRoot));
+ app.use('/api/portfolio',portfolioRouter(pool));app.use('/api/mes/uploads',uploadRouter(pool,filesRoot,gate));app.use('/api/mes',workspaceRouter(pool,filesRoot));app.use('/api/mes',mesRouter(pool,filesRoot));
  app.use((err,req,res,next)=>{
   const code=err.code;
   const status=err.status||(['28000','invalid-credentials'].includes(code)?401:code==='rate-limited'?429:code==='P0001'?403:code==='password-policy'?400:503);
@@ -40,6 +42,7 @@ export function createApp(pool,filesRoot) {
 }
 if(process.env.NODE_ENV!=='test') {
  const pool=new pg.Pool({connectionString:process.env.DATABASE_URL,max:4,idleTimeoutMillis:30000,connectionTimeoutMillis:5000,options:'-c statement_timeout=15000'});
+ pool.on('error',error=>console.error('Database connection interrupted',{code:error.code||'connection-error'}));
  const filesRoot=process.env.FILES_ROOT||'/var/lib/th-app/files';
  const app=createApp(pool,process.env.FILES_ROOT||'/var/lib/th-app/files');
  const server=app.listen(Number(process.env.PORT||3000),'127.0.0.1');server.requestTimeout=180000;

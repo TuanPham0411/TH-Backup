@@ -113,7 +113,7 @@ test('workspace publishing, media, categories and progress enforce roles and pre
  const created=await api('manageUser',{operation:'create',username:'workspace.user',displayName:'Workspace User'},owner);
  const user=(await api('activateAccount',{username:'workspace.user',activationCode:created.body.activationCode,password:'workspace-password'})).cookie;
  async function ws(action,data={},cookie=owner){const response=await fetch(base+'/api/mes/workspace',{method:'POST',headers:{'x-forwarded-host':'mes.th.io.vn','Content-Type':'application/json',cookie:cookie||''},body:JSON.stringify({action,data})});return {status:response.status,body:await response.json()};}
- assert.equal((await ws('read',{},'')).status,401);
+ assert.equal((await ws('read',{},'')).status,200);
  assert.equal((await ws('save',{kind:'announcements',title:'Denied',body:'No'},user)).status,403);
  const published=await ws('save',{kind:'announcements',title:'Production update',body:'New instructions',active:true,pinned:true});assert.equal(published.status,200,JSON.stringify(published.body));
  const draft=await ws('save',{kind:'announcements',title:'Unpublished',body:'Draft',active:false});assert.equal(draft.status,200);
@@ -137,7 +137,7 @@ test('workspace publishing, media, categories and progress enforce roles and pre
  const media=await ws('videoUpload',{title:'Production training',type:'video/mp4',size:8});assert.equal(media.status,200,JSON.stringify(media.body));
  let response=await fetch(base+media.body.url,{method:'PUT',headers:{'x-forwarded-host':'mes.th.io.vn','Content-Type':'video/mp4'},body:Buffer.from('12345678')});assert.equal(response.status,200);
  assert.equal((await fetch(base+media.body.url,{method:'PUT',headers:{'x-forwarded-host':'mes.th.io.vn','Content-Type':'video/mp4'},body:'12345678'})).status,403);
- assert.equal((await fetch(base+`/api/mes/media/${media.body.id}`,{headers:{'x-forwarded-host':'mes.th.io.vn'}})).status,401);
+ assert.equal((await fetch(base+`/api/mes/media/${media.body.id}`,{headers:{'x-forwarded-host':'mes.th.io.vn'}})).status,200);
  response=await fetch(base+`/api/mes/media/${media.body.id}`,{headers:{'x-forwarded-host':'mes.th.io.vn',cookie:user,range:'bytes=0-3'}});assert.equal(response.status,206);assert.equal(await response.text(),'1234');
  assert.equal((await ws('videoUpdate',{id:media.body.id,title:'Updated title'})).status,200);
  assert.equal((await ws('videoDelete',{id:media.body.id})).status,200);
@@ -277,7 +277,7 @@ test('users comment across tickets; access history is administrator-only and red
  await api('attachFiles',{issueId:issue.body.id,files:[{slot:issue.body.uploadSlots[0],name:'evidence.mp4'}]},userA);
  const url=base+`/api/mes/attachments/${issue.body.id}/${issue.body.uploadSlots[0]}`;
  const range=await fetch(url,{headers:{'x-forwarded-host':'mes.th.io.vn',cookie:userB,range:'bytes=2-7'}});assert.equal(range.status,206);assert.equal(await range.text(),'234567');assert.match(range.headers.get('cache-control'),/private/);assert.match(range.headers.get('accept-ranges'),/bytes/);
- assert.equal((await fetch(url,{headers:{'x-forwarded-host':'mes.th.io.vn'}})).status,401);
+ assert.equal((await fetch(url,{headers:{'x-forwarded-host':'mes.th.io.vn'}})).status,200);
  const translated=await fetch(base+'/api/mes/translation',{method:'POST',headers:{'x-forwarded-host':'mes.th.io.vn','Content-Type':'application/json',cookie:userB},body:JSON.stringify({id:issue.body.id})});assert.equal(translated.status,403);
 });
 test('translation is explicit, cached and leaves original title, formatted content and history unchanged',async()=>{
@@ -299,4 +299,49 @@ test('translation is explicit, cached and leaves original title, formatted conte
   const first=await translate();assert.equal(first.status,200,await first.clone().text());assert.equal((await first.json()).subject,'English title');assert.equal((await translate()).status,200);assert.equal(calls,1,'Unchanged content should reuse cached translation');
   assert.deepEqual((await api('readTicket',{id:ticket.id},user)).body,before);
  }finally{globalThis.fetch=originalFetch;if(oldKey===undefined)delete process.env.GOOGLE_TRANSLATE_API_KEY;else process.env.GOOGLE_TRANSLATE_API_KEY=oldKey;}
+});
+
+test('anonymous viewer reads tickets but cannot read accounts or write; layout preferences are private',async()=>{
+ const owner='th_mes='+(await pool.query("select mes_private.open_account_session('mes-owner') result")).rows[0].result.sessionToken;
+ const listing=await api('read',{path:'issues'});assert.equal(listing.status,200,JSON.stringify(listing.body));
+ for(const issue of listing.body.rows){assert.equal(issue.uploadSlots,undefined);assert.equal(issue.reporterUid,undefined);}
+ for(const path of ['users','settings','dashboardPreferences','credentials'])assert.notEqual((await api('read',{path})).status,200);
+ for(const name of ['createIssue','addComment','saveDashboardPreferences','getAccessLog','getProfile'])assert.notEqual((await api(name,{})).status,200);
+ assert.equal((await api('saveDashboardPreferences',{hidden:['video','notices']},owner)).status,200);
+ assert.deepEqual((await api('getDashboardPreferences',{},owner)).body.hidden,['video','notices']);
+ const otherUid=(await pool.query("select id from mes_private.records where collection='users' and data->>'username'='comment.b'")).rows[0].id;
+ const other='th_mes='+(await pool.query('select mes_private.open_account_session($1) result',[otherUid])).rows[0].result.sessionToken;
+ assert.deepEqual((await api('getDashboardPreferences',{},other)).body.hidden,[]);
+ assert.equal((await api('saveDashboardPreferences',{hidden:['activity'],uid:'mes-owner'},other)).status,200);
+ assert.deepEqual((await api('getDashboardPreferences',{},owner)).body.hidden,['video','notices']);
+ assert.notEqual((await api('saveDashboardPreferences',{hidden:['invalid-widget']},owner)).status,200);
+ const response=await fetch(base+'/api/mes/drive/callback?state=bad&code=bad',{headers:{'x-forwarded-host':'mes.th.io.vn',referer:'https://accounts.google.com/'}});assert.equal(response.status,400);
+ for(const path of ['drive/status','drive/connect','admin/storage'])assert.notEqual((await fetch(base+'/api/mes/'+path,{headers:{'x-forwarded-host':'mes.th.io.vn'},redirect:'manual'})).status,200);
+});
+test('Drive uploads finish asynchronously and private cloud video supports public ticket byte ranges',async()=>{
+ const {saveDriveCredentials}=await import('../drive-client.js');const {createHash}=await import('node:crypto');
+ const oldFetch=global.fetch,oldToken=process.env.DRIVE_TOKEN_FILE;process.env.DRIVE_TOKEN_FILE=join(files,'drive-credentials.json');
+ await saveDriveCredentials({refreshToken:'test-refresh',mediaFolder:'media-folder',backupFolder:'backup-folder'});
+ let uploaded=Buffer.alloc(0);const checksum=()=>createHash('md5').update(uploaded).digest('hex');
+ global.fetch=async(url,options={})=>{
+  const value=String(url);if(!value.startsWith('https://'))return oldFetch(url,options);
+  if(value.includes('oauth2.googleapis.com'))return Response.json({access_token:'test-token',expires_in:3600});
+  if(value.includes('uploadType=resumable'))return new Response(null,{status:200,headers:{location:'https://www.googleapis.com/upload/test'}});
+  if(value.endsWith('/upload/test')){await new Promise(resolve=>setTimeout(resolve,50));uploaded=Buffer.concat([uploaded,options.body]);return Response.json({id:'test-cloud-video',size:String(uploaded.length),md5Checksum:checksum()});}
+  if(value.includes('test-cloud-video?alt=media')){assert.equal(options.headers.Authorization,'Bearer test-token');assert.equal(options.headers.Range,'bytes=0-3');return new Response(uploaded.subarray(0,4),{status:206,headers:{'content-range':`bytes 0-3/${uploaded.length}`,'content-length':'4'}});}
+  throw new Error('Unexpected Drive request');
+ };
+ try{
+  await pool.query("update public.mes_storage_settings set provider='drive' where id='main'");
+  const owner='th_mes='+(await pool.query("select mes_private.open_account_session('mes-owner') result")).rows[0].result.sessionToken;
+  const department=(await pool.query("select id from mes_private.records where collection='departments' limit 1")).rows[0].id;
+  const issue=await api('createIssue',{reporterUid:'mes-owner',departmentId:department,process:'Cloud upload',description:'Cloud range test'},owner);assert.equal(issue.status,200,JSON.stringify(issue.body));
+  const slot=issue.body.uploadSlots[0],path=`issues/${issue.body.id}/${slot}`,headers={'x-forwarded-host':'mes.th.io.vn',cookie:owner,'Content-Type':'application/json'};
+  const start=await oldFetch(base+'/api/mes/uploads',{method:'POST',headers,body:JSON.stringify({kind:'ticket',path,type:'video/mp4',size:8})});assert.equal(start.status,200);const info=await start.json();
+  const patch=await oldFetch(base+'/api/mes/uploads/'+info.id,{method:'PATCH',headers:{...headers,'Content-Type':'application/octet-stream','Upload-Offset':'0'},body:'12345678'});assert.equal(patch.status,202);assert.equal((await patch.json()).processing,true);
+  let done=false;for(let i=0;i<100;i++){const status=await oldFetch(base+'/api/mes/uploads/'+info.id,{headers});const record=await status.json();assert.equal(status.status,200,JSON.stringify(record));if(record.complete){done=true;break;}await new Promise(r=>setTimeout(r,10));}assert.equal(done,true);
+  assert.equal((await api('attachFiles',{issueId:issue.body.id,files:[{slot,name:'cloud.mp4'}]},owner)).status,200);
+  const response=await oldFetch(base+`/api/mes/attachments/${issue.body.id}/${slot}`,{headers:{'x-forwarded-host':'mes.th.io.vn',range:'bytes=0-3'}});assert.equal(response.status,206);assert.equal(await response.text(),'1234');assert.equal(response.headers.get('content-range'),'bytes 0-3/8');
+  assert.equal((await pool.query('select drive_id from public.mes_cloud_files where path=$1',[path])).rows[0].drive_id,'test-cloud-video');
+ }finally{await pool.query("update public.mes_storage_settings set provider='local' where id='main'");global.fetch=oldFetch;if(oldToken===undefined)delete process.env.DRIVE_TOKEN_FILE;else process.env.DRIVE_TOKEN_FILE=oldToken;}
 });

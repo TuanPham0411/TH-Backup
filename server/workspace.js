@@ -1,3 +1,5 @@
+import {driveApi} from './drive-client.js';
+import {serveCloudMedia,removeCloudFile,prepareCloudOriginal,commitCloudRecord} from './cloud-media.js';
 import {publishFile} from './publish.js';
 import {filePath,deleteEverywhere,storageQuota} from "./storage.js";
 import {displayPath} from "./media.js";
@@ -21,11 +23,11 @@ export function workspaceRouter(pool, filesRoot) {
       [ids],
     );
     for (const item of rows)
-      await deleteEverywhere(filesRoot, `media/${item.id}`);
+      {await removeCloudFile(pool,`media/${item.id}`);await deleteEverywhere(filesRoot, `media/${item.id}`);}
   }
 
   async function session(actor, owner = false) {
-    if (!actor.session) throw fail(401, "Sign in first");
+    if (!actor.session) {if(owner)throw fail(401,"Sign in first");return {isOwner:false,isViewer:true};}
     const {
       rows: [row],
     } = await pool.query("select public.mes_dispatch($1,$2,$3) result", [
@@ -59,6 +61,8 @@ export function workspaceRouter(pool, filesRoot) {
       "Content-Type": media.type,
       "Cache-Control": "private, max-age=0, must-revalidate",
     });
+    if(await serveCloudMedia(pool,filesRoot,`media/${media.id}`,req,res,media.type))return;
+    res.set("X-Accel-Buffering","no");
     const display=await displayPath(filesRoot, `media/${media.id}`,req.query.preview==='1'&&media.type.startsWith('image/'));
     res.set('X-Media-Preview',display.endsWith('.preview.jpg')?'ready':'original');res.type(display.endsWith('.preview.jpg')?'image/jpeg':media.type);res.sendFile(display, { dotfiles: "deny" });
   });
@@ -103,15 +107,14 @@ export function workspaceRouter(pool, filesRoot) {
         createWriteStream(temporary, { flags: "wx", mode: 0o600 }),
       );
       if (size !== Number(media.size)) throw fail(400, "Video incomplete");
-      await publishFile(temporary, path);
-      try {
-        await pool.query("update public.mes_media set ready=true where id=$1", [
-          media.id,
-        ]);
+      const cloud=await prepareCloudOriginal(pool,temporary,`media/${media.id}`,media.type,size);
+      if(!cloud)await publishFile(temporary, path);
+      const db=await pool.connect();
+      try {await db.query('begin');if(cloud)await commitCloudRecord(db,cloud);
+        await db.query("update public.mes_media set ready=true where id=$1", [media.id]);await db.query('commit');
       } catch (error) {
-        await rm(path, { force: true });
-        throw error;
-      }
+        await db.query('rollback');if(cloud)await driveApi(`files/${encodeURIComponent(cloud.drive_id)}`,{method:'DELETE'}).catch(()=>{});else await rm(path, {force:true});throw error;
+      }finally{db.release();}
       res.json({ ok: true });
     } finally {
       await rm(temporary, { force: true });
@@ -311,7 +314,7 @@ export function workspaceRouter(pool, filesRoot) {
         "delete from public.mes_media where id=$1 returning id",
         [data.id],
       );
-      if (row) await deleteEverywhere(filesRoot, `media/${row.id}`);
+      if (row) {await removeCloudFile(pool,`media/${row.id}`);await deleteEverywhere(filesRoot, `media/${row.id}`);}
       return res.json({ ok: true });
     }
     throw fail(400, "Unknown workspace action");

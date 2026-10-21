@@ -7,7 +7,7 @@ const managed=root=>root==='/var/lib/th-app/files' && process.env.NODE_ENV!=='te
 export function storageCommand(action,data={},timeout=30000){
  return new Promise((resolve,reject)=>{
   const body=JSON.stringify({action,data});
-  const req=http.request({socketPath:'/run/th-storage/control.sock',path:'/',method:'POST',headers:{'Content-Type':'application/json','Content-Length':Buffer.byteLength(body)}},res=>{
+  const req=http.request({socketPath:process.env.NODE_ENV==='test'&&process.env.TEST_STORAGE_SOCKET||'/run/th-storage/control.sock',path:'/',method:'POST',headers:{'Content-Type':'application/json','Content-Length':Buffer.byteLength(body)}},res=>{
    let text='';res.on('data',b=>text+=b);res.on('end',()=>{try{const value=JSON.parse(text);if(res.statusCode!==200)throw Object.assign(new Error(value.error||'Storage unavailable'),{status:409,expose:true,code:value.code});resolve(value);}catch(e){reject(e);}});
   });req.setTimeout(timeout,()=>req.destroy(new Error('Storage operation timed out')));req.on('error',reject);req.end(body);
  });
@@ -38,11 +38,15 @@ export function maintenanceGate(){
    if(blocked||backupActive()){res.set('Retry-After','10');return res.status(503).json({error:'Backup in progress. Please retry after it completes.',code:'backup-in-progress'});}
    active++;let done=false;const finish=()=>{if(!done){done=true;active--;}};res.once('finish',finish);res.once('close',finish);next();
   },
+  async background(work){
+   if(blocked||backupActive())return false;
+   active++;try{await work();return true;}finally{active--;}
+  },
   async exclusive(work){
    if(blocked||backupActive())throw Object.assign(new Error('A storage operation is already running'),{status:409,expose:true});
    blocked=true;
    try{
-    const deadline=Date.now()+190000;
+    const deadline=Date.now()+60*60*1000;
     while(active){if(Date.now()>deadline)throw new Error('Active uploads have not finished; retry backup later');await new Promise(r=>setTimeout(r,100));}
     return await work();
    }finally{blocked=false;}

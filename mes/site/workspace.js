@@ -1,4 +1,5 @@
 import {uploadPreview} from './media-preview.js';
+import {applyDashboardPreferences} from './dashboard-preferences.js';
 import { uploadChunks } from "./uploads.js";
 import { issueTypeSummary } from "./analytics.js";
 import { t, getLanguage } from "./i18n.js";
@@ -118,7 +119,7 @@ export function initWorkspace({ state, toast, run, addEvidence }) {
   };
   theme();
   async function refresh(force = false) {
-    if ((loading && !force) || (!state.user && !state.preview)) return;
+    if (loading && !force) return;
     loading = true;
     const sequence = ++readSequence,
       epoch = generation;
@@ -165,6 +166,7 @@ export function initWorkspace({ state, toast, run, addEvidence }) {
     renderVideo();
     renderTypes();
     renderAdmin();
+    applyDashboardPreferences();
   }
   function renderTypes() {
     const select = $("issue-type-select"),
@@ -331,7 +333,7 @@ export function initWorkspace({ state, toast, run, addEvidence }) {
       return;
     }
     const url = `/api/mes/media/${current.id}`;
-    if ($("dashboard-page").hidden) {
+    if ($("dashboard-page").hidden || video.closest('.video-panel').hidden) {
       video.pause();
       return;
     }
@@ -791,7 +793,7 @@ export function initWorkspace({ state, toast, run, addEvidence }) {
     navigate(page) {
       if (["dashboard", "my-dashboard"].includes(page)) {
         renderVideo();
-        if (snapshot.videos.length)
+        if (snapshot.videos.length && !$("workspace-video").closest('.video-panel').hidden)
           $("workspace-video")
             .play()
             .catch(() => {});

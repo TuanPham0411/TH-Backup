@@ -1,0 +1,11 @@
+[Unit]
+Description=Restore TH PostgreSQL USB storage before database startup
+After=local-fs.target
+Before=postgresql.service th-app.service
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /opt/th-app/current/deploy/storage-agent.py --restore-mounts
+RemainAfterExit=true
+TimeoutStartSec=120
+[Install]
+WantedBy=multi-user.target

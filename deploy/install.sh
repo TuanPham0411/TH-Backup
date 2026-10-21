@@ -34,7 +34,7 @@ release_id=${2:?Pass a release ID}
 [[ $release_id =~ ^[a-zA-Z0-9_-]+$ ]] || exit 1
 [[ $(uname -m) == aarch64 ]] || { echo 'ARM64 is required'; exit 1; }
 systemctl is-active --quiet postgresql nginx
-for required in runtime/bin/node server/app.cjs server/migrate.cjs web/index.html mes/index.html deploy/th-app.service deploy/nginx.conf deploy/entrypoint.sh deploy/check-nginx.py deploy/storage-agent.py deploy/th-storage.service; do
+for required in runtime/bin/node server/app.cjs server/migrate.cjs web/index.html mes/index.html deploy/th-app.service deploy/nginx.conf deploy/entrypoint.sh deploy/check-nginx.py deploy/storage-agent.py deploy/th-storage.service deploy/th-storage-mounts.service; do
  [[ -f "$release_source/$required" ]] || { echo "Missing $required"; exit 1; }
 done
 # Refuse overlapping host configuration; leave the existing sites untouched.
@@ -86,6 +86,7 @@ backup=$(mktemp -d /opt/th-app/.deploy-backup.XXXXXX)
 [[ ! -f /etc/nginx/sites-available/th-app ]] || cp -a /etc/nginx/sites-available/th-app "$backup/nginx"
 [[ ! -f /etc/systemd/system/th-app.service ]] || cp -a /etc/systemd/system/th-app.service "$backup/service"
 [[ ! -f /etc/systemd/system/th-storage.service ]] || cp -a /etc/systemd/system/th-storage.service "$backup/storage-service"
+[[ ! -f /etc/systemd/system/th-storage-mounts.service ]] || cp -a /etc/systemd/system/th-storage-mounts.service "$backup/mount-service"
 rollback() {
  if [[ -n $old_target && $old_target != /opt/th-app/current ]]; then
   ln -s "$old_target" /opt/th-app/.rollback
@@ -94,6 +95,7 @@ rollback() {
  if [[ -f $backup/nginx ]]; then cp -a "$backup/nginx" /etc/nginx/sites-available/th-app; else rm -f /etc/nginx/sites-enabled/th-app /etc/nginx/sites-available/th-app; fi
  if [[ -f $backup/service ]]; then cp -a "$backup/service" /etc/systemd/system/th-app.service; else systemctl stop th-app || true; rm -f /etc/systemd/system/th-app.service; fi
  if [[ -f $backup/storage-service ]]; then cp -a "$backup/storage-service" /etc/systemd/system/th-storage.service; else systemctl stop th-storage || true; rm -f /etc/systemd/system/th-storage.service; fi
+ if [[ -f $backup/mount-service ]]; then cp -a "$backup/mount-service" /etc/systemd/system/th-storage-mounts.service; else systemctl disable --now th-storage-mounts || true; rm -f /etc/systemd/system/th-storage-mounts.service; fi
  systemctl daemon-reload
  if [[ -f $backup/storage-service ]]; then systemctl restart th-storage || true; fi
  if [[ -n $old_target && -f $backup/service ]]; then systemctl restart th-app || true; fi
@@ -101,6 +103,7 @@ rollback() {
  echo 'Deployment failed; prior application configuration restored. Migrations were retained.' >&2
 }
 trap rollback ERR
+install -m 644 "$target/deploy/th-storage-mounts.service" /etc/systemd/system/th-storage-mounts.service
 install -m 644 "$target/deploy/th-storage.service" /etc/systemd/system/th-storage.service
 install -m 644 "$target/deploy/th-app.service" /etc/systemd/system/th-app.service
 install -m 644 "$target/deploy/nginx.conf" /etc/nginx/sites-available/th-app
@@ -109,7 +112,8 @@ ln -s "$target" /opt/th-app/.next
 mv -Tf /opt/th-app/.next /opt/th-app/current
 nginx -t
 systemctl daemon-reload
-systemctl enable th-app th-storage
+systemctl enable th-app th-storage th-storage-mounts
+systemctl restart th-storage-mounts
 systemctl restart th-storage
 systemctl restart th-app
 healthy=false

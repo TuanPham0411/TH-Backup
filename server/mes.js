@@ -1,3 +1,5 @@
+import {driveApi} from './drive-client.js';
+import {serveCloudMedia,prepareCloudOriginal,commitCloudRecord,cloudRecord,removeCloudFile} from './cloud-media.js';
 import {publishFile} from './publish.js';
 import {filePath,deleteEverywhere,storageQuota} from './storage.js';
 import {displayPath} from './media.js';
@@ -9,12 +11,14 @@ import {Transform} from 'node:stream';
 import {join} from 'node:path';
 import {hash,token,validPath,actorFor} from './security.js';
 import {normalizeDocument,documentText} from '../mes/site/rich-document.js';
-const publicActions=new Set(['getDirectory','passwordLogin','activateAccount']);
+const viewerActions=new Set(['read','readBundle','readTicket','downloadUrl']);
+const publicActions=new Set(['getDirectory','passwordLogin','activateAccount',...viewerActions]);
 const types=new Set(['image/jpeg','image/png','image/webp','video/mp4','video/webm','video/quicktime','application/pdf','text/plain','text/csv','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']);
 export function mesRouter(pool,filesRoot) {
  const router=Router();
  async function dispatch(name,data,actor) {
-  const {rows:[r]}=await pool.query('select public.mes_dispatch($1,$2,$3) as result',[name,data,actor]);
+  const viewer=!actor.session&&viewerActions.has(name);
+  const {rows:[r]}=await pool.query(viewer?'select public.mes_view($1,$2) as result':'select public.mes_dispatch($1,$2,$3) as result',viewer?[name,data]:[name,data,actor]);
   if(r.result?.errorCode)throw Object.assign(new Error('Account request denied'),{code:r.result.errorCode});
   return r.result;
  }
@@ -26,6 +30,7 @@ export function mesRouter(pool,filesRoot) {
   const {rows:[grant]}=await pool.query('delete from public.file_grants where hash=$1 and action=$2 and expires>now() returning *',[hash(value),action]);
   if(!grant)return res.sendStatus(403);
   await dispatch(action,{path:grant.path},grant.actor);
+  if(action==='downloadUrl'){const info=(await pool.query('select * from public.files where path=$1',[grant.path])).rows[0];if(info&&await serveCloudMedia(pool,filesRoot,grant.path,req,res,info.type))return;}
   const path=await filePath(filesRoot,grant.path,action!=='downloadUrl');
   if(action==='downloadUrl') {
    const {rows:[meta]}=await pool.query('select * from public.files where path=$1',[grant.path]);
@@ -44,9 +49,11 @@ export function mesRouter(pool,filesRoot) {
    await pipeline(req,limiter,createWriteStream(temporary,{flags:'wx',mode:0o600}));
    if(!size)throw Object.assign(new Error('Empty file'),{status:400});
    // link is atomic and never overwrites an existing slot.
-   await publishFile(temporary,path);
-   try {await pool.query('insert into public.files(path,size,type) values($1,$2,$3)',[grant.path,size,type]);}
-   catch(e){await rm(path,{force:true});throw e;}
+   const cloud=await prepareCloudOriginal(pool,temporary,grant.path,type,size);
+   if(!cloud)await publishFile(temporary,path);
+   const db=await pool.connect();
+   try {await db.query('begin');if(cloud)await commitCloudRecord(db,cloud);await db.query('insert into public.files(path,size,type) values($1,$2,$3)',[grant.path,size,type]);await db.query('commit');}
+   catch(e){await db.query('rollback');if(cloud)await driveApi(`files/${encodeURIComponent(cloud.drive_id)}`,{method:'DELETE'}).catch(()=>{});else await rm(path,{force:true});throw e;}finally{db.release();}
    res.json({ok:true});
   } finally {await rm(temporary,{force:true});}
  });
@@ -60,6 +67,8 @@ export function mesRouter(pool,filesRoot) {
   if(!meta)return res.sendStatus(404);
   res.set({'Content-Type':req.query.preview==='1'&&meta.type.startsWith('image/')?'image/jpeg':meta.type,'Cache-Control':'private, max-age=0, must-revalidate','Content-Security-Policy':"sandbox; default-src 'none'"});
   if(!meta.type.startsWith('image/')&&!meta.type.startsWith('video/'))res.attachment(meta.name||'attachment');
+  if(await serveCloudMedia(pool,filesRoot,path,req,res,meta.type))return;
+  res.set('X-Accel-Buffering','no');
   const display=await displayPath(filesRoot,path,req.query.preview==='1'&&meta.type.startsWith('image/'));
   res.set('X-Media-Preview',display.endsWith('.preview.jpg')?'ready':'original');res.type(display.endsWith('.preview.jpg')?'image/jpeg':meta.type);res.sendFile(display,{dotfiles:'deny'});
  });
@@ -71,7 +80,9 @@ export function mesRouter(pool,filesRoot) {
   if((name==='createIssue'||(name==='updateIssue'&&data.operation==='edit'))&&data.richDocument!==undefined){data.richDocument=normalizeDocument(data.richDocument);data.description=documentText(data.richDocument);}
   if(name==='uploadUrl'||name==='downloadUrl') {
    if(!validPath(data.path))return res.sendStatus(400);
-   await dispatch(name,data,actor);const value=token();
+   await dispatch(name,data,actor);
+   if(name==='downloadUrl'&&!actor.session)return res.json({url:'/api/mes/attachments/'+data.path.split('/').slice(1).map(encodeURIComponent).join('/')});
+   const value=token();
    await pool.query('insert into public.file_grants(hash,action,path,actor) values($1,$2,$3,$4)',[hash(value),name,data.path,actor]);
    return res.json({url:`/api/mes/files/${value}`});
   }
@@ -84,7 +95,7 @@ export function mesRouter(pool,filesRoot) {
     if(!validPath(path))return res.sendStatus(400);
     const {rows:[info]}=await pool.query('select size,type from public.files where path=$1',[path]);
     if(!info)return res.sendStatus(400);
-    await stat(await filePath(filesRoot,path));files.push({slot:f.slot,path,name:f.name,size:Number(info.size),type:info.type});
+    if(!await cloudRecord(pool,path))await stat(await filePath(filesRoot,path));files.push({slot:f.slot,path,name:f.name,size:Number(info.size),type:info.type});
    }
    const result=await dispatch(name,{...data,files},actor);
    for(const f of files)await pool.query('update public.files set name=$2 where path=$1',[f.path,f.name]);
@@ -93,6 +104,7 @@ export function mesRouter(pool,filesRoot) {
   if(name==='deleteIssue') {
    if(!/^[a-zA-Z0-9_-]{1,128}$/.test(data.id||''))return res.sendStatus(400);
    await dispatch(name,data,actor);
+   for(const row of (await pool.query('select path from public.mes_cloud_files where path like $1',[`issues/${data.id}/%`])).rows)await removeCloudFile(pool,row.path);
    await deleteEverywhere(filesRoot,`issues/${data.id}`,{recursive:true,force:true});
    await pool.query('delete from public.files where path like $1',[`issues/${data.id}/%`]);
    return res.json(await dispatch('finishDelete',data,actor));

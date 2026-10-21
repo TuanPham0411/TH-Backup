@@ -1,3 +1,5 @@
+import {cloudRecord,commitCloudRecord,mediaProvider} from './cloud-media.js';
+import {uploadDriveFile} from './drive-client.js';
 import {publishFile} from './publish.js';
 import {Router} from 'express';
 import {createWriteStream} from 'node:fs';
@@ -28,11 +30,16 @@ export function previewRouter(pool,root){
    const {rows:[f]}=await pool.query('select type from public.mes_media where id=$1 and ready',[id]);if(!f?.type.startsWith('image/'))return res.sendStatus(400);relative=`media/${id}`;
   }else return res.sendStatus(400);
   if(req.headers['content-type']!=='image/jpeg')return res.sendStatus(400);
-  const dest=(await filePath(root,relative))+'.preview.jpg',temporary=dest+'.'+token()+'.tmp';let size=0,first=true;
+  const cloud=await cloudRecord(pool,relative),cloudMode=!!cloud&&await mediaProvider(pool)==='drive';
+  if(cloudMode&&await cloudRecord(pool,relative+'.preview.jpg')){req.resume();return res.json({ok:true});}
+  const dest=cloudMode?await filePath(root,'.cache/preview-'+token(),true):(await filePath(root,relative))+'.preview.jpg';
+  await (await import('node:fs/promises')).mkdir(new URL('.', 'file://'+dest),{recursive:true});
+  const temporary=dest+'.'+token()+'.tmp';let size=0,first=true;
   try{
    const limiter=new Transform({transform(chunk,_encoding,cb){size+=chunk.length;if(first){first=false;if(chunk.length<2||chunk[0]!==255||chunk[1]!==216)return cb(Object.assign(new Error('JPEG preview required'),{status:400}));}cb(size>256*1024?Object.assign(new Error('Preview too large'),{status:413}):null,chunk);}});
    await pipeline(req,limiter,createWriteStream(temporary,{flags:'wx',mode:0o600}));if(!size)return res.sendStatus(400);
-   try{await publishFile(temporary,dest);}catch(e){if(e.code!=='EEXIST')throw e;}res.json({ok:true});
+   if(cloudMode){const uploaded=await uploadDriveFile(temporary,relative+'.preview.jpg','image/jpeg',size);await commitCloudRecord(pool,{path:relative+'.preview.jpg',drive_id:uploaded.id,type:'image/jpeg',size,checksum:uploaded.checksum});}
+   else{try{await publishFile(temporary,dest);}catch(e){if(e.code!=='EEXIST')throw e;}}res.json({ok:true});
   }finally{await rm(temporary,{force:true});}
  });return router;
 }

@@ -64,4 +64,12 @@ export async function uploadChunks({
       }
     }
   }
+  // Cloud transfer continues on the Pi; short status requests avoid proxy timeouts.
+  for(let checks=0;checks<7200;checks++){
+    const status=await request(`${base}/${started.id}`);
+    if(status.complete){onProgress(100);return;}
+    onProgress(99);
+    await new Promise(resolve=>setTimeout(resolve,1500));
+  }
+  throw new Error('Storage transfer is still running. Retry to resume.');
 }

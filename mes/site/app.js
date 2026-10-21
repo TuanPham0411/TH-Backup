@@ -1,3 +1,5 @@
+import {initDriveStorage} from './drive-storage.js';
+import {initDashboardPreferences,loadDashboardPreferences,applyDashboardPreferences} from './dashboard-preferences.js';
 import { initWorkspace, progressView, ticketProgress } from "./workspace.js";
 import { revealPage, animateDashboard } from "./motion.js";
 import { activitySeries, resolutionSummary, submissionCohort } from "./analytics.js";
@@ -270,6 +272,7 @@ function renderDashboard() {
   renderOperations(issues);
   workspace.renderCharts(issues);
   renderDetailedAnalytics(issues);
+  applyDashboardPreferences();
   renderDonut(issues);
   renderDepartments(issues);
   $("recent-issues").replaceChildren();
@@ -867,6 +870,8 @@ function renderDevices() {
     $("device-list").append(el("p", "No devices registered.", "helper"));
 }
 function updateIdentity() {
+  for(const button of document.querySelectorAll('[data-page="create"],[data-page="my-dashboard"],[data-page="my-issues"],[data-page="profile"],#new-feedback'))button.hidden=!state.user&&!state.preview;
+
   $("start-tester").hidden = !state.isOwner || state.preview;
   $("tester-banner").hidden = !state.user?.isTester;
   $("admin-nav").hidden = !state.isOwner;
@@ -877,7 +882,7 @@ function updateIdentity() {
       ? "MES owner"
       : state.user
         ? "Verified workspace user"
-        : "Sign in to load data";
+        : "Read-only access";
   $("avatar").textContent = (state.user?.displayName || "V")
     .slice(0, 1)
     .toUpperCase();
@@ -885,7 +890,7 @@ function updateIdentity() {
     ? "Sample data · preview"
     : state.ready
       ? "Live workspace"
-      : state.user ? "Connecting…" : "Sign in to connect";
+      : "Connecting…";
   if (!state.isOwner && state.page === "settings") navigate("dashboard");
   renderForm();
 }
@@ -913,12 +918,12 @@ function subscribeLive() {
     if (["issues", "myIssues"].includes(field)) { state.ready = true; renderAll(); updateIdentity(); }
     else renderDirectories();
   }, onDataError, order));
-  add("teamLeaders", "leaders");
+  if(state.user) add("teamLeaders", "leaders");
   add("departments", "departments");
   if (state.isOwner) add("users", "users");
   add("issues", "issues", "desc");
-  add("myIssues", "myIssues", "desc");
-  unsubscribers.push(watchRecords("settings/policy", (rows) => {
+  if(state.user)add("myIssues", "myIssues", "desc");
+  if(state.user)unsubscribers.push(watchRecords("settings/policy", (rows) => {
     state.requiresWindows = false;
     renderForm();
   }, onDataError));
@@ -1557,6 +1562,7 @@ async function loadDirectory() {
   }
 }
 async function handleAuth(user) {
+  $('export-issues').hidden=!user;
   const generation = ++sessionGeneration;
   workspace.reset();
   stopLive();
@@ -1594,6 +1600,7 @@ async function handleAuth(user) {
   updateIdentity();
   if (!user) {
     await loadDirectory();
+    if(generation===sessionGeneration){await loadDashboardPreferences(null);subscribeLive();}
     return;
   }
   try {
@@ -1601,12 +1608,14 @@ async function handleAuth(user) {
     if (generation !== sessionGeneration) return;
     if (session.accountVersion !== 1) throw Object.assign(new Error("Account service update required"), { code: "backend-not-ready" });
     state.user = session.user;
+    await loadDashboardPreferences(state.user);
     state.isOwner = session.isOwner;
     state.requiresWindows = false;
     message("");
     updateIdentity();
     renderDirectories();
     subscribeLive();
+    if(state.isOwner&&new URLSearchParams(location.search).get("drive")==="connected"){history.replaceState(null,"",location.pathname);navigate("settings");toast("Google Drive connected.");}
     if ($("account-dialog").open && $("activation-form").hidden) $("account-dialog").close();
     toast(
       state.isOwner ? "Signed in as MES owner." : state.user.isTester ? "Tester mode. Feedback is saved to the live workspace." : "Signed in successfully.",
@@ -1724,6 +1733,8 @@ const workspace = initWorkspace({state,toast,run,addEvidence(files) {
 }});
 document.querySelector(".topbar .brand").onclick = event => { event.preventDefault(); navigate("dashboard"); };
 initUpgrade();
+initDriveStorage();
+initDashboardPreferences(()=>({user:state.user,preview:state.preview}));
 initializeLanguage(() => { workspace.render(); feedbackEditor.setLanguage(); editEditor.setLanguage(); renderAll(); renderTimeline(); updateIdentity(); if (state.selected) { const issue = state.issues.find(i => i.id === state.selected); if (issue) renderDetail(issue); } });
 selectOptions($("issue-status"), [
   { id: "All", name: "All statuses" },
