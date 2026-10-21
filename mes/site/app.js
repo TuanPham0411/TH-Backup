@@ -1,3 +1,4 @@
+import {initAppearancePreferences,loadAppearancePreferences} from './appearance-preferences.js';
 import {initContentTabs} from './content-tabs.js';
 import {initDriveStorage} from './drive-storage.js';
 import {initDashboardPreferences,loadDashboardPreferences,applyDashboardPreferences} from './dashboard-preferences.js';
@@ -1552,6 +1553,7 @@ async function handleAuth(user) {
   state.files = [];
   $("activation-result").hidden = true; $("activation-link").value = "";
   $("profile-form").reset(); $("password-form").reset();
+  loadAppearancePreferences(null);
   $("device-result").replaceChildren();
   $("device-result").hidden = true;
   renderDevices();
@@ -1569,7 +1571,7 @@ async function handleAuth(user) {
   updateIdentity();
   if (!user) {
     await loadDirectory();
-    if(generation===sessionGeneration){await loadDashboardPreferences(null);subscribeLive();}
+    if(generation===sessionGeneration){await loadDashboardPreferences(null);await loadAppearancePreferences(null);subscribeLive();}
     return;
   }
   try {
@@ -1577,7 +1579,7 @@ async function handleAuth(user) {
     if (generation !== sessionGeneration) return;
     if (session.accountVersion !== 1) throw Object.assign(new Error("Account service update required"), { code: "backend-not-ready" });
     state.user = session.user;
-    await loadDashboardPreferences(state.user);
+    await Promise.all([loadDashboardPreferences(state.user),loadAppearancePreferences(state.user)]);
     state.isOwner = session.isOwner;
     state.requiresWindows = false;
     message("");
@@ -1711,6 +1713,7 @@ document.querySelector(".topbar .brand").onclick = event => { event.preventDefau
 initUpgrade();
 initDriveStorage();
 initContentTabs({state,navigate,toast});
+initAppearancePreferences(()=>({user:state.user,preview:state.preview}));
 initDashboardPreferences(()=>({user:state.user,preview:state.preview}));
 initializeLanguage(() => { workspace.render(); feedbackEditor.setLanguage(); editEditor.setLanguage(); renderAll(); renderTimeline(); updateIdentity(); if (state.selected) { const issue = state.issues.find(i => i.id === state.selected); if (issue) renderDetail(issue); } });
 selectOptions($("issue-status"), [

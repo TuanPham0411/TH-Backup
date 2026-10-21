@@ -403,6 +403,22 @@ test('admin fully edits old tickets and replaces/removes files atomically; downl
  const removal={...edit,baseUpdatedAt:current.updatedAt,richDocument:{version:1,ops:[{insert:'Keep one image '},{insert:{image:0}},{insert:'\n'}]},files:[{...edit.files[0],name:'renamed.png'}]};const removed=await api('saveTicketEdit',removal,owner);assert.equal(removed.status,200,JSON.stringify(removed.body));assert.equal((await api('readTicket',{id},owner)).body.attachments.length,1);assert.equal((await readFile(join(files,edit.files[1].path))).toString(),'newimage');
  }finally{base=previousBase;await new Promise(r=>isolated.close(r));}
 });
+test('appearance preferences are bounded, private per account, and persistent across sessions',async()=>{
+ const pref=(name,data,cookie)=>api(name,data,cookie,'mes.th.io.vn',{'x-forwarded-for':'192.0.2.40'});
+ const owner='th_mes='+(await pool.query("select mes_private.open_account_session('mes-owner') result")).rows[0].result.sessionToken;
+ const uid=(await pool.query("select id from mes_private.records where collection='users' and data->>'username'='comment.b'")).rows[0].id;
+ const other='th_mes='+(await pool.query('select mes_private.open_account_session($1) result',[uid])).rows[0].result.sessionToken;
+ for(const name of ['getAppearancePreferences','saveAppearancePreferences'])assert.notEqual((await pref(name,{font:'arial',size:18})).status,200);
+ assert.notEqual((await pref('read',{path:'appearancePreferences'},owner)).status,200);
+ assert.deepEqual((await pref('getAppearancePreferences',{},other)).body,{font:'calibri',size:14});
+ assert.equal((await pref('saveAppearancePreferences',{font:'georgia',size:18,uid:'mes-owner'},other)).status,200);
+ assert.deepEqual((await pref('getAppearancePreferences',{},owner)).body,{font:'calibri',size:14});
+ const fresh='th_mes='+(await pool.query('select mes_private.open_account_session($1) result',[uid])).rows[0].result.sessionToken;
+ assert.deepEqual((await pref('getAppearancePreferences',{},fresh)).body,{font:'georgia',size:18});
+ for(const data of [{font:'url(evil)',size:14},{font:'arial',size:999},{font:'arial',size:'18'},{font:'arial'},{size:14}])assert.notEqual((await pref('saveAppearancePreferences',data,other)).status,200);
+ assert.deepEqual((await pref('getAppearancePreferences',{},other)).body,{font:'georgia',size:18});
+ assert.equal((await pref('saveAppearancePreferences',{font:'calibri',size:14},other)).status,200);
+});
 test('content tabs publish bounded widgets and documents with owner/member/viewer permissions, revisions and retained history',async()=>{
  const previousBase=base,isolated=createApp(runtimePool,files).listen(0,'127.0.0.1');await new Promise(r=>isolated.once('listening',r));base=`http://127.0.0.1:${isolated.address().port}`;
  try{

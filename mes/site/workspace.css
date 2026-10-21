@@ -38,7 +38,7 @@
 body {
   background: var(--bg);
   color: var(--ink);
-  font-size: 14px;
+  font-size: 0.875rem;
   line-height: 1.6;
 }
 .app-shell {
@@ -72,7 +72,7 @@ body {
   color: var(--accent-ink);
   border-radius: 12px;
   box-shadow: none;
-  font-size: 24px;
+  font-size: 1.5rem;
   width: 44px;
   height: 44px;
   display: grid;
@@ -80,19 +80,19 @@ body {
   transform: rotate(-7deg);
 }
 .brand > div {
-  font-size: 21px;
+  font-size: 1.3125rem;
   font-weight: 600;
   letter-spacing: -0.8px;
 }
 .brand small {
   color: var(--muted);
   letter-spacing: 0.18em;
-  font-size: 8px;
+  font-size: 0.5rem;
 }
 .breadcrumb {
   margin-right: auto;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 0.6875rem;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -107,7 +107,7 @@ body {
   align-items: center;
   margin: 0;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 0.6875rem;
 }
 .connection > span {
   width: 6px;
@@ -136,7 +136,7 @@ body {
 }
 .account-button small {
   color: var(--muted);
-  font-size: 9px;
+  font-size: 0.5625rem;
 }
 .account-button > span:last-child {
   display: none;
@@ -169,7 +169,7 @@ body {
   border: 1px solid transparent;
   border-radius: 100px;
   padding: 9px 17px;
-  font-size: 12px;
+  font-size: 0.75rem;
   white-space: nowrap;
   transition:
     background 0.2s,
@@ -184,14 +184,14 @@ body {
   color: var(--ink);
 }
 .command-nav button > span {
-  font-size: 17px;
+  font-size: 1.0625rem;
 }
 .command-nav b {
   color: var(--ink);
   background: var(--surface);
   border-radius: 20px;
   padding: 0 6px;
-  font-size: 10px;
+  font-size: 0.625rem;
 }
 .command-nav .active b {
   color: var(--card);
@@ -215,7 +215,7 @@ main {
   border-bottom: 1px solid var(--line);
 }
 .workspace-hero h1 {
-  font-size: clamp(36px, 4.7vw, 70px);
+  font-size: clamp(2.25rem, 4.7vw, 4.375rem);
   font-weight: 500;
   line-height: 1.08;
   letter-spacing: -3px;
@@ -223,13 +223,13 @@ main {
   margin: 12px 0 15px;
 }
 .workspace-hero .subtitle {
-  font-size: 14px;
+  font-size: 0.875rem;
   max-width: 650px;
   color: var(--muted);
   margin: 0;
 }
 .eyebrow {
-  font-size: 9px;
+  font-size: 0.5625rem;
   letter-spacing: 0.18em;
   font-weight: 600;
   color: var(--muted);
@@ -265,18 +265,18 @@ main {
 }
 .card-heading h2,
 h2 {
-  font-size: 18px;
+  font-size: 1.125rem;
   font-weight: 500;
   letter-spacing: -0.45px;
   color: var(--ink);
 }
 .card-heading p {
-  font-size: 12px;
+  font-size: 0.75rem;
   line-height: 1.5;
   color: var(--muted);
 }
 .card-heading .eyebrow {
-  font-size: 9px;
+  font-size: 0.5625rem;
   margin-bottom: 8px;
 }
 .metrics {
@@ -293,11 +293,11 @@ h2 {
 }
 .metric-label {
   color: var(--muted);
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 .metric-value {
   color: var(--ink);
-  font-size: 42px;
+  font-size: 2.625rem;
   font-weight: 500;
   letter-spacing: -2px;
   line-height: 1.2;
@@ -306,12 +306,12 @@ h2 {
 }
 .metric-note {
   color: var(--muted);
-  font-size: 10px;
+  font-size: 0.625rem;
 }
 .metric-icon {
   top: 20px;
   right: 18px;
-  font-size: 16px;
+  font-size: 1rem;
   border-radius: 50%;
 }
 .metric:nth-child(1) {
@@ -349,7 +349,7 @@ h2 {
 }
 .broadcast-panel h2 {
   color: inherit;
-  font-size: 25px;
+  font-size: 1.5625rem;
 }
 .broadcast-panel .eyebrow {
   color: var(--bg);
@@ -362,7 +362,7 @@ h2 {
   gap: 15px;
 }
 .live-tag {
-  font-size: 9px;
+  font-size: 0.5625rem;
   letter-spacing: 0.14em;
   color: var(--signal);
   background: var(--signal-soft);
@@ -384,11 +384,11 @@ h2 {
   border: 0;
 }
 .notice-item > small {
-  font-size: 10px;
+  font-size: 0.625rem;
   opacity: 0.65;
 }
 .notice-item h3 {
-  font-size: 18px;
+  font-size: 1.125rem;
   font-weight: 500;
   margin: 8px 0;
 }
@@ -396,19 +396,19 @@ h2 {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   line-height: 1.7;
-  font-size: 13px;
+  font-size: 0.8125rem;
   opacity: 0.85;
   margin: 0 0 10px;
 }
 .notice-author {
-  font-size: 10px;
+  font-size: 0.625rem;
   opacity: 0.55;
 }
 .workspace-empty {
   color: var(--muted);
   padding: 24px 0;
   line-height: 1.7;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 .broadcast-panel .workspace-empty {
   color: inherit;
@@ -437,10 +437,10 @@ h2 {
   color: #a7b5b8;
   text-align: center;
   max-width: 350px;
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 .video-stage #video-empty > span {
-  font-size: 42px;
+  font-size: 2.625rem;
   display: block;
   color: #d1decd;
   margin-bottom: 6px;
@@ -454,11 +454,11 @@ h2 {
 }
 .video-navigation .button {
   padding: 7px 12px;
-  font-size: 11px;
+  font-size: 0.6875rem;
 }
 #video-state {
   color: var(--muted);
-  font-size: 10px;
+  font-size: 0.625rem;
   text-align: center;
 }
 .chart-grid {
@@ -469,7 +469,7 @@ h2 {
 }
 .network-method {
   color: var(--muted);
-  font-size: 10px;
+  font-size: 0.625rem;
   border: 1px solid var(--line);
   padding: 6px 10px;
   border-radius: 30px;
@@ -494,11 +494,11 @@ h2 {
   gap: 10px;
 }
 .service-heading h3 {
-  font-size: 14px;
+  font-size: 0.875rem;
   margin: 0;
 }
 .service-state {
-  font-size: 9px;
+  font-size: 0.5625rem;
   padding: 3px 8px;
   border-radius: 30px;
 }
@@ -522,16 +522,16 @@ h2 {
 }
 .service-metrics strong {
   display: block;
-  font-size: 18px;
+  font-size: 1.125rem;
   font-weight: 500;
   color: var(--ink);
 }
 .service-metrics small {
-  font-size: 10px;
+  font-size: 0.625rem;
   color: var(--muted);
 }
 .service-card .helper {
-  font-size: 10px;
+  font-size: 0.625rem;
   margin: 9px 0 0;
 }
 .uptime-strip {
@@ -551,7 +551,7 @@ h2 {
   background: #e96d64;
 }
 .probe-error {
-  font-size: 11px;
+  font-size: 0.6875rem;
   color: #db7b68;
   margin: 10px 0 0;
 }
@@ -572,14 +572,14 @@ h2 {
   display: flex;
   justify-content: space-between;
   gap: 16px;
-  font-size: 12px;
+  font-size: 0.75rem;
   margin-bottom: 10px;
 }
 .type-row strong,
 .department-summary span {
   white-space: nowrap;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 0.6875rem;
 }
 .bar-track {
   background: var(--surface);
@@ -619,7 +619,7 @@ h2 {
   display: flex;
   justify-content: space-between;
   gap: 15px;
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--muted);
   margin-bottom: 9px;
 }
@@ -635,7 +635,7 @@ h2 {
   max-width: 290px;
 }
 .compact .progress-label {
-  font-size: 9px;
+  font-size: 0.5625rem;
   margin-bottom: 5px;
 }
 .compact .ticket-track {
@@ -940,7 +940,7 @@ td small,
   border-bottom: 1px solid var(--line);
 }
 .admin-item strong {
-  font-size: 12px;
+  font-size: 0.75rem;
   overflow-wrap: anywhere;
 }
 .admin-item > div {
@@ -950,7 +950,7 @@ td small,
   justify-content: flex-end;
 }
 .admin-item button {
-  font-size: 10px;
+  font-size: 0.625rem;
   white-space: nowrap;
 }
 .admin-item:last-child {
@@ -1066,7 +1066,7 @@ dialog::backdrop {
   padding: 20px clamp(20px, 3vw, 52px);
   color: var(--muted);
   border-top: 1px solid var(--line);
-  font-size: 10px;
+  font-size: 0.625rem;
 }
 .toast {
   background: var(--ink);
@@ -1147,7 +1147,7 @@ dialog::backdrop {
     padding: 20px;
   }
   .metric-value {
-    font-size: 36px;
+    font-size: 2.25rem;
   }
   .chart-grid {
     grid-template-columns: 1fr 1fr;
@@ -1175,15 +1175,15 @@ dialog::backdrop {
     min-width: 125px;
   }
   .brand > div {
-    font-size: 18px;
+    font-size: 1.125rem;
   }
   .brand small {
-    font-size: 6px;
+    font-size: 0.375rem;
   }
   .brand-icon {
     width: 37px;
     height: 37px;
-    font-size: 20px;
+    font-size: 1.25rem;
   }
   .topbar .breadcrumb {
     display: none;
@@ -1201,7 +1201,7 @@ dialog::backdrop {
     padding: 8px 20px 12px;
   }
   .command-nav button {
-    font-size: 11px;
+    font-size: 0.6875rem;
     padding: 7px 12px;
   }
   .workspace-board {
@@ -1246,12 +1246,12 @@ dialog::backdrop {
     display: none;
   }
   .brand > div {
-    font-size: 17px;
+    font-size: 1.0625rem;
   }
   .brand-icon {
     width: 32px;
     height: 32px;
-    font-size: 18px;
+    font-size: 1.125rem;
   }
   .topbar-actions {
     gap: 5px;
@@ -1261,7 +1261,7 @@ dialog::backdrop {
   }
   .language-select {
     width: 82px;
-    font-size: 10px;
+    font-size: 0.625rem;
     padding: 6px;
   }
   .icon-button {
@@ -1279,7 +1279,7 @@ dialog::backdrop {
   }
   .topbar #new-feedback::after {
     content: "+";
-    font-size: 22px;
+    font-size: 1.375rem;
   }
   #mobile-nav {
     display: none;
@@ -1291,12 +1291,12 @@ dialog::backdrop {
     gap: 3px;
   }
   .command-nav button {
-    font-size: 10px;
+    font-size: 0.625rem;
     padding: 7px 10px;
     gap: 6px;
   }
   .command-nav button > span {
-    font-size: 14px;
+    font-size: 0.875rem;
   }
   main {
     padding: 20px 16px 36px;
@@ -1309,13 +1309,13 @@ dialog::backdrop {
     min-height: 0;
   }
   .workspace-hero h1 {
-    font-size: 40px;
+    font-size: 2.5rem;
     line-height: 1.08;
     letter-spacing: -2px;
     margin: 12px 0;
   }
   .workspace-hero .subtitle {
-    font-size: 12px;
+    font-size: 0.75rem;
     max-width: 300px;
   }
   .workspace-hero .heading-actions {
@@ -1340,14 +1340,14 @@ dialog::backdrop {
     padding: 18px;
   }
   .metric-value {
-    font-size: 34px;
+    font-size: 2.125rem;
     margin: 10px 0;
   }
   .metric-label {
-    font-size: 10px;
+    font-size: 0.625rem;
   }
   .metric-note {
-    font-size: 9px;
+    font-size: 0.5625rem;
   }
   .metric:last-child {
     grid-column: 1/-1;
@@ -1387,7 +1387,7 @@ dialog::backdrop {
     padding: 16px;
   }
   .service-metrics strong {
-    font-size: 17px;
+    font-size: 1.0625rem;
   }
   .status-chart {
     gap: 15px;
@@ -1398,10 +1398,10 @@ dialog::backdrop {
     flex: 0 0 130px;
   }
   .status-legend {
-    font-size: 10px;
+    font-size: 0.625rem;
   }
   .card-heading h2 {
-    font-size: 17px;
+    font-size: 1.0625rem;
   }
   .recent-row {
     gap: 10px;
@@ -1410,13 +1410,13 @@ dialog::backdrop {
     width: 140px;
   }
   .recent-row h3 {
-    font-size: 12px;
+    font-size: 0.75rem;
   }
   .recent-row p {
-    font-size: 10px;
+    font-size: 0.625rem;
   }
   .badge {
-    font-size: 9px;
+    font-size: 0.5625rem;
   }
   .video-stage video {
     max-height: 240px;
@@ -1425,13 +1425,13 @@ dialog::backdrop {
     gap: 6px;
   }
   #video-state {
-    font-size: 9px;
+    font-size: 0.5625rem;
   }
   .capture-actions {
     gap: 7px;
   }
   .capture-actions .button {
-    font-size: 11px;
+    font-size: 0.6875rem;
   }
   .publishing-grid {
     gap: 16px;
@@ -1457,7 +1457,7 @@ dialog::backdrop {
     padding-bottom: 38px;
   }
   .activity-day small {
-    font-size: 9px;
+    font-size: 0.5625rem;
   }
   .resolution-insights {
     grid-template-columns: 1fr 1fr;
@@ -1468,7 +1468,7 @@ dialog::backdrop {
     padding: 0;
   }
   .insight strong {
-    font-size: 30px;
+    font-size: 1.875rem;
   }
   .insight:last-child {
     grid-column: 1/-1;
@@ -1491,7 +1491,7 @@ dialog::backdrop {
   border: 1px solid #ffffff20;
 }
 .network-footnote {
-  font-size: 10px;
+  font-size: 0.625rem;
   margin: 18px 0 0;
 }
 @media (max-width: 600px) {

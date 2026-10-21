@@ -415,6 +415,12 @@
             <label>Confirm password<input id="confirm-password" type="password" required minlength="10" autocomplete="new-password" /></label>
             <p class="helper">Use at least 10 characters. Other sessions will be signed out.</p>
             <button class="button primary">Update password</button><p id="password-status" role="status"></p>
+          </form></article><article class="card"><h2>Display settings</h2>
+          <form id="appearance-form" class="profile-form">
+            <label>Site font<select id="appearance-font"><option value="calibri">Calibri</option><option value="arial">Arial</option><option value="segoe">Segoe UI</option><option value="tahoma">Tahoma</option><option value="verdana">Verdana</option><option value="georgia">Georgia</option><option value="times">Times New Roman</option><option value="courier">Courier New</option></select></label>
+            <label>Base text size<select id="appearance-size"><option value="12">12 px</option><option value="14" selected>14 px</option><option value="16">16 px</option><option value="18">18 px</option><option value="20">20 px</option></select></label>
+            <p class="helper">Headings and labels scale proportionally. Your choices are saved to your account and applied when you sign in on another device. Fonts unavailable on your device use a fallback.</p>
+            <div class="account-actions"><button id="appearance-save" class="button primary">Save display settings</button><button id="appearance-reset" type="button" class="button">Use defaults</button></div><p id="appearance-status" role="status"></p>
           </form></article></div>
         </section>
         <section id="settings-page" class="page" hidden>
