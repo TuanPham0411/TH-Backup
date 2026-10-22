@@ -4,16 +4,17 @@ import {uploadChunks} from "./uploads.js";
 let listener;
 let tester = sessionStorage.getItem('th-mes-tester') === 'true';
 const watchers = new Set();
-let loading = false;
+let loading = false,refreshTimer,watcherVersion=0;
+function scheduleRefresh(){if(refreshTimer!==undefined)return;refreshTimer=setTimeout(()=>{refreshTimer=undefined;refreshRecords();},0);}
 export async function refreshRecords() {
   if (loading || !watchers.size || document.hidden) return;
   loading = true;
-  const active = [...watchers];
+  const active = [...watchers],version=watcherVersion;
   try {
-    const result = await api("readBundle", { paths: active.map(w => ({ path: w.path, order: w.order })) });
+    const result = await api("readBundle", { paths: [...new Map(active.map(w=>[w.path+":"+(w.order||""),{path:w.path,order:w.order}])).values()] });
     for (const w of active) if (watchers.has(w)) w.onData(result.snapshots[w.path].rows);
   } catch (error) { for (const w of active) if (watchers.has(w)) w.onError(error); }
-  finally { loading = false; }
+  finally { loading = false;if(version!==watcherVersion&&watchers.size)scheduleRefresh(); }
 }
 export function initializeBackend() {}
 export async function api(name, data = {}) {
@@ -28,8 +29,8 @@ export async function api(name, data = {}) {
   });
   const body = await response.json();
   if (!response.ok) throw Object.assign(new Error(body.error || 'Request failed'), { code: body.code || 'unavailable',status:response.status });
-  if (!['getAppearanceDefaults','getAppearancePreferences','read','readBundle','getDirectory','getSession','listDevices','downloadUrl','uploadUrl'].includes(name))
-    setTimeout(refreshRecords, 0);
+  if (!['getDashboardPreferences','getProfile','getAppearanceDefaults','getAppearancePreferences','read','readBundle','getDirectory','getSession','listDevices','downloadUrl','uploadUrl'].includes(name))
+    scheduleRefresh();
   return body;
   }finally{clearTimeout(timeout);}
 }
@@ -54,10 +55,10 @@ export async function logout() {
 }
 export function watchRecords(path, onData, onError, order) {
   const watcher = { path, onData, onError, order };
-  watchers.add(watcher);
-  setTimeout(refreshRecords, 0);
+  watchers.add(watcher);watcherVersion++;
+  scheduleRefresh();
   return () => {
-    watchers.delete(watcher);
+    if(watchers.delete(watcher))watcherVersion++;
   };
 }
 export async function uploadAttachment(path, file, type) {

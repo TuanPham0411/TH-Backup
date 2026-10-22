@@ -27,3 +27,10 @@ test('startup passes the verified session to the UI without requiring a second s
  const app=backend(async()=>{requests++;return {ok:true,status:200,json:async()=>session};});
  app.watchAuth(value=>{received=value;});await settle();assert.equal(requests,1);assert.equal(received.session,session);
 });
+
+ test('MES batches subscriptions, deduplicates paths and avoids refreshing tickets for preferences',async()=>{
+ const requests=[];const app=backend(async(_url,options)=>{const body=JSON.parse(options.body);requests.push(body);return {ok:true,status:200,json:async()=>({snapshots:{issues:{rows:[]},departments:{rows:[]}}})};});
+ let delivered=0;const stops=['issues','departments','issues'].map(path=>app.watchRecords(path,()=>delivered++,error=>{throw error;}));
+ await settle();assert.equal(requests.length,1);assert.equal(requests[0].data.paths.length,2);assert.equal(delivered,3);
+ await app.api('getDashboardPreferences');await settle();assert.equal(requests.filter(r=>r.name==='readBundle').length,1);stops.forEach(stop=>stop());
+ });

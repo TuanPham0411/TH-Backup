@@ -1,3 +1,4 @@
+import {uploadLoadedPreview} from './media-preview.js';
 import {initMobileFeedback} from './mobile-feedback.js';
 import {initAppearancePreferences,loadAppearancePreferences} from './appearance-preferences.js';
 import {initContentTabs} from './content-tabs.js';
@@ -22,6 +23,7 @@ import {
   statuses,
   priorities,
   validateFiles,
+  validateEvidence,
   validateIssue,
   filterIssues,
   stats,
@@ -582,7 +584,7 @@ function renderDetail(issue) {
   for (const f of issue.attachments || []) {
     const card = el("article", undefined, "attachment-card");
     if(f.type?.startsWith('image/')){
-      const image=document.createElement('img');image.alt='';image.loading='lazy';image.decoding='async';imageUrl(f).then(url=>{image.src=url.startsWith('/api/')?url+'?preview=1':url;}).catch(()=>{});card.append(image);
+      const image=document.createElement('img');image.alt='';image.loading='lazy';image.decoding='async';image.addEventListener('load',()=>repairTicketPreview(f,image),{once:true});imageUrl(f).then(url=>{image.src=url.startsWith('/api/')?url+'?preview=1':url;}).catch(()=>{});card.append(image);
     }
     const row = el("div", undefined, "file-row"), button = el("button", state.preview ? "Preview file" : "View", "text-button");
     if (f.type?.startsWith("video/")) { button.textContent = `↗ ${t("View video")}`; button.classList.add("video-evidence-link"); }
@@ -925,10 +927,12 @@ function subscribeLive() {
   stopLive();
   state.connectionError=false;
   workspace.start();
+  let scheduled=false;
+  const draw=()=>{if(scheduled)return;scheduled=true;queueMicrotask(()=>{scheduled=false;renderDirectories();renderAll();updateIdentity();openLinkedTicket();});};
   const add = (path, field, order) => unsubscribers.push(watchRecords(path, (rows) => {
     state[field] = rows;
-    if (["issues", "myIssues"].includes(field)) { state.ready = true; state.connectionError=false; message(""); renderAll(); updateIdentity();openLinkedTicket(); }
-    else renderDirectories();
+    if (["issues", "myIssues"].includes(field)) { state.ready = true; state.connectionError=false; message(""); draw(); }
+    else draw();
   }, onDataError, order));
   if(state.user) add("teamLeaders", "leaders");
   add("departments", "departments");
@@ -972,7 +976,7 @@ $("feedback-form").onsubmit = (e) => {
     };
     data.description = documentText(data.richDocument);
     data.subject = data.description.split(/\r?\n/)[0].slice(0, 100);
-    const invalid = validateIssue(data) || validateFiles(state.files);
+    const invalid = validateIssue(data) || validateEvidence(state.files);
     if (invalid) {
       showStatus("create-status", invalid);
       return;
@@ -1020,7 +1024,7 @@ $("feedback-form").onsubmit = (e) => {
         "Preview feedback created. No production data was submitted.",
       );
     } else {
-      const result = await callable("createIssue", data);
+      const result = await callable("createIssue", {...data, evidence: state.files.map(file => ({name:file.name,type:attachmentType(file),size:file.size}))});
       createdId = result.id;
       const uploaded = [];
       try {
@@ -1650,11 +1654,16 @@ function renderOccurrences(items) {
   }
   return section;
 }
-const imageCache = new Map(), previewImages = new Set();
+const imageCache = new Map(), previewImages = new Set(),repairedPreviews=new Set();
+async function repairTicketPreview(file,image){
+ if(!state.isOwner||state.preview||!file.path||repairedPreviews.has(file.path)||!image.naturalWidth||file.size<=262144)return;
+ repairedPreviews.add(file.path);const generation=sessionGeneration;
+ try{const url=await imageUrl(file),response=await fetch(url+'?preview=1',{method:'HEAD',credentials:'same-origin'});if(response.ok&&response.headers.get('X-Media-Preview')==='original'&&generation===sessionGeneration)await uploadLoadedPreview('ticket',file.path,image);}catch{}
+}
 function previewFileUrl(file) { const url = URL.createObjectURL(file); previewImages.add(url); return url; }
 function clearImages() {
   for (const entry of imageCache.values()) if (entry.url) URL.revokeObjectURL(entry.url);
-  imageCache.clear(); for (const url of previewImages) URL.revokeObjectURL(url); previewImages.clear();
+  imageCache.clear();repairedPreviews.clear(); for (const url of previewImages) URL.revokeObjectURL(url); previewImages.clear();
   $("image-viewer").close(); $("image-full").removeAttribute("src");
 }
 async function imageUrl(file) {
@@ -1669,11 +1678,7 @@ async function openImage(file) {
     if (generation !== sessionGeneration) return;
     $('image-download').href=url.startsWith('/api/')?url+'?download=1':url;$('image-download').download=file.name;
     $("image-name").textContent = file.name;const display=$('image-full'),preview=url.startsWith('/api/')?url+'?preview=1':url;display.alt=file.name;display.dataset.original=url;
-    display.onload=async()=>{display.onload=null;if(!url.startsWith('/api/'))return;
-      try{const cached=await fetch(preview,{cache:'force-cache'});const ready=cached.headers.get('X-Media-Preview')==='ready';await cached.body?.cancel();if(!ready||generation!==sessionGeneration||display.dataset.original!==url)return;
-        const full=new Image();full.decoding='async';full.onload=()=>{if(generation===sessionGeneration&&display.dataset.original===url)display.src=url;};full.src=url;
-      }catch{}
-    };display.src=preview;
+    display.onload=()=>{display.onload=null;repairTicketPreview(file,display);};display.src=preview;
     $("image-stage").classList.remove("natural-size");
     if (!$("image-viewer").open) $("image-viewer").showModal();
   } catch (error) { toast("Unable to load image. Try again."); }
@@ -1682,8 +1687,8 @@ $("add-moment").onclick = () => addOccurrence("point");
 $("add-range").onclick = () => addOccurrence("range");
 $("image-close").onclick = () => $("image-viewer").close();
 $("image-fit").onclick = () => $("image-stage").classList.remove("natural-size");
-$("image-zoom").onclick = () => $("image-stage").classList.add("natural-size");
-$("image-full").ondblclick = () => $("image-stage").classList.toggle("natural-size");
+$("image-zoom").onclick = () => {const image=$('image-full');if(image.dataset.original)image.src=image.dataset.original;$("image-stage").classList.add("natural-size");};
+$("image-full").ondblclick = () => {if(!$('image-stage').classList.contains('natural-size')&&$('image-full').dataset.original)$('image-full').src=$('image-full').dataset.original;$("image-stage").classList.toggle("natural-size");};
 $("image-viewer").addEventListener("click", event => { if (event.target === $("image-viewer")) $("image-viewer").close(); });
 window.addEventListener("beforeunload", clearImages);
 
@@ -1708,7 +1713,7 @@ function inlineImageFile(file){
   const button=el("button",undefined,"inline-report-image");button.type="button";
   button.setAttribute("aria-label",`${t("View image")}: ${file.name}`);
   const image=document.createElement("img");image.alt=file.name;image.loading="lazy";button.append(image);
-  imageUrl(file).then(url=>{if(button.isConnected){image.src=url.startsWith('/api/')?url+'?preview=1':url;image.decoding='async';}}).catch(()=>{button.append(el("span",t("Image unavailable. Click to retry.")));});
+  image.addEventListener('load',()=>repairTicketPreview(file,image),{once:true});imageUrl(file).then(url=>{if(button.isConnected){image.src=url.startsWith('/api/')?url+'?preview=1':url;image.decoding='async';}}).catch(()=>{button.append(el("span",t("Image unavailable. Click to retry.")));});
   button.onclick=()=>openImage(file);return button;
 }
 const feedbackEditor = createRichEditor($("description-input"), {

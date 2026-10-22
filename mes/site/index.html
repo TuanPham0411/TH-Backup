@@ -268,13 +268,14 @@
                 maxlength="5000"
                 placeholder="Describe the issue or suggestion. Attach a screenshot if helpful."
               ></textarea
-              ><label for="attachment-input">Attachments</label
+              ><label for="attachment-input">Photo or video (required)</label
               ><label class="upload-zone" for="attachment-input"
                 ><span>↥</span><strong>Choose files from your computer</strong
                 ><small
                   >Up to 5 files · images/documents 10 MB · videos 200 MB · MP4, WEBM, MOV supported</small
                 ><input
                   id="attachment-input"
+                  aria-required="true"
                   type="file"
                   multiple
                   accept=".jpg,.jpeg,.png,.webp,.pdf,.txt,.csv,.xlsx,.mp4,.webm,.mov"

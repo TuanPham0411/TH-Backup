@@ -37,3 +37,9 @@ The standalone branch contains source only. To move a live instance, schedule a 
 ## Quick Access
 
 The source and runtime include `/quick-access/`, protected by the same MES login. It defaults to MES Night and retains private per-user Drive preferences. All account management remains in MES. Configure existing source-folder read access and Drive consent as described in [Quick Access setup](quick-access/README.md).
+
+## Media loading
+
+Drive image reads use a disposable private disk cache under `FILES_ROOT/.cache/drive-media` (128 MiB, at most 512 entries; images up to 12 MiB). Set `MEDIA_CACHE_ROOT` to a writable private directory and `MEDIA_CACHE_MAX_BYTES=0` to disable it. Every read still checks current MES permissions. Drive originals and database mappings remain authoritative; deleting the cache does not delete evidence. Videos retain byte-range streaming. The viewer loads display previews first and fetches full-resolution images on zoom or download.
+
+New ticket forms require at least one supported image or video. Creation API requests declare attachment metadata in `evidence`; document-only submissions are rejected. Creation still uses the existing two-phase upload flow: if an upload fails after ticket allocation, the UI reports the retained ticket ID so the evidence upload can be recovered. Existing tickets are preserved.

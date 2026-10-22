@@ -98,6 +98,44 @@ jobs:
           sudo -n /usr/local/sbin/th-deploy "$PWD/unpacked" "$RELEASE_ID"
       - name: Inspect routing without credentials
         run: sudo -n /usr/local/sbin/th-deploy --inspect-routing
+      - name: Measure API and media after rollout
+        run: |
+          python3 - <<'PY'
+          import concurrent.futures,json,time,urllib.request,urllib.parse
+          origin='http://127.0.0.1:3000'
+          def request(label,path,body=None,media=False):
+            started=time.monotonic();headers={'Host':'mes.th.io.vn','Content-Type':'application/json'}
+            if media:headers['Range']='bytes=0-262143'
+            try:
+              req=urllib.request.Request(origin+path,data=json.dumps(body).encode() if body else None,headers=headers)
+              with urllib.request.urlopen(req,timeout=25) as response:
+                first=response.read(1);ttfb=time.monotonic()-started
+                data=first+response.read(262143 if media else 8*1024*1024)
+                print(json.dumps({'metric':label,'status':response.status,'ttfb_ms':round(ttfb*1000),'total_ms':round((time.monotonic()-started)*1000),'bytes':len(data),'preview':response.headers.get('X-Media-Preview'),'cache':response.headers.get('X-Media-Cache'),'content_length':response.headers.get('Content-Length')}),flush=True)
+                return json.loads(data) if response.headers.get('Content-Type','').startswith('application/json') else None
+            except Exception as error:
+              print(json.dumps({'metric':label,'error':type(error).__name__,'total_ms':round((time.monotonic()-started)*1000)}),flush=True)
+          bundle=None
+          for attempt in range(2):
+            request('health.'+str(attempt),'/api/health')
+            bundle=request('tickets.'+str(attempt),'/api/mes',{'name':'readBundle','data':{'paths':[{'path':'departments'},{'path':'issues','order':'desc'}]}}) or bundle
+            request('workspace.'+str(attempt),'/api/mes/workspace',{'action':'read'})
+            request('appearance.'+str(attempt),'/api/mes',{'name':'getAppearanceDefaults'})
+          images=[]
+          for ticket in (bundle or {}).get('snapshots',{}).get('issues',{}).get('rows',[]):
+            for item in ticket.get('attachments',[]):
+              path=item.get('path','');parts=path.split('/')
+              if item.get('type','').startswith('image/') and len(parts)==3 and parts[0]=='issues':
+                url='/api/mes/attachments/'+'/'.join(urllib.parse.quote(p,safe='') for p in parts[1:])+'?preview=1'
+                if url not in images:images.append(url)
+          for i,url in enumerate(images[:3]):
+            request('image.prime.'+str(i),url)
+          with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
+            pending=[executor.submit(request,'image.'+str(i),url,None,True) for i,url in enumerate(images[:3])]
+            request('health.during-media','/api/health')
+            for future in pending:future.result()
+          print(json.dumps({'metric':'summary','tickets':len((bundle or {}).get('snapshots',{}).get('issues',{}).get('rows',[])),'sample_images':len(images[:3])}),flush=True)
+          PY
       - name: Remove downloaded artifact
         if: always()
         shell: bash

@@ -52,6 +52,10 @@ export function validateFiles(files) {
   }
   return "";
 }
+export function validateEvidence(files) {
+  if (!Array.isArray(files) || files.some(file => !file || typeof file.name !== "string" || !Number.isSafeInteger(file.size))) return "Add at least one photo or video.";
+  return validateFiles(files) || (files.some(file => /^(image|video)\//.test(attachmentType(file))) ? "" : "Add at least one photo or video.");
+}
 export function validateIssue(value) {
   if (!value.departmentId) return "Select a department.";
   if (!value.process?.trim() || value.process.trim().length > 120)

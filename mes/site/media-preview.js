@@ -13,3 +13,16 @@ export async function uploadPreview(kind,path,file,headers={}){
  }catch{/* Preview is optional; original upload stays valid. */}
  finally{bitmap?.close();}
 }
+
+// Repair a missing display copy from an image already decoded by the owner's browser.
+// This does not fetch the original again or replace original evidence.
+export async function uploadLoadedPreview(kind,path,image,headers={}){
+ try{
+  const ratio=Math.min(1,640/Math.max(image.naturalWidth,image.naturalHeight)),canvas=document.createElement('canvas');
+  canvas.width=Math.max(1,Math.round(image.naturalWidth*ratio));canvas.height=Math.max(1,Math.round(image.naturalHeight*ratio));
+  const context=canvas.getContext('2d');context.fillStyle='#fff';context.fillRect(0,0,canvas.width,canvas.height);context.drawImage(image,0,0,canvas.width,canvas.height);
+  const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/jpeg',.78));if(!blob||blob.size>256*1024)return false;
+  const suffix=kind==='ticket'?path.split('/').slice(1).map(encodeURIComponent).join('/'):encodeURIComponent(path)+'/image';
+  return (await fetch(`/api/mes/previews/${kind}/${suffix}`,{method:'PUT',credentials:'same-origin',headers:{'Content-Type':'image/jpeg',...headers},body:blob})).ok;
+ }catch{return false;}
+}

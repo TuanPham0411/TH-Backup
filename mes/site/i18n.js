@@ -277,3 +277,5 @@ Object.assign(vi, {'Use your device camera, or choose existing files. Videos can
 Object.assign(vi, {'Storage managed by the hosting platform':'Lưu trữ do nền tảng triển khai quản lý','USB operations and host backups are available only on the Raspberry Pi deployment.':'Thao tác USB và sao lưu máy chủ chỉ khả dụng trên bản Raspberry Pi.','Use your hosting platform tools for full backups and bulk media transfers.':'Dùng công cụ của nền tảng triển khai để sao lưu toàn bộ và chuyển tệp hàng loạt.'});
 
 Object.assign(vi, {'Connection failed. Press Refresh to retry.':'Không kết nối được. Bấm Làm mới để thử lại.'});
+
+Object.assign(vi, {'Photo or video (required)':'Ảnh hoặc video (bắt buộc)','3. Add a photo or video (required)':'3. Thêm ảnh hoặc video (bắt buộc)','Add at least one photo or video.':'Thêm ít nhất một ảnh hoặc video.'});

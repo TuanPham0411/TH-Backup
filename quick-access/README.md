@@ -118,3 +118,7 @@ checks cover session expiry, rejection of Windows/tester-header impersonation,
 owner-only edits/uploads, private preferences, stale versions, safe resource
 paths, origin checks and existing MES functionality. Live Google consent and
 real Pi/domain operation require separate integration verification.
+
+## Loading and cache
+
+MES does not preload Quick Access resources. Quick Access JSON reads are coalesced and cached in server memory for up to 15 seconds (4 MiB total); successful writes refresh that cache immediately. Writes always re-read Drive under the database coordination lock to validate versions. Drive remains the durable data store. The runtime uses a separate single-connection pool for these writes so a slow Drive save does not occupy a core MES database connection.
