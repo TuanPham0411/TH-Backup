@@ -127,6 +127,7 @@ jobs:
           probe('portfolio.page','/')
           probe('portfolio.health','/api/health')
           origin='https://mes.th.io.vn'
+          probe('connection-check','/api/connection-check')
           page=probe('page','/')
           if page:
             match=re.search(r'src="(/assets/[^" ]+\.js)"',page.decode())
