@@ -36,6 +36,7 @@ test('Quick Access persists JSON through Drive, rejects stale edits, and propaga
   assert.ok(events.some(e=>e.sql.includes('pg_advisory_xact_lock')&&e.args[0]==='quick-access:content'));
   assert.ok(events.some(e=>e.sql==='rollback'));
   failed=true;await assert.rejects(store.write('content',{lines:['unsaved']},{fallback}),{status:502});assert.deepEqual(value,second);
+  delete process.env.GOOGLE_DRIVE_SOURCE_READ;assert.ok(new URL(driveAuthorization('state','verifier',{sourceRead:true})).searchParams.get('scope').includes('drive.readonly'));assert.ok(!new URL(driveAuthorization('state','verifier')).searchParams.get('scope').includes('drive.readonly'));
   process.env.GOOGLE_DRIVE_SOURCE_READ='true';assert.ok(new URL(driveAuthorization('state','verifier')).searchParams.get('scope').includes('drive.readonly'));
  }finally{global.fetch=savedFetch;for(const [key,value]of Object.entries(saved))if(value===undefined)delete process.env[key];else process.env[key]=value;await rm(dir,{recursive:true,force:true});}
 });

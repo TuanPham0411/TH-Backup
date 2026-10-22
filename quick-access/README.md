@@ -48,10 +48,13 @@ root. Files are never made public. Scripts and Windows installers are downloads;
 the server does not execute them. PDF.js is bundled locally for previews.
 
 **Required once for the existing source documents:** the Drive account connected
-on the server must have read access to that folder. Set
-`GOOGLE_DRIVE_SOURCE_READ=true` in the private runtime environment, enable the
-`https://www.googleapis.com/auth/drive.readonly` scope in the Google OAuth consent
-configuration, restart the application and reconnect Drive through MES Administration.
+on the server must have read access to that folder. Enable
+the optional `https://www.googleapis.com/auth/drive.readonly` scope in the Google
+OAuth consent configuration. As the MES owner, open Quick Access → MES account →
+**Connect source documents on Drive** and approve Google's read-access request
+with the same Drive account. This reuses the existing connected root folder.
+Alternatively set `GOOGLE_DRIVE_SOURCE_READ=true` in the private runtime environment,
+restart and reconnect through MES Administration.
 Google may require OAuth app verification for this restricted scope depending on
 the app's publishing mode. Existing `drive.file` consent alone does not grant
 access to an arbitrary pre-existing source folder. The extra scope is read-only;

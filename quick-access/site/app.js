@@ -289,6 +289,7 @@ async function refreshMe(){
   userBadge.textContent = me.username && me.username !== 'Guest' ? `${me.username} · ${me.role}` : 'MES session unavailable';
   userBadge.title = [me.username || 'Guest', me.authMode || 'none', me.windowsIdentity || ''].filter(Boolean).join(' | ');
   document.getElementById('mesAdministrationLink').hidden=!me.isOwner;
+  document.getElementById('quickSourceDriveLink').hidden=!me.isOwner;
   document.getElementById('mesAccountName').textContent = me.username || 'Guest';
   document.getElementById('mesAccountMode').textContent = 'Signed in with your MES account';
 }
