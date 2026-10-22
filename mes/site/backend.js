@@ -37,7 +37,7 @@ export function watchAuth(callback,onError=()=>{}) {
  listener=callback;
  setTimeout(async()=>{
   let user;
-  try{await api('getSession');user={id:'local'};}
+  try{const session=await api('getSession');user={id:'local',session};}
   catch(error){if(error.status===401||error.code==='unauthenticated')user=null;else{onError(error);return;}}
   try{await callback(user);}catch(error){onError(error);}
  },0);

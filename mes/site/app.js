@@ -1567,7 +1567,6 @@ async function handleAuth(user) {
   state.files = [];
   $("activation-result").hidden = true; $("activation-link").value = "";
   $("profile-form").reset(); $("password-form").reset();
-  loadAppearancePreferences(null);
   $("device-result").replaceChildren();
   $("device-result").hidden = true;
   renderDevices();
@@ -1590,12 +1589,11 @@ async function handleAuth(user) {
     return;
   }
   try {
-    const session = await callable("getSession");
+    const session = user.session || await callable("getSession");
     if (generation !== sessionGeneration) return;
     if (session.accountVersion !== 1) throw Object.assign(new Error("Account service update required"), { code: "backend-not-ready" });
     if(new URLSearchParams(location.search).get('returnTo')==='/quick-access'&&!session.user.isTester){location.replace('/quick-access/');return;}
     state.user = session.user;
-    await Promise.all([loadDashboardPreferences(state.user),loadAppearancePreferences(state.user)]);
     state.isOwner = session.isOwner;
     state.requiresWindows = false;
     const requestedView=new URLSearchParams(location.search).get('view');
@@ -1604,6 +1602,7 @@ async function handleAuth(user) {
     updateIdentity();
     renderDirectories();
     subscribeLive();
+    setTimeout(()=>{if(generation===sessionGeneration)Promise.all([loadDashboardPreferences(state.user),loadAppearancePreferences(state.user)]).catch(()=>toast("Could not load personal workspace preferences. Press Refresh to retry."));},0);
     if(state.isOwner&&new URLSearchParams(location.search).get("drive")==="connected"){history.replaceState(null,"",location.pathname);navigate("settings");toast("Google Drive connected.");}
     if ($("account-dialog").open && $("activation-form").hidden) $("account-dialog").close();
     toast(

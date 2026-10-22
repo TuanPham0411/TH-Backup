@@ -21,3 +21,9 @@ test('a stalled MES request aborts instead of leaving startup waiting indefinite
  let deadline;const app=backend(async(url,{signal})=>new Promise((resolve,reject)=>signal.addEventListener('abort',()=>reject(Object.assign(new Error('Timeout'),{name:'AbortError'})))),{setTimer:(callback,delay)=>{assert.equal(delay,15000);deadline=callback;return 0;}});
  const request=app.api('getSession');deadline();await assert.rejects(request,{name:'AbortError'});
 });
+
+test('startup passes the verified session to the UI without requiring a second session lookup',async()=>{
+ let requests=0,received;const session={accountVersion:1,user:{uid:'member-1'},isOwner:false};
+ const app=backend(async()=>{requests++;return {ok:true,status:200,json:async()=>session};});
+ app.watchAuth(value=>{received=value;});await settle();assert.equal(requests,1);assert.equal(received.session,session);
+});
