@@ -275,3 +275,5 @@ Object.assign(vi, {'1. Describe the feedback':'1. Mô tả phản hồi','2. Add
 Object.assign(vi, {'Use your device camera, or choose existing files. Videos can be up to 200 MB each.':'Dùng camera của thiết bị hoặc chọn tệp có sẵn. Mỗi video tối đa 200 MB.'});
 
 Object.assign(vi, {'Storage managed by the hosting platform':'Lưu trữ do nền tảng triển khai quản lý','USB operations and host backups are available only on the Raspberry Pi deployment.':'Thao tác USB và sao lưu máy chủ chỉ khả dụng trên bản Raspberry Pi.','Use your hosting platform tools for full backups and bulk media transfers.':'Dùng công cụ của nền tảng triển khai để sao lưu toàn bộ và chuyển tệp hàng loạt.'});
+
+Object.assign(vi, {'Connection failed. Press Refresh to retry.':'Không kết nối được. Bấm Làm mới để thử lại.'});

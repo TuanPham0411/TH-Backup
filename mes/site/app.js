@@ -894,7 +894,9 @@ function updateIdentity() {
     .toUpperCase();
   $("connection-state").textContent = state.preview
     ? "Sample data · preview"
-    : state.ready
+    : state.connectionError
+      ? "Connection failed. Press Refresh to retry."
+      : state.ready
       ? "Workspace loaded"
       : "Connecting…";
   if (!state.isOwner && state.page === "settings") navigate("dashboard");
@@ -908,6 +910,8 @@ function stopLive() {
   if (timelineUnsubscribe) timelineUnsubscribe();
 }
 function onDataError(error) {
+  state.connectionError=true;
+  $("connection-state").textContent=t("Connection failed. Press Refresh to retry.");
   message(errorMessage(error));
   if (["permission-denied", "unauthenticated"].includes(String(error.code)) && state.user) {
     stopLive();
@@ -919,10 +923,11 @@ function onDataError(error) {
 }
 function subscribeLive() {
   stopLive();
+  state.connectionError=false;
   workspace.start();
   const add = (path, field, order) => unsubscribers.push(watchRecords(path, (rows) => {
     state[field] = rows;
-    if (["issues", "myIssues"].includes(field)) { state.ready = true; renderAll(); updateIdentity();openLinkedTicket(); }
+    if (["issues", "myIssues"].includes(field)) { state.ready = true; state.connectionError=false; message(""); renderAll(); updateIdentity();openLinkedTicket(); }
     else renderDirectories();
   }, onDataError, order));
   if(state.user) add("teamLeaders", "leaders");
@@ -1522,6 +1527,7 @@ $("refresh-button").onclick = async () => {
     toast("Preview data refreshed.");
     return;
   }
+  if(!state.ready){watchAuth(handleAuth,onDataError);return;}
   await Promise.all([refreshRecords(),workspace.refresh()]);
   document.dispatchEvent(new CustomEvent('mes:refresh'));
   toast('Workspace refreshed.');
@@ -1546,6 +1552,7 @@ async function handleAuth(user) {
   state.user = null;
   state.isOwner = false;
   state.ready = false;
+  state.connectionError=false;
   state.issues = [];
   state.myIssues = [];
   state.users = [];
@@ -1605,7 +1612,7 @@ async function handleAuth(user) {
   } catch (e) {
     if (generation === sessionGeneration) {
       showStatus("account-status", errorMessage(e));
-      message(errorMessage(e));
+      onDataError(e);
     }
   }
 }
@@ -1757,7 +1764,7 @@ if (state.preview) {
   updateIdentity();
 } else if (configured) {
   initializeBackend();
-  watchAuth(handleAuth);
+  watchAuth(handleAuth,onDataError);
   renderDirectories();
   renderAll();
   updateIdentity();

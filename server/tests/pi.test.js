@@ -78,7 +78,8 @@ test('MES activation, CRUD, private files, tester restrictions, revocation',asyn
  assert.equal((await api('deleteIssue',{id:issue.body.id},user)).status,403);
  assert.equal((await api('manageDirectory',{type:'departments',operation:'create',name:'Blocked'},owner,'mes.th.io.vn',{'x-mes-tester':'true'})).status,403);
  assert.equal((await api('manageUser',{operation:'deactivate',uid:created.body.uid,active:false},owner)).status,200);
- assert.equal((await api('getSession',{},user)).status,401);
+ const expiredSession=await api('getSession',{},user);assert.equal(expiredSession.status,401);assert.match(expiredSession.headers.get('set-cookie'),/th_mes=;/);
+ const viewerBundle=await api('readBundle',{paths:[{path:'departments'},{path:'issues'}]},expiredSession.cookie);assert.equal(viewerBundle.status,200);assert.ok(Array.isArray(viewerBundle.body.snapshots.issues.rows));
  assert.equal((await quickMe(user)).status,401);
  assert.equal((await api('deleteIssue',{id:issue.body.id},owner)).status,200);
  assert.equal((await pool.query('select 1 from public.files where path=$1',[path])).rowCount,0);

@@ -17,19 +17,31 @@ export async function refreshRecords() {
 }
 export function initializeBackend() {}
 export async function api(name, data = {}) {
+  const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),15000);
+  try{
   const response = await fetch('/api/mes', {
+    signal:controller.signal,
     method: 'POST',
     credentials: 'same-origin',
     headers: { 'Content-Type': 'application/json', ...(tester ? { 'X-MES-Tester': 'true' } : {}) },
     body: JSON.stringify({ name, data }),
   });
   const body = await response.json();
-  if (!response.ok) throw Object.assign(new Error(body.error || 'Request failed'), { code: body.code || 'unavailable' });
+  if (!response.ok) throw Object.assign(new Error(body.error || 'Request failed'), { code: body.code || 'unavailable',status:response.status });
   if (!['getAppearanceDefaults','getAppearancePreferences','read','readBundle','getDirectory','getSession','listDevices','downloadUrl','uploadUrl'].includes(name))
     setTimeout(refreshRecords, 0);
   return body;
+  }finally{clearTimeout(timeout);}
 }
-export function watchAuth(callback) { listener = callback; setTimeout(async () => { try { await api('getSession'); await callback({ id: 'local' }); } catch { await callback(null); } }, 0); }
+export function watchAuth(callback,onError=()=>{}) {
+ listener=callback;
+ setTimeout(async()=>{
+  let user;
+  try{await api('getSession');user={id:'local'};}
+  catch(error){if(error.status===401||error.code==='unauthenticated')user=null;else{onError(error);return;}}
+  try{await callback(user);}catch(error){onError(error);}
+ },0);
+}
 export async function ownerLogin() { location.href='/api/oauth/start'+(new URLSearchParams(location.search).get('returnTo')==='/quick-access'?'?returnTo=%2Fquick-access':''); }
 export async function managedLogin() { tester = false; sessionStorage.removeItem('th-mes-tester'); await listener?.({ id: 'local' }); }
 export async function setTesterMode(enabled) {

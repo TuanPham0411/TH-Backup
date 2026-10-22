@@ -116,7 +116,9 @@ export function mesRouter(pool,filesRoot) {
    await pool.query('delete from public.files where path like $1',[`issues/${data.id}/%`]);
    return res.json(await dispatch('finishDelete',data,actor));
   }
-  const result=await dispatch(name,data,actor);
+  let result;
+  try{result=await dispatch(name,data,actor);}
+  catch(error){if(name==='getSession'&&error.code==='28000')res.clearCookie('th_mes',{path:'/',httpOnly:true,secure:true,sameSite:'lax'});throw error;}
   if(result.sessionToken) {
    res.cookie('th_mes',result.sessionToken,{httpOnly:true,secure:true,sameSite:'lax',path:'/',maxAge:12*3600*1000});
    delete result.sessionToken;

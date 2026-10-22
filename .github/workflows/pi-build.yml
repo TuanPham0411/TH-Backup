@@ -131,6 +131,7 @@ jobs:
           status=$(curl --silent --show-error --max-time 20 -o /dev/null -w '%{http_code}' -H 'Content-Type: application/json' --data '{"action":"read"}' https://mes.th.io.vn/api/mes/workspace)
           test "$status" = 200
           curl --fail --silent --show-error --max-time 20 -H 'Content-Type: application/json' --data '{"name":"read","data":{"path":"issues"}}' https://mes.th.io.vn/api/mes | python3 -c 'import json,sys; data=json.load(sys.stdin); assert isinstance(data.get("rows"),list); assert all("uploadSlots" not in row and "reporterUsername" not in row for row in data["rows"])'
+          curl --fail --silent --show-error --max-time 20 -H 'Content-Type: application/json' --data '{"name":"readBundle","data":{"paths":[{"path":"departments"},{"path":"issues"}]}}' https://mes.th.io.vn/api/mes | python3 -c 'import json,sys; data=json.load(sys.stdin); assert all(isinstance(data["snapshots"][path]["rows"],list) for path in ["departments","issues"])'
           status=$(curl --silent --show-error --max-time 20 -o /dev/null -w '%{http_code}' -H 'Content-Type: application/json' --data '{"name":"addComment","data":{"issueId":"viewer-probe","text":"blocked"}}' https://mes.th.io.vn/api/mes)
           test "$status" = 401
           reference=$(curl --fail --silent --show-error --max-time 20 -H 'Content-Type: application/json' --data '{"name":"read","data":{"path":"issues"}}' https://mes.th.io.vn/api/mes | python3 -c 'import json,sys; rows=json.load(sys.stdin)["rows"]; print(next((r["ticketNumber"] for r in rows if r.get("ticketNumber")),""))')
