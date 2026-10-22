@@ -1,6 +1,6 @@
 import {incidentSeries} from './incident-analytics.js';
 export const severityOrder=['Low','Medium','High','Critical','Unclassified'];
-export const severityColors={Low:'#62b5a0',Medium:'#e7bc58',High:'#f28a50',Critical:'#ee6172',Unclassified:'#8795aa'};
+export const severityColors={Low:'#36b7a0',Medium:'#e9b44c',High:'#f18743',Critical:'#ef626e',Unclassified:'#94a3b8'};
 const timestamp=value=>typeof value==='number'?value:Date.parse(value);
 // Merge each ticket's intervals before sweeping: multiple reports must never
 // inflate its simultaneous contribution. End events precede starts at a boundary.
@@ -36,9 +36,9 @@ export function incidentLoad(issues,options={}){
  let cursor=0;
  for(const b of buckets){
   while(cursor<segments.length&&segments[cursor].end<=b.start)cursor++;
-  b.count=0;b.starts=0;b.tickets=[];b.counts=Object.fromEntries(severityOrder.map(p=>[p,0]));
+  b.count=0;b.starts=0;b.startCounts=Object.fromEntries(severityOrder.map(p=>[p,0]));b.tickets=[];b.counts=Object.fromEntries(severityOrder.map(p=>[p,0]));
   for(let j=cursor;j<segments.length&&segments[j].start<b.end;j++)if(segments[j].count>b.count){b.count=segments[j].count;b.counts=segments[j].counts;}
-  for(const e of entries){if(e.ranges.some(r=>r.start<b.end&&r.end>b.start))b.tickets.push(e.issue);if(e.reported.some(r=>r.start>=b.start&&r.start<b.end))b.starts++;}
+  for(const e of entries){if(e.ranges.some(r=>r.start<b.end&&r.end>b.start))b.tickets.push(e.issue);if(e.reported.some(r=>r.start>=b.start&&r.start<b.end)){b.starts++;b.startCounts[e.priority]++;}}
   b.matches=options.frequency==='high'?b.count>=Number(options.threshold??3):options.frequency==='low'?b.count<=Number(options.threshold??3):true;
  }
  return {segments,buckets,entries,peak,missing,total:entries.length,ranked:buckets.filter(b=>b.matches).sort((a,b)=>(options.frequency==='low'?a.count-b.count:b.count-a.count)||a.start-b.start)};

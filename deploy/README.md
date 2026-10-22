@@ -221,22 +221,29 @@ Historical catalog labels remain selectable.
 
 The main incident timeline uses `occurrences`, never ticket creation time. A sweep
 of merged per-ticket intervals computes exact concurrent load; a ticket counts
-once even when its own reported ranges overlap. Severity-colored stacked areas
-and a white total line use the left axis. Pale columns count distinct ticket
-starts per hour/day on a separate labeled right axis. Dots show reported starts;
-selecting a window inspects its peak time and shows ticket/type/department detail.
-Point incidents visually continue to the current time by default (including
-closed tickets); this is explicitly labeled as a visualization, not a verified
-incident duration. Users can switch to reported moments only. Recorded ranges
-stop at their actual end. Invalid/missing times are reported separately.
+once even when its own reported ranges overlap. The compact chart separates three
+aligned tracks: a blue line of peak concurrent tickets per hour/day, severity-
+colored stacked columns of distinct ticket starts, and individual reported spans.
+Line and column axes use integer ticket counts; the line is not normalized to
+0–1. Peak sampling is explicitly labeled, and selecting a window inspects its
+exact peak time. The SVG uses its measured pixel width and the user's inherited
+font size instead of stretching text with a fixed viewBox.
 
-Date, type, department, severity and peak-concurrency filters run locally. The
-visible dashboard refreshes the existing record bundle every 60 seconds; no media
-or per-filter API requests are added. A maximum of 744 hourly/daily buckets bounds
-window summaries. Expandable ticket spans show up to 50 tickets; filters narrow
-larger sets. The compact dashboard combines status, handling metrics and recent
-tickets into one overview, and collapses legacy charts under Additional analysis.
-Existing per-user and administrator widget preferences remain in effect.
+Solid spans stop at the actual reported range end. Point incidents use a dot and
+an optional dashed continuation to the current time (including closed tickets);
+this is a visualization, not a verified incident duration. Users can select
+reported moments only. The chart previews three priority-sorted ticket lanes;
+Explore tickets contains full metadata, up to 50 spans and ranked windows.
+Invalid/missing incident times are reported separately. Theme/width/font changes
+redraw the chart locally. Date, type, department, severity and concurrency filters
+also run locally, without loading media or adding per-filter API requests.
+The visible dashboard refreshes its existing record bundle every 60 seconds.
+
+The compact layout combines status, handling metrics and recent tickets into one
+overview. Secondary analysis has a three-column classification row plus two
+side-by-side switchable widgets (department/priority distribution and open-ticket
+age/resolution time). Tab choices persist per user; existing admin/user widget
+visibility remains authoritative. The old Feedback activity widget is removed.
 
 
 `hpham` (`mes-owner`) remains the sole Owner. Owner assigns admin/user roles in

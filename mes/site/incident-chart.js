@@ -1,0 +1,50 @@
+import {severityOrder,severityColors} from './incident-load.js';
+import {t,getLanguage} from './i18n.js';
+const NS='http://www.w3.org/2000/svg';
+const S=(tag,attrs={},text)=>{const n=document.createElementNS(NS,tag);for(const [k,v]of Object.entries(attrs))n.setAttribute(k,String(v));if(text!==undefined)n.textContent=text;return n;};
+export function countScale(maximum,minimum=3){
+ const target=Math.max(minimum,maximum),raw=target/3,base=10**Math.floor(Math.log10(Math.max(raw,.001))),step=[1,2,5,10].map(n=>n*base).find(n=>n>=raw),integerStep=Math.max(1,Math.ceil(step)),max=Math.ceil(target/integerStep)*integerStep;
+ return {max,ticks:Array.from({length:Math.round(max/integerStep)+1},(_,i)=>i*integerStep)};
+}
+export function createIncidentChart(result,{width=960,fontSize=14,night=true,unit='day',onBucket=()=>{},onTime=()=>{},onTicket=()=>{},onHover=()=>{},onLeave=()=>{}}={}){
+ const scale=fontSize/14,w=Math.max(360,width),left=96*scale,right=w-18*scale,plot=Math.max(100,right-left),top=27*scale,lineBottom=105*scale,barTop=137*scale,barBottom=181*scale,axis=203*scale,laneTop=230*scale,rowHeight=20*scale;
+ const entries=[...result.entries].sort((a,b)=>({Critical:4,High:3,Medium:2,Low:1}[b.priority]||0)-({Critical:4,High:3,Medium:2,Low:1}[a.priority]||0)).slice(0,3),height=(entries.length?235+20*entries.length:230)*scale;
+ const c=night?{ink:'#e7eef4',muted:'#a3b2be',grid:'#354149',track:'#28343c',line:'#73bdff',select:'#b7d9ff'}:{ink:'#233244',muted:'#617284',grid:'#dce4ea',track:'#eaf0f4',line:'#216ed4',select:'#216ed4'};
+ const x=time=>left+(time-result.start)/(result.end-result.start)*plot,lineScale=countScale(result.peak),barScale=countScale(Math.max(0,...result.buckets.map(b=>b.starts)),1),y=n=>lineBottom-n/lineScale.max*(lineBottom-top),by=n=>barBottom-n/barScale.max*(barBottom-barTop);
+ const svg=S('svg',{xmlns:NS,viewBox:`0 0 ${w} ${height}`,width:w,height,role:'group',tabindex:0,'aria-label':t('Incident analysis: concurrent ticket peaks, new starts and reported intervals'),'aria-description':t('Use arrow keys to inspect intervals. Press Enter to see tickets.'),class:'incident-analysis-svg','data-count-max':lineScale.max,'data-peak':result.peak,style:`font-family:inherit;font-size:${fontSize}px;width:${w}px;height:${height}px;max-width:none`});
+ svg.append(S('title',{},t('Incident analysis: concurrent ticket peaks, new starts and reported intervals')));
+ const text=(value,px,py,attrs={})=>S('text',{x:px,y:py,fill:c.muted,'font-size':fontSize,'font-family':'inherit',...attrs},value);
+ svg.append(text(t('Peak concurrent'),left,14*scale,{fill:c.ink,'font-weight':600}),text(`${t('tickets')} / ${t(unit==='hour'?'Hour':'Day')}`,right,14*scale,{'text-anchor':'end'}));
+ for(const value of lineScale.ticks){svg.append(S('line',{x1:left,x2:right,y1:y(value),y2:y(value),stroke:c.grid,'stroke-width':1}),text(value,left-12*scale,y(value)+4*scale,{'text-anchor':'end'}));}
+ const highlight=S('rect',{x:left,y:top,width:0,height:barBottom-top,fill:c.select,opacity:.07,'pointer-events':'none',class:'incident-highlight'});svg.append(highlight);
+ const filtered=result.buckets.some(b=>!b.matches);
+ const points=result.buckets.map(b=>({bucket:b,x:x((b.start+b.end)/2),y:y(b.count)}));
+ if(points.length){svg.append(S('path',{d:'M'+points.map(p=>`${p.x},${p.y}`).join(' L'),fill:'none',stroke:c.line,'stroke-width':2.5*scale,'stroke-linejoin':'round','stroke-linecap':'round',opacity:filtered ? 0.25 : 1,class:'incident-total-line'}));
+  if(filtered){let run=[];const finish=()=>{if(run.length>1)svg.append(S('path',{d:'M'+run.map(p=>`${p.x},${p.y}`).join(' L'),fill:'none',stroke:c.line,'stroke-width':2.5*scale,'stroke-linejoin':'round','stroke-linecap':'round',class:'incident-matched-line'}));run=[];};for(const p of points){if(p.bucket.matches)run.push(p);else finish();}finish();}
+  if(points.length<=40)for(const p of points){svg.append(S('circle',{cx:p.x,cy:p.y,r:3*scale,fill:c.line,stroke:night?'#1b2227':'#fff','stroke-width':1.5*scale,opacity:p.bucket.matches?1:.25,class:'incident-load-dot'}));if(points.length<=14&&p.bucket.count>0&&p.bucket.matches)svg.append(text(p.bucket.count,p.x,(p.y<top+14*scale?p.y+18*scale:p.y-9*scale),{'text-anchor':'middle',fill:c.line,'font-weight':600}));}
+ }
+ svg.append(text(t('Starts'),left-12*scale,126*scale,{'text-anchor':'end',fill:c.ink,'font-weight':600}));
+ svg.append(S('line',{x1:left,x2:right,y1:barBottom,y2:barBottom,stroke:c.grid}),text('0',left-12*scale,barBottom+4*scale,{'text-anchor':'end'}),text(barScale.max,left-12*scale,barTop+4*scale,{'text-anchor':'end'}));
+ for(const b of result.buckets){const available=x(b.end)-x(b.start),bw=Math.min(30*scale,Math.max(1,available*.52)),center=x((b.start+b.end)/2);let below=0;
+  for(const priority of severityOrder){const count=b.startCounts?.[priority]||0;if(!count)continue;svg.append(S('rect',{x:center-bw/2,y:by(below+count),width:bw,height:by(below)-by(below+count),fill:severityColors[priority],rx:1.5*scale,class:'incident-start-column','data-severity':priority,'data-start':b.start,'data-series':'starts','data-count':count,opacity:b.matches?1:.2}));below+=count;}
+  if(result.buckets.length<=14&&b.starts>0&&b.matches)svg.append(text(b.starts,center,by(b.starts)-6*scale,{'text-anchor':'middle',fill:c.ink,'font-weight':600}));
+ }
+ const tickCount=Math.max(2,Math.min(points.length,8,Math.floor(plot/(90*scale))));
+ for(let i=0;i<tickCount;i++){const index=Math.round(i*(points.length-1)/(tickCount-1)),point=points[index];if(!point)continue;const at=point.bucket.start;const date=new Date(at),value=date.toLocaleString(getLanguage()==='vi'?'vi-VN':'en-GB',{timeZone:'Asia/Ho_Chi_Minh',...(unit==='hour'?{hour:'2-digit',minute:'2-digit'}:{day:'2-digit',month:'2-digit'})});svg.append(text(value,point.x,axis,{'text-anchor':'middle'}));}
+ if(entries.length)svg.append(text(`${t('Reported intervals')} · ${entries.length}/${result.entries.length}`,left,laneTop-11*scale,{fill:c.ink,'font-weight':600}));else svg.append(text(t('No incidents in this range.'),left,laneTop-11*scale));
+ for(const [index,entry]of entries.entries()){
+  const cy=laneTop+index*rowHeight+6*scale,color=severityColors[entry.priority],name=entry.issue.ticketNumber||entry.id,label=text(String(name).slice(0,13),left-12*scale,cy+4*scale,{'text-anchor':'end',fill:c.ink,role:'button',tabindex:0,class:'incident-lane-label'});label.append(S('title',{},`${name} · ${entry.issue.subject||''}`));label.addEventListener('mouseenter',event=>onHover({entry,report:entry.reported[0]},event));label.addEventListener('mouseleave',onLeave);label.addEventListener('click',()=>onTicket(entry.issue.id));label.addEventListener('keydown',event=>{if(['Enter',' '].includes(event.key)){event.preventDefault();event.stopPropagation();onTicket(entry.issue.id);}});svg.append(label,S('line',{x1:left,x2:right,y1:cy,y2:cy,stroke:c.track,'stroke-width':1}));
+  for(const report of entry.reported){const from=Math.max(result.start,report.start),to=Math.min(result.end,report.end);if(from>=result.end||to<result.start)continue;const group=S('g',{class:'incident-range',role:'button',tabindex:0,'data-kind':report.kind,'aria-label':`${name} · ${t(report.kind==='range'?'Time range':'Moment')} · ${entry.issue.departmentName||''}`});const tip=S('title',{},`${name} · ${entry.issue.subject||''}\n${entry.issue.issueTypeName||t('Unclassified')} · ${entry.issue.departmentName||t('Unclassified')}`);group.append(tip);
+   if(report.kind==='range'){group.append(S('rect',{x:x(from),y:cy-4*scale,width:Math.max(1,x(to)-x(from)),height:8*scale,rx:2*scale,fill:color}));if(report.end<=result.end)group.append(S('line',{x1:x(to),x2:x(to),y1:cy-6*scale,y2:cy+6*scale,stroke:color,'stroke-width':2*scale}));}
+   else{if(to>from)group.append(S('line',{x1:x(from),x2:x(to),y1:cy,y2:cy,stroke:color,'stroke-width':2*scale,'stroke-dasharray':`${5*scale} ${3*scale}`,class:'incident-continuation'}));if(report.start>=result.start)group.append(S('circle',{cx:x(report.start),cy,r:3.5*scale,fill:color,class:'incident-start-dot'}));}
+   const activate=()=>onTime(from);group.addEventListener('click',event=>{event.stopPropagation();activate();});group.addEventListener('keydown',event=>{if(['Enter',' '].includes(event.key)){event.preventDefault();event.stopPropagation();activate();}});group.addEventListener('mouseenter',event=>onHover({entry,report},event));group.addEventListener('mouseleave',onLeave);svg.append(group);
+  }
+ }
+ let selected=Math.max(0,result.buckets.findIndex(b=>b.count===result.peak));
+ function inspect(index,event){selected=Math.max(0,Math.min(result.buckets.length-1,index));const b=result.buckets[selected];if(!b)return;highlight.setAttribute('x',x(b.start));highlight.setAttribute('width',Math.max(1,x(b.end)-x(b.start)));onHover({bucket:b},event);}
+ svg.addEventListener('mousemove',event=>{if(event.target.closest('.incident-range,.incident-lane-label'))return;const bounds=svg.getBoundingClientRect(),px=(event.clientX-bounds.left)*w/(bounds.width||w),time=result.start+(px-left)/plot*(result.end-result.start),index=result.buckets.findIndex(b=>b.start<=time&&time<b.end);if(index>=0&&event.clientY-bounds.top<axis)inspect(index,event);else onLeave();});
+ svg.addEventListener('mouseleave',()=>{highlight.setAttribute('width',0);onLeave();});
+ svg.addEventListener('click',event=>{if(event.target.closest('.incident-range,.incident-lane-label'))return;const bounds=svg.getBoundingClientRect(),px=(event.clientX-bounds.left)*w/(bounds.width||w),time=result.start+(px-left)/plot*(result.end-result.start),b=result.buckets.find(b=>b.start<=time&&time<b.end);if(b)onBucket(b,event.target.closest('[data-series=starts]')?'starts':'load');});
+ svg.addEventListener('keydown',event=>{if(!['ArrowLeft','ArrowRight','Home','End','Enter',' '].includes(event.key))return;event.preventDefault();if(['Enter',' '].includes(event.key))onBucket(result.buckets[selected],'load');else inspect(event.key==='Home'?0:event.key==='End'?result.buckets.length-1:selected+(event.key==='ArrowLeft'?-1:1));});
+ return svg;
+}
