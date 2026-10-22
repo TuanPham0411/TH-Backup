@@ -8,7 +8,7 @@ import express from 'express';
 import {MediaCache} from '../media-cache.js';
 
 test('Drive images stream once, concurrent/repeated reads reuse private cache, ranges and revocation remain enforced',async()=>{
- const root=await mkdtemp(join(tmpdir(),'mes-media-cache-'));const cache=new MediaCache(root,{maxBytes:10000,maxFiles:2,maxEntryBytes:10000});
+ const root=await mkdtemp(join(tmpdir(),'mes-media-cache-'));const cache=new MediaCache(join(root,'.cache','drive-media'),{maxBytes:10000,maxFiles:2,maxEntryBytes:10000});
  const data=Buffer.from('an immutable image payload'),record={drive_id:'file-1',checksum:createHash('md5').update(data).digest('hex'),size:data.length};let downloads=0,allowed=true;
  const app=express();app.get('/image',async(req,res,next)=>{try{if(!allowed)return res.sendStatus(403);res.set({'Content-Type':'image/png','Cache-Control':'private, max-age=0, must-revalidate','ETag':'"test-image"'});const served=await cache.serve(record,req,res,async()=>{downloads++;await new Promise(r=>setTimeout(r,30));return new Response(data,{headers:{'Content-Length':String(data.length)}});});if(!served)res.sendStatus(501);}catch(e){next(e);}});
  const server=app.listen(0,'127.0.0.1');await new Promise(r=>server.once('listening',r));const url=`http://127.0.0.1:${server.address().port}/image`;

@@ -36,7 +36,7 @@ export class MediaCache {
  }
  async send(key,res){
   this.pinned.set(key,(this.pinned.get(key)||0)+1);res.set('X-Media-Cache','hit');
-  try{await new Promise((resolve,reject)=>res.sendFile(join(this.root,key+'.bin'),{cacheControl:false,lastModified:false},error=>error?reject(error):resolve()));}
+  try{await new Promise((resolve,reject)=>res.sendFile(join(this.root,key+'.bin'),{cacheControl:false,lastModified:false,dotfiles:'allow'},error=>error?reject(error):resolve()));}
   finally{const count=this.pinned.get(key)-1;if(count)this.pinned.set(key,count);else this.pinned.delete(key);await this.trim();}
   return true;
  }
