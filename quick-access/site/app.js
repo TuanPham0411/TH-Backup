@@ -363,7 +363,7 @@ settingsSave.addEventListener('click', async ()=>{
 settingsReset.addEventListener('click', ()=> { clientLog('settings_reset_reload', { targetUser: currentUser.username || 'Guest' }); location.reload(); });
 
 // Login modal overlay
-function showLoginModal(){ location.href='/?returnTo=%2Fquick-access'; }
+function showLoginModal(){if(currentUser.username&&currentUser.username!=='Guest'){openSettings();activateTab('profile');}else location.href='/?returnTo=%2Fquick-access';}
 function hideLoginModal(){ loginModal.classList.remove('show'); loginModal.setAttribute('aria-hidden','true'); userBadge.focus(); }
 userBadge.addEventListener('click', () => { openSettings(); activateTab('profile'); });
 mCancel.addEventListener('click', hideLoginModal);

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import express from 'express';
 import {readFile} from 'node:fs/promises';
 import {quickAccessRouter,validateQuickAccess} from '../quick-access.js';
+import {createApp} from '../index.js';
 import {versionOf} from '../quick-access-store.js';
 
 const seed=JSON.parse(await readFile('quick-access/default-config.json','utf8'));
@@ -66,4 +67,24 @@ test('resource gateway serves only known Drive resources, never arbitrary file I
 test('resource paths and station URLs reject executable URL schemes and traversal',()=>{
  for(const path of ['javascript:alert(1)','./resources/../users.json','./resources/evil\\file']){const config=structuredClone(seed);config.guidelines[0].path=path;assert.throws(()=>validateQuickAccess(config));}
  const config=structuredClone(seed);config.lines[0].stations[0].url='javascript:alert(1)';assert.throws(()=>validateQuickAccess(config));
+});
+
+test('owner uploads use the private Drive resource path',async()=>{
+ await withApp(async({url})=>{
+  const result=await fetch(url+'/api/content/upload?name=layout.png',{method:'POST',headers:{...headers,'Content-Type':'application/octet-stream'},body:Buffer.from('image')});
+  assert.equal(result.status,200);assert.deepEqual(await result.json(),{path:'./resources/uploads/new-file/layout.png'});
+  const denied=await fetch(url+'/api/content/upload?name=page.html',{method:'POST',headers:{...headers,'Content-Type':'application/octet-stream'},body:'html'});assert.equal(denied.status,400);
+ },{owner:true});
+});
+
+test('mounted application normalizes the path once, then redirects to MES login without a loop',async()=>{
+ const pool={query:async()=>{throw new Error('Anonymous navigation must not access database');}};
+ const server=createApp(pool,'/unused').listen(0,'127.0.0.1');await new Promise(resolve=>server.once('listening',resolve));
+ try{
+  const base=`http://127.0.0.1:${server.address().port}`;
+  const request=path=>fetch(base+path,{headers:{'x-forwarded-host':'mes.th.io.vn'},redirect:'manual'});
+  const canonical=await request('/quick-access');assert.equal(canonical.status,308);assert.equal(canonical.headers.get('location'),'/quick-access/');
+  const login=await request('/quick-access/');assert.equal(login.status,302);assert.equal(login.headers.get('location'),'/?returnTo=%2Fquick-access');
+  assert.equal((await request('/quick-access/api/config')).status,401);
+ }finally{await new Promise(resolve=>server.close(resolve));}
 });

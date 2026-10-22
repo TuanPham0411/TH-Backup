@@ -56,6 +56,12 @@ test('MES activation, CRUD, private files, tester restrictions, revocation',asyn
  const created=await api('manageUser',{operation:'create',username:'pi.user',displayName:'Pi User'},owner);assert.equal(created.status,200,JSON.stringify(created.body));
  const userLogin=await api('activateAccount',{username:'pi.user',activationCode:created.body.activationCode,password:'test-user-password'});assert.equal(userLogin.status,200);
  const user=userLogin.cookie;
+ const quickMe=async(cookie)=>fetch(base+'/quick-access/api/me',{headers:{'x-forwarded-host':'mes.th.io.vn',cookie}});
+ const ownerMe=await quickMe(owner);assert.equal(ownerMe.status,200);assert.equal((await ownerMe.json()).isOwner,true);
+ const userMe=await quickMe(user);assert.equal(userMe.status,200);assert.equal((await userMe.json()).isOwner,false);
+ assert.equal((await fetch(base+'/quick-access/api/content',{headers:{'x-forwarded-host':'mes.th.io.vn',cookie:user}})).status,403);
+ assert.equal((await fetch(base+'/quick-access/',{headers:{'x-forwarded-host':'mes.th.io.vn',cookie:user}})).status,200);
+
  assert.equal((await api('manageUser',{operation:'create',username:'bad.user'},user)).status,403);
  const tl=await api('manageDirectory',{type:'teamLeaders',operation:'create',name:'Leader'},owner);
  const dept=await api('manageDirectory',{type:'departments',operation:'create',name:'Production'},owner);
@@ -73,10 +79,12 @@ test('MES activation, CRUD, private files, tester restrictions, revocation',asyn
  assert.equal((await api('manageDirectory',{type:'departments',operation:'create',name:'Blocked'},owner,'mes.th.io.vn',{'x-mes-tester':'true'})).status,403);
  assert.equal((await api('manageUser',{operation:'deactivate',uid:created.body.uid,active:false},owner)).status,200);
  assert.equal((await api('getSession',{},user)).status,401);
+ assert.equal((await quickMe(user)).status,401);
  assert.equal((await api('deleteIssue',{id:issue.body.id},owner)).status,200);
  assert.equal((await pool.query('select 1 from public.files where path=$1',[path])).rowCount,0);
  assert.equal((await api('logout',{},owner)).status,200);
  assert.equal((await api('getSession',{},owner)).status,401);
+ assert.equal((await quickMe(owner)).status,401);
 });
 test('administrator edits, reissues and deletes accounts; self profile cannot elevate access',async()=>{
  const owner=(await api('passwordLogin',{username:'hpham',password:'test-owner-password'})).cookie;

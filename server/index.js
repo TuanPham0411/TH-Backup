@@ -31,7 +31,7 @@ export function createApp(pool,filesRoot,{sites=runtimeSites(),mesOnly=process.e
  app.use('/api/portfolio',(req,res,next)=>!mesOnly&&req.hostname===hostOf(sites.portfolio)?next():res.sendStatus(404));
  app.use('/api/mes',(req,res,next)=>req.hostname===hostOf(sites.mes)?next():res.sendStatus(404));
  app.use((req,res,next)=>['login','register','reset','consumeToken'].includes(req.body?.action)||['passwordLogin','activateAccount'].includes(req.body?.name)?authLimit(req,res,next):next());
- app.get('/quick-access',(req,res)=>res.redirect(308,'/quick-access/'));
+ app.get('/quick-access',(req,res,next)=>req.path==='/quick-access'?res.redirect(308,'/quick-access/'):next());
  app.use('/quick-access',rateLimit({windowMs:60000,limit:180,standardHeaders:'draft-7',legacyHeaders:false}),quickAccessRouter(pool));
  app.use('/api/mes',driveRouter(pool));app.use('/api/mes',pagesRouter(pool));
  app.use('/api/mes',previewRouter(pool,filesRoot));
