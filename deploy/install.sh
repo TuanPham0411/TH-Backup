@@ -85,6 +85,7 @@ old_target=$(readlink -f /opt/th-app/current || true)
 backup=$(mktemp -d /opt/th-app/.deploy-backup.XXXXXX)
 [[ ! -f /etc/nginx/sites-available/th-app ]] || cp -a /etc/nginx/sites-available/th-app "$backup/nginx"
 [[ ! -f /etc/systemd/system/th-app.service ]] || cp -a /etc/systemd/system/th-app.service "$backup/service"
+[[ ! -f /etc/systemd/system/th-wifi.service ]] || cp -a /etc/systemd/system/th-wifi.service "$backup/wifi-service"
 [[ ! -f /etc/systemd/system/th-storage.service ]] || cp -a /etc/systemd/system/th-storage.service "$backup/storage-service"
 [[ ! -f /etc/systemd/system/th-storage-mounts.service ]] || cp -a /etc/systemd/system/th-storage-mounts.service "$backup/mount-service"
 rollback() {
@@ -96,7 +97,9 @@ rollback() {
  if [[ -f $backup/service ]]; then cp -a "$backup/service" /etc/systemd/system/th-app.service; else systemctl stop th-app || true; rm -f /etc/systemd/system/th-app.service; fi
  if [[ -f $backup/storage-service ]]; then cp -a "$backup/storage-service" /etc/systemd/system/th-storage.service; else systemctl stop th-storage || true; rm -f /etc/systemd/system/th-storage.service; fi
  if [[ -f $backup/mount-service ]]; then cp -a "$backup/mount-service" /etc/systemd/system/th-storage-mounts.service; else systemctl disable --now th-storage-mounts || true; rm -f /etc/systemd/system/th-storage-mounts.service; fi
+ if [[ -f $backup/wifi-service ]]; then cp -a "$backup/wifi-service" /etc/systemd/system/th-wifi.service; else systemctl disable --now th-wifi || true; rm -f /etc/systemd/system/th-wifi.service; fi
  systemctl daemon-reload
+ if [[ -f $backup/wifi-service ]]; then systemctl restart th-wifi || true; fi
  if [[ -f $backup/storage-service ]]; then systemctl restart th-storage || true; fi
  if [[ -n $old_target && -f $backup/service ]]; then systemctl restart th-app || true; fi
  nginx -t && systemctl reload nginx
@@ -105,6 +108,7 @@ rollback() {
 trap rollback ERR
 install -m 644 "$target/deploy/th-storage-mounts.service" /etc/systemd/system/th-storage-mounts.service
 install -m 644 "$target/deploy/th-storage.service" /etc/systemd/system/th-storage.service
+install -m 644 "$target/deploy/th-wifi.service" /etc/systemd/system/th-wifi.service
 install -m 644 "$target/deploy/th-app.service" /etc/systemd/system/th-app.service
 install -m 644 "$target/deploy/nginx.conf" /etc/nginx/sites-available/th-app
 ln -sfn /etc/nginx/sites-available/th-app /etc/nginx/sites-enabled/th-app
@@ -112,7 +116,8 @@ ln -s "$target" /opt/th-app/.next
 mv -Tf /opt/th-app/.next /opt/th-app/current
 nginx -t
 systemctl daemon-reload
-systemctl enable th-app th-storage th-storage-mounts
+systemctl enable th-app th-storage th-storage-mounts th-wifi
+systemctl restart th-wifi
 systemctl restart th-storage-mounts
 systemctl restart th-storage
 systemctl restart th-app

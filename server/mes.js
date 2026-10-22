@@ -13,7 +13,7 @@ import {join} from 'node:path';
 import {hash,token,validPath,actorFor} from './security.js';
 import {normalizeDocument,documentText} from '../mes/site/rich-document.js';
 const viewerActions=new Set(['read','readBundle','readTicket','downloadUrl']);
-const publicActions=new Set(['getAppearanceDefaults','getDirectory','passwordLogin','activateAccount',...viewerActions]);
+const publicActions=new Set(['getDashboardDefaults','getAppearanceDefaults','getDirectory','passwordLogin','activateAccount',...viewerActions]);
 const types=new Set(['image/jpeg','image/png','image/webp','video/mp4','video/webm','video/quicktime','application/pdf','text/plain','text/csv','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']);
 export function mesRouter(pool,filesRoot) {
  const router=Router();

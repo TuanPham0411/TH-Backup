@@ -440,11 +440,12 @@ test('content tabs publish bounded widgets and documents with owner/member/viewe
  const pdf=Buffer.from('%PDF-1.4\n% test document\n%%EOF');const reserved=await call('pages/media','POST',{name:'Training.pdf',type:'application/pdf',size:pdf.length});assert.equal(reserved.status,201);const id=reserved.body.id;
  const upload=await fetch(base+'/api/mes/uploads',{method:'POST',headers:{'x-forwarded-host':'mes.th.io.vn',cookie:owner,'Content-Type':'application/json'},body:JSON.stringify({kind:'media',path:id,type:'application/pdf',size:pdf.length})});assert.equal(upload.status,200);const uploadId=(await upload.json()).id;assert.equal((await fetch(base+'/api/mes/uploads/'+uploadId,{method:'PATCH',headers:{'x-forwarded-host':'mes.th.io.vn',cookie:owner,'Content-Type':'application/octet-stream','Upload-Offset':'0'},body:pdf})).status,200);
  assert.equal((await fetch(base+'/api/mes/media/'+id,{headers:{'x-forwarded-host':'mes.th.io.vn'}})).status,404,'Unpublished page documents stay private');
- const make=(type,extra={})=>({id:crypto.randomUUID(),type,title:type,body:'Safe text',width:'half',tone:'default',links:[],media:[],...extra});const widgets=[make('heading'),make('links',{links:[{label:'Documentation',url:'https://example.com/manual'}]}),make('documents',{media:[id]})];
+ const make=(type,extra={})=>({id:crypto.randomUUID(),type,title:type,body:'Safe text',width:'half',tone:'default',links:[],media:[],...extra});const widgets=[make('heading'),make('links',{links:[{label:'Documentation',url:'https://example.com/manual'},{label:'Intranet',url:'http://192.168.1.5:8080/'},{label:'Drive',url:'Z:\\MES'},{label:'Site',url:'/page/internal'}]}),make('documents',{media:[id]})];
  assert.equal((await call('pages/'+p.id,'PUT',{...p,active:true,widgets},user)).status,403);
  assert.equal((await call('pages/'+p.id,'PUT',{...p,widgets:[make('links',{links:[{label:'Bad',url:'javascript:alert(1)'}]})]})).status,400);
  assert.equal((await call('pages/'+p.id,'PUT',{...p,widgets:[make('image',{media:[id]})]})).status,400);
  let saved=await call('pages/'+p.id,'PUT',{...p,active:true,widgets});assert.equal(saved.status,200,JSON.stringify(saved.body));p=saved.body;
+ assert.deepEqual(p.widgets[1].links.map(l=>l.kind),['web','web','drive','web']);
  assert.equal((await call('pages/'+p.id,'GET',null,user)).status,200);assert.equal((await call('pages/'+p.id,'GET',null,'')).status,404);assert.equal((await call('pages','GET',null,'')).body.pages.some(x=>x.id===p.id),false);
  const memberDoc=await fetch(base+'/api/mes/media/'+id+'?inline=1',{headers:{'x-forwarded-host':'mes.th.io.vn',cookie:user}});assert.equal(memberDoc.status,200);assert.equal(memberDoc.headers.get('content-type'),'application/pdf');assert.equal(memberDoc.headers.get('content-disposition'),null);assert.deepEqual(Buffer.from(await memberDoc.arrayBuffer()),pdf);
  assert.equal((await call('pages/'+p.id,'PUT',{...p,revision:1})).status,409);
@@ -463,4 +464,42 @@ test('creation API requires photo/video evidence before allocating a ticket',asy
  const response=await fetch(`http://127.0.0.1:${isolated.address().port}/api/mes`,{method:'POST',headers:{'x-forwarded-host':'mes.th.io.vn','Content-Type':'application/json',cookie},body:JSON.stringify({name:'createIssue',data:{evidence}})});
  assert.equal(response.status,400);assert.equal((await response.json()).code,'invalid-evidence');
  }}finally{await new Promise(resolve=>isolated.close(resolve));}
+});
+
+test('owner assigns admin/user; widget defaults inherit without overwriting personal layouts and Wi-Fi remains owner-only',async()=>{
+ const previousBase=base,isolated=createApp(runtimePool,files).listen(0,'127.0.0.1');await new Promise(r=>isolated.once('listening',r));base=`http://127.0.0.1:${isolated.address().port}`;
+ try{
+ const session=async uid=>'th_mes='+(await pool.query('select mes_private.open_account_session($1) result',[uid])).rows[0].result.sessionToken;
+ const owner=await session('mes-owner');assert.equal((await api('getSession',{},owner)).body.role,'owner');
+ const account=await api('manageUser',{operation:'create',username:'widgets.admin',displayName:'Widget administrator'},owner);assert.equal(account.status,200);
+ const uid=account.body.uid,user=(await api('activateAccount',{username:'widgets.admin',activationCode:account.body.activationCode,password:'test-widget-password'})).cookie;
+ assert.equal((await api('getSession',{},user)).body.isAdmin,false);
+ assert.equal((await api('saveDashboardDefaults',{hidden:['incidents']},user)).status,403);
+ assert.equal((await api('setAccountRole',{uid:'mes-owner',role:'user'},owner)).status,403);
+ assert.equal((await api('setAccountRole',{uid,role:'owner'},owner)).status,403);
+ assert.equal((await api('setAccountRole',{uid,role:'admin'},user)).status,403);
+ assert.equal((await api('setAccountRole',{uid,role:'admin'},owner)).status,200);
+ assert.equal((await api('getSession',{},user)).status,401,'Role changes revoke old sessions');
+ const admin=await session(uid);assert.equal((await api('getSession',{},admin)).body.isAdmin,true);assert.equal((await api('getSession',{},admin)).body.isOwner,false);
+ assert.equal((await api('setAccountRole',{uid,role:'user'},admin)).status,403);
+ assert.equal((await api('manageUser',{operation:'deactivate',uid:'mes-owner'},admin)).status,403);
+ const personalBefore=(await api('getDashboardPreferences',{},owner)).body;
+ assert.equal((await api('saveDashboardDefaults',{hidden:['incidents','video']},admin)).status,200);
+ assert.deepEqual((await api('getDashboardDefaults')).body.hidden,['incidents','video']);
+ assert.deepEqual((await api('getDashboardPreferences',{},admin)).body,{hidden:['incidents','video'],customized:false});
+ assert.deepEqual((await api('getDashboardPreferences',{},owner)).body,personalBefore,'Admin defaults must preserve existing personal layouts');
+ assert.equal((await api('saveDashboardPreferences',{hidden:['incidents'],uid:'mes-owner'},admin)).status,200);
+ assert.deepEqual((await api('getDashboardPreferences',{},owner)).body,personalBefore,'Cannot write another account preferences');
+ assert.equal((await api('saveDashboardDefaults',{hidden:['video']},admin)).status,200);
+ assert.deepEqual((await api('getDashboardPreferences',{},admin)).body.hidden,['incidents']);
+ assert.deepEqual((await api('resetDashboardPreferences',{},admin)).body,{hidden:['video'],customized:false});
+ assert.equal((await api('saveDashboardDefaults',{hidden:['not-a-widget']},admin)).status,403);
+ for(const cookie of ['',admin])for(const [path,method,body]of [['wifi','GET'],['wifi/connect','POST',{ssid:'test',password:'secret-password'}],['wifi/confirm','POST',{id:'bad'}]]){
+  const response=await fetch(base+'/api/mes/'+path,{method,headers:{'x-forwarded-host':'mes.th.io.vn',cookie,'Content-Type':'application/json'},...(body?{body:JSON.stringify(body)}:{})});assert.notEqual(response.status,200);
+ }
+ const ownerWifi=await fetch(base+'/api/mes/wifi',{headers:{'x-forwarded-host':'mes.th.io.vn',cookie:owner}});assert.equal(ownerWifi.status,200);assert.equal((await ownerWifi.json()).available,false,'No Pi broker in test environment');
+ const blocked=await fetch(base+'/api/mes/wifi/connect',{method:'POST',headers:{'x-forwarded-host':'mes.th.io.vn',cookie:owner,origin:'https://evil.test','Content-Type':'application/json'},body:'{}'});assert.equal(blocked.status,403);
+ assert.equal((await api('setAccountRole',{uid,role:'user'},owner)).status,200);assert.equal((await api('getSession',{},admin)).status,401);assert.equal((await api('getSession',{},await session(uid))).body.isAdmin,false);
+ assert.equal((await api('saveDashboardDefaults',{hidden:[]},owner)).status,200);
+ }finally{base=previousBase;await new Promise(r=>isolated.close(r));}
 });

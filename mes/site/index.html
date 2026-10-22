@@ -186,7 +186,9 @@
                 ><input
                   id="issue-search"
                   type="search"
-                  placeholder="Search ID, feedback, process, reporter…" /></label
+                  placeholder="Search ticket, user, title, type, department or content…" /></label
+              ><select id="issue-search-field" aria-label="Search field"><option value="all">All fields</option><option value="user">Reporter / user</option><option value="ticket">Ticket number</option><option value="title">Title</option><option value="type">Ticket type</option><option value="department">Department</option><option value="content">Ticket content</option></select
+              ><select id="issue-type-filter" aria-label="Filter by ticket type"><option value="All">All ticket types</option></select
               ><select id="issue-status" aria-label="Filter by status"></select
               ><select
                 id="issue-department"
@@ -198,6 +200,7 @@
               ></select
               ><button id="clear-filters" class="text-button">Reset</button>
             </div>
+            <p class="helper ticket-search-help">Search includes closed tickets. Choose Closed to view closed tickets only.</p>
             <div class="table-wrap">
               <table role="table" aria-label="Issue list">
                 <thead>
@@ -567,6 +570,7 @@
       <form id="user-admin-form" class="profile-form">
         <label>Username<input id="admin-username" required maxlength="64" pattern="[a-z0-9][a-z0-9._-]*" /></label>
         <label>Display name<input id="admin-name" required maxlength="80" /></label>
+        <label>Account role<select id="admin-role"><option value="user">User</option><option value="admin">Admin</option></select></label>
         <label>Email<input id="admin-email" type="email" maxlength="160" /></label>
         <label>Phone<input id="admin-phone" maxlength="32" /></label>
         <label>Job title<input id="admin-title" maxlength="80" /></label>

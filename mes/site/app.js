@@ -1,3 +1,6 @@
+import {initSettingsTabs} from './settings-tabs.js';
+import {initWifiSettings} from './wifi-settings.js';
+import {initIncidentTimeline} from './incident-timeline.js';
 import {initMobileFeedback} from './mobile-feedback.js';
 import {initAppearancePreferences,loadAppearancePreferences} from './appearance-preferences.js';
 import {initContentTabs} from './content-tabs.js';
@@ -25,6 +28,7 @@ import {
   validateEvidence,
   validateIssue,
   filterIssues,
+  issueFilterOptions,
   stats,
   safeUsername,
   makeDemo,
@@ -50,6 +54,7 @@ const state = {
   preview: previewMode,
   user: null,
   isOwner: false,
+  isAdmin: false,
   ready: false,
   requiresWindows: true,
   users: [],
@@ -181,7 +186,7 @@ function ownerOnly() {
 function navigate(page) {
   if(!page.startsWith('content:')&&/^\/page\//.test(location.pathname))history.pushState(null,'','/');
   if(page!=='detail'&&/^\/ticket\//.test(location.pathname)&&!linkedTicketPending)history.pushState(null,'','/');
-  if (page === "settings" && !state.isOwner) {
+  if (page === "settings" && !state.isOwner && !state.isAdmin) {
     toast("Owner access is required.");
     return;
   }
@@ -225,10 +230,6 @@ function renderDirectories() {
   selectOptions($("login-user"), active(state.users), {
     placeholder: "Select your display name",
   });
-  selectOptions($("issue-department"), [
-    { id: "All", name: "All departments" },
-    ...state.departments,
-  ]);
   renderForm();
   if (state.isOwner) renderSettings();
 }
@@ -275,6 +276,7 @@ function renderDashboard() {
     );
     $("metrics").append(card);
   }
+  incidentTimeline.render();
   renderActivity(scopedIssues());
   renderOperations(issues);
   workspace.renderCharts(issues);
@@ -438,12 +440,17 @@ function renderOperations(issues) {
 function filtered() {
   return filterIssues(scopedIssues(), {
     search: $("issue-search").value,
+    searchField: $("issue-search-field").value,
+    issueType: $("issue-type-filter").value || "All",
     status: $("issue-status").value || "All",
     department: $("issue-department").value || "All",
     priority: $("issue-priority").value || "All",
   }).sort((a, b) => stamp(b.updatedAt) - stamp(a.updatedAt));
 }
 function renderIssues() {
+  const options=issueFilterOptions(scopedIssues(),state.departments);
+  selectOptions($("issue-department"),[{id:"All",name:"All departments"},...options.departments]);
+  selectOptions($("issue-type-filter"),[{id:"All",name:"All ticket types"},...options.types.map(item=>({...item,name:item.id==="__unclassified"?t("Unclassified"):item.name}))]);
   const issues = filtered(),
     pageSize = 12,
     totalPages = Math.max(1, Math.ceil(issues.length / pageSize));
@@ -748,7 +755,7 @@ function renderSettings() {
   $("user-rows").replaceChildren();
   for (const u of state.users) {
     const row = el("tr");
-    row.append(el("td", u.displayName), el("td", u.username));
+    row.append(el("td", u.displayName), el("td", `${u.username} · ${u.id === "mes-owner" ? "Owner" : u.role || "user"}`));
     const active = el("td");
     active.append(badge(u.active ? "Active" : "Inactive", "state"));
     const controls = el("td"),
@@ -795,6 +802,7 @@ let editingUser;
 function openUserAdmin(user) {
   if (!state.isOwner || ["mes-owner", "mes-tester"].includes(user.id)) return;
   editingUser = user;
+  $("admin-role").value = user.role === "admin" ? "admin" : "user";
   for (const [id, key] of [["admin-username","username"],["admin-name","displayName"],["admin-email","email"],["admin-phone","phone"],["admin-title","jobTitle"]]) $(id).value = user[key] || "";
   $("admin-toggle").textContent = user.active ? "Deactivate" : "Restore";
   $("admin-reset").disabled = !user.active;
@@ -812,6 +820,8 @@ $("user-admin-form").onsubmit = e => {
   run("user-admin-status", e.currentTarget.querySelector("button"), async () => {
     const data = {operation:"update", uid:editingUser.id, username:$("admin-username").value.trim().toLowerCase(), displayName:$("admin-name").value.trim(), email:$("admin-email").value.trim(), phone:$("admin-phone").value.trim(), jobTitle:$("admin-title").value.trim()};
     if (state.preview) Object.assign(editingUser,data); else await callable("manageUser",data);
+    const role=$("admin-role").value;
+    if(role !== (editingUser.role || "user")){if(state.preview)editingUser.role=role;else await callable("setAccountRole",{uid:editingUser.id,role});}
     await refreshAccounts(); showStatus("user-admin-status","Account saved.");
   });
 };
@@ -881,14 +891,14 @@ function updateIdentity() {
 
   $("start-tester").hidden = !state.isOwner || state.preview;
   $("tester-banner").hidden = !state.user?.isTester;
-  $("admin-nav").hidden = !state.isOwner;
+  $("admin-nav").hidden = !state.isOwner && !state.isAdmin;
   $("account-name").textContent = state.user?.displayName || "Viewer";
   $("account-role").textContent = state.preview
     ? "Preview session"
     : state.isOwner
       ? "MES owner"
       : state.user
-        ? "Verified workspace user"
+        ? state.isAdmin ? "Administrator" : "Verified workspace user"
         : "Read-only access";
   $("avatar").textContent = (state.user?.displayName || "V")
     .slice(0, 1)
@@ -898,7 +908,7 @@ function updateIdentity() {
     : state.ready
       ? "Workspace loaded"
       : "Connecting…";
-  if (!state.isOwner && state.page === "settings") navigate("dashboard");
+  if (!state.isOwner && !state.isAdmin && state.page === "settings") navigate("dashboard");
   renderForm();
   document.dispatchEvent(new CustomEvent('mes:identity'));
 }
@@ -1457,6 +1467,8 @@ document
 $("dashboard-period").onchange = renderDashboard;
 for (const id of [
   "issue-search",
+  "issue-search-field",
+  "issue-type-filter",
   "issue-status",
   "issue-department",
   "issue-priority",
@@ -1467,7 +1479,8 @@ for (const id of [
   });
 $("clear-filters").onclick = () => {
   $("issue-search").value = "";
-  for (const id of ["issue-status", "issue-department", "issue-priority"])
+  $("issue-search-field").value = "all";
+  for (const id of ["issue-status", "issue-department", "issue-priority", "issue-type-filter"])
     $(id).value = "All";
   state.tablePage = 1;
   renderIssues();
@@ -1546,6 +1559,7 @@ async function handleAuth(user) {
   stopLive();
   state.user = null;
   state.isOwner = false;
+  state.isAdmin = false;
   state.ready = false;
   state.issues = [];
   state.myIssues = [];
@@ -1589,6 +1603,7 @@ async function handleAuth(user) {
     state.user = session.user;
     await Promise.all([loadDashboardPreferences(state.user),loadAppearancePreferences(state.user)]);
     state.isOwner = session.isOwner;
+    state.isAdmin = session.isAdmin === true;
     state.requiresWindows = false;
     message("");
     updateIdentity();
@@ -1718,12 +1733,16 @@ const workspace = initWorkspace({state,toast,run,addEvidence(files) {
   state.files.push(...files); renderFiles(); return true;
 }});
 document.querySelector(".topbar .brand").onclick = event => { event.preventDefault(); navigate("dashboard"); };
+const incidentTimeline=initIncidentTimeline(scopedIssues,()=>state.ready);
+setInterval(()=>{if(!state.preview&&!document.hidden&&incidentTimeline.visible())refreshRecords();},60000);
 initUpgrade();
 initDriveStorage();
+initWifiSettings(()=>({isOwner:state.isOwner,preview:state.preview,page:state.page}));
 initContentTabs({state,navigate,toast});
 initMobileFeedback();
 initAppearancePreferences(()=>({user:state.user,preview:state.preview,isOwner:state.isOwner}));
-initDashboardPreferences(()=>({user:state.user,preview:state.preview}));
+initDashboardPreferences(()=>({user:state.user,preview:state.preview,isAdmin:state.isAdmin||state.isOwner}));
+initSettingsTabs(()=>({isOwner:state.isOwner,isAdmin:state.isAdmin}));
 initializeLanguage(() => { workspace.render(); feedbackEditor.setLanguage(); editEditor.setLanguage(); renderAll(); renderTimeline(); updateIdentity(); if (state.selected) { const issue = state.issues.find(i => i.id === state.selected); if (issue) renderDetail(issue); } });
 selectOptions($("issue-status"), [
   { id: "All", name: "All statuses" },
