@@ -1,3 +1,4 @@
+import {compactDashboard} from './dashboard-layout.js';
 import {initSettingsTabs} from './settings-tabs.js';
 import {initWifiSettings} from './wifi-settings.js';
 import {initIncidentTimeline} from './incident-timeline.js';
@@ -1733,7 +1734,7 @@ const workspace = initWorkspace({state,toast,run,addEvidence(files) {
   state.files.push(...files); renderFiles(); return true;
 }});
 document.querySelector(".topbar .brand").onclick = event => { event.preventDefault(); navigate("dashboard"); };
-const incidentTimeline=initIncidentTimeline(scopedIssues,()=>state.ready);
+const incidentTimeline=initIncidentTimeline(scopedIssues,()=>state.ready,openIssue);
 setInterval(()=>{if(!state.preview&&!document.hidden&&incidentTimeline.visible())refreshRecords();},60000);
 initUpgrade();
 initDriveStorage();
@@ -1742,6 +1743,7 @@ initContentTabs({state,navigate,toast});
 initMobileFeedback();
 initAppearancePreferences(()=>({user:state.user,preview:state.preview,isOwner:state.isOwner}));
 initDashboardPreferences(()=>({user:state.user,preview:state.preview,isAdmin:state.isAdmin||state.isOwner}));
+compactDashboard();
 initSettingsTabs(()=>({isOwner:state.isOwner,isAdmin:state.isAdmin}));
 initializeLanguage(() => { workspace.render(); feedbackEditor.setLanguage(); editEditor.setLanguage(); renderAll(); renderTimeline(); updateIdentity(); if (state.selected) { const issue = state.issues.find(i => i.id === state.selected); if (issue) renderDetail(issue); } });
 selectOptions($("issue-status"), [

@@ -219,11 +219,25 @@ number, title, issue type, department, description and assessment. Search ignore
 case and Vietnamese accents; type/status/department/priority filters combine.
 Historical catalog labels remain selectable.
 
-The incident timeline uses `occurrences`, never ticket creation time. Each ticket
-counts once in each overlapping hour/day (Vietnam time); missing/invalid times
-are reported separately. Frequency thresholds include quiet zero-ticket windows.
-The visible dashboard refreshes the existing record bundle every 60 seconds;
-filters work locally and do not fetch media. A maximum of 744 bins bounds rendering.
+The main incident timeline uses `occurrences`, never ticket creation time. A sweep
+of merged per-ticket intervals computes exact concurrent load; a ticket counts
+once even when its own reported ranges overlap. Severity-colored stacked areas
+and a white total line use the left axis. Pale columns count distinct ticket
+starts per hour/day on a separate labeled right axis. Dots show reported starts;
+selecting a window inspects its peak time and shows ticket/type/department detail.
+Point incidents visually continue to the current time by default (including
+closed tickets); this is explicitly labeled as a visualization, not a verified
+incident duration. Users can switch to reported moments only. Recorded ranges
+stop at their actual end. Invalid/missing times are reported separately.
+
+Date, type, department, severity and peak-concurrency filters run locally. The
+visible dashboard refreshes the existing record bundle every 60 seconds; no media
+or per-filter API requests are added. A maximum of 744 hourly/daily buckets bounds
+window summaries. Expandable ticket spans show up to 50 tickets; filters narrow
+larger sets. The compact dashboard combines status, handling metrics and recent
+tickets into one overview, and collapses legacy charts under Additional analysis.
+Existing per-user and administrator widget preferences remain in effect.
+
 
 `hpham` (`mes-owner`) remains the sole Owner. Owner assigns admin/user roles in
 User directory → Edit account. Role changes revoke existing sessions. Admins
