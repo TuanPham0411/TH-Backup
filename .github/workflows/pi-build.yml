@@ -2,6 +2,7 @@ name: Build and deploy Pi
 on:
   push:
     branches: [main, feat/mes-quick-access]
+    paths-ignore: [.github/workflows/mes-performance.yml]
   pull_request:
   workflow_dispatch:
 permissions:
