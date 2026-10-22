@@ -43,6 +43,7 @@ export function initUpgrade(){
  const show=(id,error)=>$(id).textContent=error.message||String(error);
  function options(id,items,selected){const select=$(id);select.replaceChildren();for(const [value,label]of items){const o=make('option',label);o.value=value;select.append(o);}if(selected!==undefined)select.value=selected;}
  async function loadStorage(){if(!context.isOwner||context.preview||storageBusy)return;storageBusy=true;try{const data=await request('admin/storage');$('storage-summary').textContent=`${t('Internal free')}: ${size(data.internal.free)} / ${size(data.internal.total)} · ${t('File quota')}: ${size(data.quota)}`;
+  if(data.hostStorage===false){const card=$('storage-summary').closest('article');for(const child of card.children)child.hidden=!child.matches('h2,#storage-summary,#storage-message');card.querySelector('h2').textContent=t('Storage managed by the hosting platform');$('storage-message').textContent=t('USB operations and host backups are available only on the Raspberry Pi deployment.');return;}
   options('usb-unmounted',(data.unmounted||[]).map(v=>[v.id,`${v.device} · ${v.filesystem||t('Unknown filesystem')} · ${v.id}`]));$('usb-mount').disabled=!(data.unmounted||[]).length;
   const drives=(data.locationsAvailable||[]).filter(v=>v.key!=='internal').map(v=>[v.key,`${v.device==='internal'?t('SD card'):t('USB')} · ${v.path||v.folder||v.key} · ${v.online?size(v.free)+' '+t('free'):t('Disconnected')}`]);
   renderStorageManager(data);

@@ -3,6 +3,12 @@
 Portfolio: `https://th.io.vn`. MES: `https://mes.th.io.vn`.
 Target: Pi 3B+, Raspberry Pi OS Lite ARM64, 1 GB RAM. See [deployment guide](deploy/README.md).
 
+## Repository and independent MES branch
+
+`main` contains the parent portfolio (`site/`) and its child **MES Ticket** application (`mes/`), with shared backend code in `server/`. The portfolio links to the live MES and its independent [`mes-standalone` branch](https://github.com/TuanPham0411/Thien-Ha/tree/mes-standalone). Git branches have no parent/child hierarchy; this is a monorepo plus a generated standalone source branch.
+
+Run `npm run export:mes -- work/mes-source` to export a complete, independently buildable MES source tree without secrets or live data. The **Export standalone MES** workflow validates that tree and its Docker image, publishes an artifact and synchronizes the standalone branch from `main`. See [MES project](mes/README.md) and [portable deployment](mes/STANDALONE.md). The existing Pi workflow and live storage remain in place.
+
 ## Architecture
 
 Nginx serves both Vite builds and proxies `/api` to one Node.js process bound to `127.0.0.1:3000`. PostgreSQL holds portfolio records, accounts and MES business logic; private attachments live at `/var/lib/th-app/files`. Google OAuth and SMTP run through the backend. No Firebase or Supabase service, client SDK, hosted auth, storage or Edge Function is used by the deployed apps.

@@ -8,7 +8,8 @@ export function adminRouter(pool,root,gate){
  const actor=req=>actorFor(req.cookies.th_mes,req.headers['x-mes-tester']);
  const dispatch=async(name,data,identity)=>(await pool.query('select public.mes_dispatch($1,$2,$3) result',[name,data,identity])).rows[0].result;
  router.use(async(req,res,next)=>{if(req.method==='GET'&&req.path==='/storage'&&job?.state==='running'&&req.cookies.th_mes===jobSession)return next();const s=await dispatch('getSession',{},actor(req));if(!s.isOwner)return res.sendStatus(403);next();});
- router.get('/storage',async(req,res)=>res.json({...await storageStatus(root),quota:storageQuota(),job}));
+ router.get('/storage',async(req,res)=>res.json({...await storageStatus(root),quota:storageQuota(),job,hostStorage:!req.app.locals.mesOnly}));
+ router.use((req,res,next)=>{if(req.app.locals.mesOnly&&['/storage','/mount','/folders','/transfer-plan','/transfer','/database-plan','/database-move','/backup','/drive-recover','/drive-backup','/drive-transfer','/drive-to-local'].includes(req.path))return res.status(501).json({error:'Host storage and bulk backup operations require the Raspberry Pi storage broker. Use your hosting platform backup tools.',code:'host-storage-unavailable'});next();});
  router.post('/storage',async(req,res)=>{
   if(!['primary','overflow'].includes(req.body.mode)||!(req.body.id===null||typeof req.body.id==='string'))return res.sendStatus(400);
   await gate.exclusive(()=>storageCommand('select',req.body));if(req.body.mode==='primary')await pool.query("update public.mes_storage_settings set provider='local' where id='main'");res.json({ok:true});

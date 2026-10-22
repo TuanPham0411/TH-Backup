@@ -1,0 +1,73 @@
+name: Export standalone MES
+on:
+  push:
+    branches: [main]
+    paths: [mes/**, server/**, package.json, package-lock.json, vite.mes.config.js, .github/workflows/mes-standalone.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: mes-standalone-export
+  cancel-in-progress: false
+jobs:
+  export:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Export source without runtime data
+        run: node mes/export.mjs "$RUNNER_TEMP/mes-source"
+      - name: Install and build independently
+        working-directory: ${{ runner.temp }}/mes-source
+        run: npm ci && npm run build
+      - name: Validate portable Docker image
+        working-directory: ${{ runner.temp }}/mes-source
+        run: docker build -t mes-ticket:check .
+      - name: Verify fresh database and portable runtime
+        working-directory: ${{ runner.temp }}/mes-source
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker tag mes-ticket:check th-mes-ticket:local
+          printf '%s\n' 'MES_ORIGIN=https://tickets.example.com' 'POSTGRES_PASSWORD=ci-admin-only' 'MES_DB_PASSWORD=ci-runtime-only' 'OWNER_EMAIL=owner@example.com' > .env
+          trap 'docker compose -p mes-source-ci down -v; rm -f .env' EXIT
+          docker compose -p mes-source-ci up -d --no-build --wait --wait-timeout 120
+          docker compose -p mes-source-ci exec -T mes node --input-type=module < ci/smoke.mjs
+      - name: Package source artifact
+        run: |
+          tar --exclude=.env --exclude=node_modules --exclude=dist --exclude=mes/dist -C "$RUNNER_TEMP/mes-source" -czf "$RUNNER_TEMP/mes-standalone-source.tar.gz" .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mes-standalone-source
+          path: ${{ runner.temp }}/mes-standalone-source.tar.gz
+          retention-days: 14
+      - name: Synchronize generated MES branch without force push
+        shell: bash
+        run: |
+          set -euo pipefail
+          target="$RUNNER_TEMP/mes-branch"
+          if git ls-remote --exit-code origin refs/heads/mes-standalone > /dev/null; then
+            git fetch origin mes-standalone
+            git worktree add --detach "$target" FETCH_HEAD
+          else
+            status=$?
+            test "$status" = 2
+            git worktree add --detach "$target" HEAD
+            git -C "$target" switch --orphan mes-standalone
+          fi
+          git -C "$target" rm -rf --ignore-unmatch .
+          tar --exclude=.env --exclude=node_modules --exclude=dist --exclude=mes/dist -C "$RUNNER_TEMP/mes-source" -cf - . | tar -C "$target" -xf -
+          git -C "$target" config user.name 'github-actions[bot]'
+          git -C "$target" config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git -C "$target" add -A
+          if ! git -C "$target" diff --cached --quiet; then
+            git -C "$target" commit -m "Sync standalone MES from $GITHUB_SHA"
+            git -C "$target" push origin HEAD:refs/heads/mes-standalone
+          fi

@@ -12,7 +12,8 @@
     "build:mes": "vite build --config vite.mes.config.js",
     "preview:mes": "vite preview --config vite.mes.config.js --host 127.0.0.1 --port 4174",
     "build:server": "node server/build.js",
-    "test:pi": "NODE_ENV=test node --test server/tests/*.test.js"
+    "test:pi": "NODE_ENV=test node --test server/tests/*.test.js",
+    "export:mes": "node mes/export.mjs"
   },
   "dependencies": {
     "@fontsource/carlito": "^5.3.0",

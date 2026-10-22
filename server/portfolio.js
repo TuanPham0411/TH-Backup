@@ -1,7 +1,7 @@
 import {Router} from 'express';
 import nodemailer from 'nodemailer';
 import {hash,token,passwordOK} from './security.js';
-import {validInquiry} from '../site/content.js';
+import {validInquiry} from './inquiry.js';
 const cookie = {httpOnly:true,secure:true,sameSite:'lax',path:'/',maxAge:12*3600*1000};
 export const setPortfolioCookie = (res,value) => res.cookie('th_portfolio',value,cookie);
 export const publicUser = u => u ? {uid:u.id,email:u.email,displayName:u.name,emailVerified:u.verified,isAdmin:u.admin} : null;

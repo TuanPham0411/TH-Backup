@@ -1,4 +1,6 @@
-# Use a SECOND Netlify project. Set base directory to mes.
+# Frontend only: requires a separately hosted same-origin /api backend.
+# See STANDALONE.md for the complete Node/PostgreSQL deployment.
+# Use a separate Netlify project with base directory mes.
 [build]
   command = "npm run build"
   publish = "dist"
@@ -8,6 +10,6 @@
   for = "/*"
   [headers.values]
     X-Content-Type-Options = "nosniff"
-    X-Frame-Options = "DENY"
+    X-Frame-Options = "SAMEORIGIN"
     Referrer-Policy = "strict-origin-when-cross-origin"
-    Permissions-Policy = "camera=(), microphone=(), geolocation=()"
+    Permissions-Policy = "camera=(self), microphone=(self), geolocation=()"

@@ -1,0 +1,10 @@
+.git
+.github
+node_modules
+**/node_modules
+dist
+mes/dist
+.env
+.env.*
+*.dump
+*.tar.gz

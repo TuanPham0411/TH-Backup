@@ -1,3 +1,4 @@
+import {publicOrigin} from './sites.js';
 import { createHash, randomBytes } from 'node:crypto';
 export const hash = value => createHash('sha256').update(value).digest('hex');
 export const token = () => randomBytes(32).toString('hex');
@@ -8,7 +9,7 @@ export function sameOrigin(req,res,next) {
   // Google returns via a cross-site navigation. This exact GET endpoint is
   // protected by OAuth state and the PKCE verifier cookie in oauthRouter.
   if (req.method === 'GET' && ['/api/oauth/callback','/api/mes/drive/callback'].includes(req.originalUrl.split('?')[0])) return next();
-  if (req.headers.origin && req.headers.origin !== `https://${req.hostname}`) return res.status(403).json({error:'Origin denied'});
+  if (req.headers.origin && req.headers.origin !== publicOrigin(req)) return res.status(403).json({error:'Origin denied'});
   if (req.headers['sec-fetch-site'] === 'cross-site') return res.status(403).json({error:'Origin denied'});
   next();
 }

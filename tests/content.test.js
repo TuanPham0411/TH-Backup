@@ -17,5 +17,5 @@ test('inquiries enforce bounded content and supported topics',()=>{
 });
 test('project catalog has unique safe identifiers and HTTPS references',()=>{
  assert.equal(new Set(projects.map(p=>p.id)).size,projects.length);
- for(const p of projects){assert.match(p.id,/^[a-z0-9-]+$/);assert.equal(new URL(p.url).protocol,'https:');assert.equal(p.status,'In development');}
+ for(const p of projects){assert.match(p.id,/^[a-z0-9-]+$/);assert.equal(new URL(p.url).protocol,'https:');assert.ok(['In development','Live'].includes(p.status));}
 });
