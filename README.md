@@ -100,3 +100,7 @@ Administrators can select **Create tab** in navigation (also available in Settin
 Signed-in users can open **My profile → Display settings**, choose a site font and base size (12–20 px), then **Save display settings**. Preferences are private, stored in PostgreSQL by authenticated account ID, and restored on other devices. **Use defaults** selects the site default; save to confirm. Headings and interface labels scale proportionally without resizing media. Existing authored rich-text font overrides are preserved.
 
 Administrators can set **Administration → Default display settings** for anonymous viewers and accounts using site defaults. An explicit personal choice takes precedence. Users can select **Use site defaults** and save to remove their override. Global changes are applied on the next Refresh or sign-in; there is no periodic polling. The initial site default remains Calibri 14 px.
+
+### Mobile feedback
+
+Phones use a touch layout with readable ticket cards and three feedback sections: description, context and optional evidence. Text formatting and incident time expand on demand. Users can take a photo, record video through the device camera, or select existing files; the original 5-file and 200 MB/video limits apply. The send bar stays at the bottom, moves out of the way while the software keyboard is open, and shows upload status above it. Inputs use at least 16 px to avoid automatic iOS focus zoom; safe areas and dynamic viewport heights are respected. Desktop layout remains unchanged, with a darker Issue list hover.

@@ -1,3 +1,4 @@
+import {initMobileFeedback} from './mobile-feedback.js';
 import {initAppearancePreferences,loadAppearancePreferences} from './appearance-preferences.js';
 import {initContentTabs} from './content-tabs.js';
 import {initDriveStorage} from './drive-storage.js';
@@ -14,6 +15,7 @@ import "@fontsource/carlito/latin-ext-400.css";
 import "@fontsource/carlito/latin-ext-700.css";
 import {initUpgrade,renderDetailedAnalytics} from './upgrade.js';
 import './upgrade.css';
+import './mobile.css';
 import { initializeBackend, refreshRecords, setTesterMode, api, watchAuth, ownerLogin, managedLogin, logout, watchRecords, uploadAttachment, downloadAttachment as fetchAttachment } from "./backend.js";
 import { configured, previewMode } from "./config.js";
 import {
@@ -452,6 +454,7 @@ function renderIssues() {
   )) {
     const row = el("tr");
     row.dataset.id = i.id;
+    row.setAttribute("role","row");
     const title = el("td");
     const link = userEl("button", i.subject, "issue-title-button");
     link.onclick = () => openIssue(i.id);
@@ -467,16 +470,20 @@ function renderIssues() {
       button = el("button", "↗", "text-button");
     button.setAttribute("aria-label", `Open ${i.subject}`);
     button.onclick = () => openIssue(i.id);
+    open.className='issue-open';button.dataset.mobileTitle=t('View ticket');
     open.append(button);
+    const updated=el('td',date(i.updatedAt));
+    for(const [cell,name] of [[department,'Department / Process'],[reporter,'Reporter'],[priority,'Priority'],[status,'Status'],[updated,'Updated']])cell.prepend(el('span',t(name),'mobile-field-label'));
     row.append(
       title,
       department,
       reporter,
       priority,
       status,
-      el("td", date(i.updatedAt)),
+      updated,
       open,
     );
+    for(const cell of row.children)cell.setAttribute("role","cell");
     $("issue-rows").append(row);
   }
   if (!issues.length) {
@@ -1713,6 +1720,7 @@ document.querySelector(".topbar .brand").onclick = event => { event.preventDefau
 initUpgrade();
 initDriveStorage();
 initContentTabs({state,navigate,toast});
+initMobileFeedback();
 initAppearancePreferences(()=>({user:state.user,preview:state.preview,isOwner:state.isOwner}));
 initDashboardPreferences(()=>({user:state.user,preview:state.preview}));
 initializeLanguage(() => { workspace.render(); feedbackEditor.setLanguage(); editEditor.setLanguage(); renderAll(); renderTimeline(); updateIdentity(); if (state.selected) { const issue = state.issues.find(i => i.id === state.selected); if (issue) renderDetail(issue); } });
