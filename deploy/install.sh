@@ -34,7 +34,7 @@ release_id=${2:?Pass a release ID}
 [[ $release_id =~ ^[a-zA-Z0-9_-]+$ ]] || exit 1
 [[ $(uname -m) == aarch64 ]] || { echo 'ARM64 is required'; exit 1; }
 systemctl is-active --quiet postgresql nginx
-for required in server/quick-access/site/index.html server/quick-access/default-config.json server/quick-access/source-files.json runtime/bin/node server/app.cjs server/migrate.cjs web/index.html mes/index.html deploy/th-app.service deploy/nginx.conf deploy/entrypoint.sh deploy/check-nginx.py deploy/storage-agent.py deploy/th-storage.service deploy/th-storage-mounts.service; do
+for required in runtime/bin/node server/app.cjs server/migrate.cjs web/index.html mes/index.html deploy/th-app.service deploy/nginx.conf deploy/entrypoint.sh deploy/check-nginx.py deploy/storage-agent.py deploy/th-storage.service deploy/th-storage-mounts.service; do
  [[ -f "$release_source/$required" ]] || { echo "Missing $required"; exit 1; }
 done
 # Refuse overlapping host configuration; leave the existing sites untouched.
@@ -125,8 +125,6 @@ done
 systemctl reload nginx
 curl -fsS -H 'Host: th.io.vn' http://127.0.0.1/ >/dev/null
 curl -fsS -H 'Host: mes.th.io.vn' http://127.0.0.1/ >/dev/null
-[[ $(curl -sS -o /dev/null -w '%{http_code}' -H 'Host: mes.th.io.vn' http://127.0.0.1/quick-access/) == 302 ]]
-[[ $(curl -sS -o /dev/null -w '%{http_code}' -H 'Host: mes.th.io.vn' http://127.0.0.1/quick-access/api/config) == 401 ]]
 curl -fsS -H 'Host: mes.th.io.vn' -H 'Content-Type: application/json' --data '{"name":"getDirectory"}' http://127.0.0.1/api/mes >/dev/null
 systemctl is-active ssh cloudflared nginx postgresql th-app
 # Future releases use this root-owned entrypoint with a dedicated sudo rule.
@@ -146,4 +144,14 @@ for p in others[2:]: shutil.rmtree(p)
 PY
 lsblk -o NAME,TYPE,TRAN,RM,FSTYPE,SIZE,MOUNTPOINTS
 python3 "$target/deploy/storage-agent.py" --status
+# Dedicated physical console; keep normal login on VT1.
+if [[ -c /dev/tty8 && -c /dev/tty0 ]]; then
+ install -m 644 "$target/deploy/th-status.service" /etc/systemd/system/th-status.service
+ systemctl daemon-reload
+ systemctl enable th-status.service
+ systemctl restart th-status.service
+ systemctl is-active --quiet th-status.service
+else
+ echo 'No Linux virtual console found; physical status screen skipped.'
+fi
 echo 'Deployment healthy. Configure Google OAuth and SMTP in /etc/th-app/runtime.env if this is the first installation.'

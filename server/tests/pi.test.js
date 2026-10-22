@@ -35,7 +35,6 @@ before(async()=>{
 });
 after(async()=>{await new Promise(resolve=>server.close(resolve));await runtimePool.end();await pool.end();await rm(files,{recursive:true,force:true});});
 async function api(name,data={},cookie='',host='mes.th.io.vn',extra={}) {
- // Existing creation fixtures declare the required evidence using the new creation protocol.
  if(name==='createIssue'&&data.evidence===undefined)data={...data,evidence:[{name:'evidence.png',type:'image/png',size:100}]};
  const response=await fetch(base+(host==='th.io.vn'?'/api/portfolio':'/api/mes'),{method:'POST',headers:{'x-forwarded-host':host,'Content-Type':'application/json',cookie,...extra},body:JSON.stringify(host==='th.io.vn'?{action:name,data}:{name,data})});
  const text=await response.text();let body;try{body=JSON.parse(text);}catch{body=text;}
@@ -54,17 +53,10 @@ test('MES activation, CRUD, private files, tester restrictions, revocation',asyn
  const login=await api('activateAccount',{username:'hpham',activationCode:activation.result.activationCode,password:'test-owner-password'});
  assert.equal(login.status,200,JSON.stringify(login.body));assert.ok(login.cookie);assert.equal(login.body.sessionToken,undefined);assert.match(login.headers.get('set-cookie'),/HttpOnly/);assert.match(login.headers.get('set-cookie'),/Secure/);
  const owner=login.cookie;
-
  assert.equal((await api('activateAccount',{username:'hpham',activationCode:activation.result.activationCode,password:'test-owner-password'})).status,401);
  const created=await api('manageUser',{operation:'create',username:'pi.user',displayName:'Pi User'},owner);assert.equal(created.status,200,JSON.stringify(created.body));
  const userLogin=await api('activateAccount',{username:'pi.user',activationCode:created.body.activationCode,password:'test-user-password'});assert.equal(userLogin.status,200);
  const user=userLogin.cookie;
- const quickMe=async(cookie)=>fetch(base+'/quick-access/api/me',{headers:{'x-forwarded-host':'mes.th.io.vn',cookie}});
- const ownerMe=await quickMe(owner);assert.equal(ownerMe.status,200);assert.equal((await ownerMe.json()).isOwner,true);
- const userMe=await quickMe(user);assert.equal(userMe.status,200);assert.equal((await userMe.json()).isOwner,false);
- assert.equal((await fetch(base+'/quick-access/api/content',{headers:{'x-forwarded-host':'mes.th.io.vn',cookie:user}})).status,403);
- assert.equal((await fetch(base+'/quick-access/',{headers:{'x-forwarded-host':'mes.th.io.vn',cookie:user}})).status,200);
-
  assert.equal((await api('manageUser',{operation:'create',username:'bad.user'},user)).status,403);
  const tl=await api('manageDirectory',{type:'teamLeaders',operation:'create',name:'Leader'},owner);
  const dept=await api('manageDirectory',{type:'departments',operation:'create',name:'Production'},owner);
@@ -81,14 +73,11 @@ test('MES activation, CRUD, private files, tester restrictions, revocation',asyn
  assert.equal((await api('deleteIssue',{id:issue.body.id},user)).status,403);
  assert.equal((await api('manageDirectory',{type:'departments',operation:'create',name:'Blocked'},owner,'mes.th.io.vn',{'x-mes-tester':'true'})).status,403);
  assert.equal((await api('manageUser',{operation:'deactivate',uid:created.body.uid,active:false},owner)).status,200);
- const expiredSession=await api('getSession',{},user);assert.equal(expiredSession.status,401);assert.match(expiredSession.headers.get('set-cookie'),/th_mes=;/);
- const viewerBundle=await api('readBundle',{paths:[{path:'departments'},{path:'issues'}]},expiredSession.cookie);assert.equal(viewerBundle.status,200);assert.ok(Array.isArray(viewerBundle.body.snapshots.issues.rows));
- assert.equal((await quickMe(user)).status,401);
+ assert.equal((await api('getSession',{},user)).status,401);
  assert.equal((await api('deleteIssue',{id:issue.body.id},owner)).status,200);
  assert.equal((await pool.query('select 1 from public.files where path=$1',[path])).rowCount,0);
  assert.equal((await api('logout',{},owner)).status,200);
  assert.equal((await api('getSession',{},owner)).status,401);
- assert.equal((await quickMe(owner)).status,401);
 });
 test('administrator edits, reissues and deletes accounts; self profile cannot elevate access',async()=>{
  const owner=(await api('passwordLogin',{username:'hpham',password:'test-owner-password'})).cookie;

@@ -88,7 +88,7 @@ export function mesRouter(pool,filesRoot) {
   if(name==='createIssue'){
    await dispatch('getSession',{},actor);
    const invalid=validateEvidence(data.evidence);
-   if(invalid||data.evidence.some(file=>!Number.isSafeInteger(file.size)))return res.status(400).json({code:'invalid-evidence',error:invalid||'Invalid attachment size.'});
+   if(invalid)return res.status(400).json({code:'invalid-evidence',error:invalid});
   }
   if((name==='createIssue'||name==='saveTicketEdit'||(name==='updateIssue'&&data.operation==='edit'))&&data.richDocument!==undefined){data.richDocument=normalizeDocument(data.richDocument);data.description=documentText(data.richDocument);}
   if(name==='uploadUrl'||name==='downloadUrl') {
@@ -122,9 +122,7 @@ export function mesRouter(pool,filesRoot) {
    await pool.query('delete from public.files where path like $1',[`issues/${data.id}/%`]);
    return res.json(await dispatch('finishDelete',data,actor));
   }
-  let result;
-  try{result=await dispatch(name,data,actor);}
-  catch(error){if(name==='getSession'&&error.code==='28000')res.clearCookie('th_mes',{path:'/',httpOnly:true,secure:true,sameSite:'lax'});throw error;}
+  const result=await dispatch(name,data,actor);
   if(result.sessionToken) {
    res.cookie('th_mes',result.sessionToken,{httpOnly:true,secure:true,sameSite:'lax',path:'/',maxAge:12*3600*1000});
    delete result.sessionToken;

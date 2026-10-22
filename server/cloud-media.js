@@ -1,4 +1,3 @@
-import {mediaCache} from './media-cache.js';
 import {access,rm} from 'node:fs/promises';
 import {Readable} from 'node:stream';
 import {pipeline} from 'node:stream/promises';
@@ -16,7 +15,6 @@ export async function serveCloudMedia(pool,root,path,req,res,type){
  if(await mediaProvider(pool)!=='drive'){try{await access(await filePath(root,path));return false;}catch{}}
  const etag='"drive-'+record.checksum+'"';res.set({'ETag':etag,'Cache-Control':'private, max-age=0, must-revalidate','Content-Type':type,'X-Accel-Buffering':'no','Accept-Ranges':'bytes','X-Media-Preview':record!==original?'ready':'original'});
  if(req.headers['if-none-match']===etag&&!req.headers.range){res.status(304).end();return true;}
- if(type.startsWith('image/')&&await mediaCache(root).serve(record,req,res,signal=>driveApi(`files/${encodeURIComponent(record.drive_id)}?alt=media`,{headers:{'Accept-Encoding':'identity'},signal})))return true;
  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),30000);const abort=()=>controller.abort();res.once('close',abort);
  try{
   const response=await driveApi(`files/${encodeURIComponent(record.drive_id)}?alt=media`,{headers:{'Accept-Encoding':'identity',...(req.headers.range?{Range:req.headers.range}:{})},signal:controller.signal});clearTimeout(timer);

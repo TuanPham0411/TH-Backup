@@ -1515,8 +1515,3 @@ dialog::backdrop {
 }
 
 .notice-media-gallery { display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin:14px 0; }.notice-media-gallery img,.notice-media-gallery video { width:100%;max-height:320px;object-fit:contain;border-radius:10px;background:#0b1014; }.notice-media-gallery img { height:auto; }.notice-media-editor { display:grid;gap:8px; }#notice-board { max-height:640px; }
-
-.command-nav a.nav-link {display:flex;align-items:center;gap:8px;flex:0 0 auto;color:var(--muted);background:transparent;border:1px solid transparent;border-radius:100px;padding:9px 17px;font-size:.75rem;white-space:nowrap;text-decoration:none;}
-.command-nav a.nav-link:hover {background:var(--surface);color:var(--ink);}
-.command-nav a.nav-link>span {font-size:1.0625rem;}
-@media(max-width:760px),(pointer:coarse) and (max-width:1024px){.command-nav a.nav-link {min-height:44px;font-size:.875rem;padding:9px 14px;}}

@@ -1,4 +1,3 @@
-import {connectionCheck,requestTiming} from './connection-check.js';
 import {resolve} from 'node:path';
 import {runtimeSites,hostOf} from './sites.js';
 import express from 'express';
@@ -16,14 +15,10 @@ import {previewRouter} from './media.js';
 import {adminRouter} from './admin.js';
 import {translationRouter} from './translation.js';
 import {maintenanceGate,backupActive} from './storage.js';
-import {quickAccessStore} from './quick-access-store.js';
-import {quickAccessRouter} from './quick-access.js';
 import {oauthRouter} from './oauth.js';
-export function createApp(pool,filesRoot,{sites=runtimeSites(),mesOnly=process.env.APP_MODE==='mes',webRoot=process.env.MES_WEB_ROOT,quickAccessWritePool=pool}={}) {
+export function createApp(pool,filesRoot,{sites=runtimeSites(),mesOnly=process.env.APP_MODE==='mes',webRoot=process.env.MES_WEB_ROOT}={}) {
  const app=express();app.disable('x-powered-by');app.set('trust proxy',(process.env.TRUST_PROXY||'loopback').split(',').map(v=>v.trim()));app.locals.sites=sites;app.locals.mesOnly=mesOnly;
  app.use((req,res,next)=>{res.set({'Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});if(![hostOf(sites.mes),...(!mesOnly?[hostOf(sites.portfolio)]:[]),'127.0.0.1'].includes(req.hostname))return res.sendStatus(400);next();});
- app.use('/api',requestTiming);
- app.get('/api/connection-check',(req,res)=>res.type('html').set('Content-Security-Policy',"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'").send(connectionCheck));
  app.get('/api/health',async(req,res)=>{await pool.query('select 1');res.json({ok:true});});
  app.use('/api',sameOrigin,cookieParser(),rateLimit({windowMs:60000,limit:180,skip:req=>['GET','PATCH'].includes(req.method)&&/^\/api\/mes\/(media|uploads)\/[a-f0-9-]{36}(?:\?|$)/.test(req.originalUrl),standardHeaders:'draft-7',legacyHeaders:false}));
  const authLimit=rateLimit({windowMs:900000,limit:30,standardHeaders:'draft-7',legacyHeaders:false});
@@ -35,8 +30,6 @@ export function createApp(pool,filesRoot,{sites=runtimeSites(),mesOnly=process.e
  app.use('/api/portfolio',(req,res,next)=>!mesOnly&&req.hostname===hostOf(sites.portfolio)?next():res.sendStatus(404));
  app.use('/api/mes',(req,res,next)=>req.hostname===hostOf(sites.mes)?next():res.sendStatus(404));
  app.use((req,res,next)=>['login','register','reset','consumeToken'].includes(req.body?.action)||['passwordLogin','activateAccount'].includes(req.body?.name)?authLimit(req,res,next):next());
- app.get('/quick-access',(req,res,next)=>req.path==='/quick-access'?res.redirect(308,'/quick-access/'):next());
- app.use('/quick-access',rateLimit({windowMs:60000,limit:180,standardHeaders:'draft-7',legacyHeaders:false}),quickAccessRouter(pool,{store:quickAccessStore(quickAccessWritePool)}));
  app.use('/api/mes',driveRouter(pool));app.use('/api/mes',pagesRouter(pool));
  app.use('/api/mes',previewRouter(pool,filesRoot));
  app.use('/api/mes/admin',adminRouter(pool,filesRoot,gate));app.use('/api/mes',translationRouter(pool));
@@ -56,10 +49,8 @@ if(process.env.NODE_ENV!=='test') {
  const pool=new pg.Pool({connectionString:process.env.DATABASE_URL,max:4,idleTimeoutMillis:30000,connectionTimeoutMillis:5000,options:'-c statement_timeout=15000'});
  pool.on('error',error=>console.error('Database connection interrupted',{code:error.code||'connection-error'}));
  const filesRoot=process.env.FILES_ROOT||'/var/lib/th-app/files';
- const quickAccessWritePool=new pg.Pool({connectionString:process.env.DATABASE_URL,max:1,idleTimeoutMillis:30000,connectionTimeoutMillis:5000,options:'-c statement_timeout=15000'});
- quickAccessWritePool.on('error',error=>console.error('Quick Access coordination interrupted',{code:error.code||'connection-error'}));
- const app=createApp(pool,filesRoot,{quickAccessWritePool});
+ const app=createApp(pool,process.env.FILES_ROOT||'/var/lib/th-app/files');
  const server=app.listen(Number(process.env.PORT||3000),process.env.HOST||'127.0.0.1');server.requestTimeout=180000;
  const cleanup=setInterval(()=>{if(app.locals.maintenance.blocked||backupActive())return;return cleanupUploads(pool,filesRoot).then(()=>pool.query("delete from public.file_grants where expires<now(); delete from portfolio.sessions where expires<now(); delete from portfolio.tokens where expires<now()")).catch(()=>{});},3600000);cleanup.unref();
- process.on('SIGTERM',()=>{clearInterval(cleanup);server.close(()=>Promise.all([pool.end(),quickAccessWritePool.end()]).then(()=>process.exit(0)));});
+ process.on('SIGTERM',()=>{clearInterval(cleanup);server.close(()=>pool.end().then(()=>process.exit(0)));});
 }

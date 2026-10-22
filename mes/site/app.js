@@ -1,4 +1,3 @@
-import {uploadLoadedPreview} from './media-preview.js';
 import {initMobileFeedback} from './mobile-feedback.js';
 import {initAppearancePreferences,loadAppearancePreferences} from './appearance-preferences.js';
 import {initContentTabs} from './content-tabs.js';
@@ -94,7 +93,6 @@ function toast(message) {
 }
 function errorMessage(e) {
   const c = String(e?.code || "");
-  if (["request-timeout","network-error","gateway-response","edge-challenge"].includes(c)) return `Connection error: ${e.action || "startup"} · ${c}${e.status ? " · HTTP " + e.status : ""}. Open connection check for details.`;
   if (["invalid-credentials", "rate-limited", "password-policy", "P0099", "P0409"].includes(c)) return e.message;
   if (c === "owner-required") return "This Google account is not accepted as the MES owner. Use eric.scorp93@gmail.com. Reset sign-in session to switch accounts.";
   if (c === "backend-not-ready") return "Account service update required. Deploy the MES accounts SQL installer and the matching API.";
@@ -585,7 +583,7 @@ function renderDetail(issue) {
   for (const f of issue.attachments || []) {
     const card = el("article", undefined, "attachment-card");
     if(f.type?.startsWith('image/')){
-      const image=document.createElement('img');image.alt='';image.loading='lazy';image.decoding='async';image.addEventListener('load',()=>repairTicketPreview(f,image),{once:true});imageUrl(f).then(url=>{image.src=url.startsWith('/api/')?url+'?preview=1':url;}).catch(()=>{});card.append(image);
+      const image=document.createElement('img');image.alt='';image.loading='lazy';image.decoding='async';imageUrl(f).then(url=>{image.src=url.startsWith('/api/')?url+'?preview=1':url;}).catch(()=>{});card.append(image);
     }
     const row = el("div", undefined, "file-row"), button = el("button", state.preview ? "Preview file" : "View", "text-button");
     if (f.type?.startsWith("video/")) { button.textContent = `↗ ${t("View video")}`; button.classList.add("video-evidence-link"); }
@@ -897,9 +895,7 @@ function updateIdentity() {
     .toUpperCase();
   $("connection-state").textContent = state.preview
     ? "Sample data · preview"
-    : state.connectionError
-      ? "Connection failed. Press Refresh to retry."
-      : state.ready
+    : state.ready
       ? "Workspace loaded"
       : "Connecting…";
   if (!state.isOwner && state.page === "settings") navigate("dashboard");
@@ -913,10 +909,7 @@ function stopLive() {
   if (timelineUnsubscribe) timelineUnsubscribe();
 }
 function onDataError(error) {
-  state.connectionError=true;
-  $("connection-state").textContent=t("Connection failed. Press Refresh to retry.");
   message(errorMessage(error));
-  const check=document.createElement("a");check.href="/api/connection-check";check.textContent=" · Kiểm tra kết nối / Connection check";$("global-message").append(check);
   if (["permission-denied", "unauthenticated"].includes(String(error.code)) && state.user) {
     stopLive();
     toast(
@@ -927,14 +920,11 @@ function onDataError(error) {
 }
 function subscribeLive() {
   stopLive();
-  state.connectionError=false;
   workspace.start();
-  let scheduled=false;
-  const draw=()=>{if(scheduled)return;scheduled=true;queueMicrotask(()=>{scheduled=false;renderDirectories();renderAll();updateIdentity();openLinkedTicket();});};
   const add = (path, field, order) => unsubscribers.push(watchRecords(path, (rows) => {
     state[field] = rows;
-    if (["issues", "myIssues"].includes(field)) { state.ready = true; state.connectionError=false; message(""); draw(); }
-    else draw();
+    if (["issues", "myIssues"].includes(field)) { state.ready = true; renderAll(); updateIdentity();openLinkedTicket(); }
+    else renderDirectories();
   }, onDataError, order));
   if(state.user) add("teamLeaders", "leaders");
   add("departments", "departments");
@@ -1533,7 +1523,6 @@ $("refresh-button").onclick = async () => {
     toast("Preview data refreshed.");
     return;
   }
-  if(!state.ready){watchAuth(handleAuth,onDataError);return;}
   await Promise.all([refreshRecords(),workspace.refresh()]);
   document.dispatchEvent(new CustomEvent('mes:refresh'));
   toast('Workspace refreshed.');
@@ -1558,7 +1547,6 @@ async function handleAuth(user) {
   state.user = null;
   state.isOwner = false;
   state.ready = false;
-  state.connectionError=false;
   state.issues = [];
   state.myIssues = [];
   state.users = [];
@@ -1573,6 +1561,7 @@ async function handleAuth(user) {
   state.files = [];
   $("activation-result").hidden = true; $("activation-link").value = "";
   $("profile-form").reset(); $("password-form").reset();
+  loadAppearancePreferences(null);
   $("device-result").replaceChildren();
   $("device-result").hidden = true;
   renderDevices();
@@ -1590,25 +1579,21 @@ async function handleAuth(user) {
   updateIdentity();
   if (!user) {
     await loadDirectory();
-    if(new URLSearchParams(location.search).get('returnTo')==='/quick-access'||['profile','settings'].includes(new URLSearchParams(location.search).get('view')))openAccount();
-    if(generation===sessionGeneration){subscribeLive();Promise.all([loadDashboardPreferences(null),loadAppearancePreferences(null)]).catch(()=>{});}
+    if(generation===sessionGeneration){await loadDashboardPreferences(null);await loadAppearancePreferences(null);subscribeLive();}
     return;
   }
   try {
-    const session = user.session || await callable("getSession");
+    const session = await callable("getSession");
     if (generation !== sessionGeneration) return;
     if (session.accountVersion !== 1) throw Object.assign(new Error("Account service update required"), { code: "backend-not-ready" });
-    if(new URLSearchParams(location.search).get('returnTo')==='/quick-access'&&!session.user.isTester){location.replace('/quick-access/');return;}
     state.user = session.user;
+    await Promise.all([loadDashboardPreferences(state.user),loadAppearancePreferences(state.user)]);
     state.isOwner = session.isOwner;
     state.requiresWindows = false;
-    const requestedView=new URLSearchParams(location.search).get('view');
-    if(requestedView==='profile'||requestedView==='settings'&&state.isOwner){navigate(requestedView);history.replaceState(null,'',location.pathname);}
     message("");
     updateIdentity();
     renderDirectories();
     subscribeLive();
-    setTimeout(()=>{if(generation===sessionGeneration)Promise.all([loadDashboardPreferences(state.user),loadAppearancePreferences(state.user)]).catch(()=>toast("Could not load personal workspace preferences. Press Refresh to retry."));},0);
     if(state.isOwner&&new URLSearchParams(location.search).get("drive")==="connected"){history.replaceState(null,"",location.pathname);navigate("settings");toast("Google Drive connected.");}
     if ($("account-dialog").open && $("activation-form").hidden) $("account-dialog").close();
     toast(
@@ -1617,7 +1602,7 @@ async function handleAuth(user) {
   } catch (e) {
     if (generation === sessionGeneration) {
       showStatus("account-status", errorMessage(e));
-      onDataError(e);
+      message(errorMessage(e));
     }
   }
 }
@@ -1656,16 +1641,11 @@ function renderOccurrences(items) {
   }
   return section;
 }
-const imageCache = new Map(), previewImages = new Set(),repairedPreviews=new Set();
-async function repairTicketPreview(file,image){
- if(!state.isOwner||state.preview||!file.path||repairedPreviews.has(file.path)||!image.naturalWidth||file.size<=262144)return;
- repairedPreviews.add(file.path);const generation=sessionGeneration;
- try{const url=await imageUrl(file),response=await fetch(url+'?preview=1',{method:'HEAD',credentials:'same-origin'});if(response.ok&&response.headers.get('X-Media-Preview')==='original'&&generation===sessionGeneration)await uploadLoadedPreview('ticket',file.path,image);}catch{}
-}
+const imageCache = new Map(), previewImages = new Set();
 function previewFileUrl(file) { const url = URL.createObjectURL(file); previewImages.add(url); return url; }
 function clearImages() {
   for (const entry of imageCache.values()) if (entry.url) URL.revokeObjectURL(entry.url);
-  imageCache.clear();repairedPreviews.clear(); for (const url of previewImages) URL.revokeObjectURL(url); previewImages.clear();
+  imageCache.clear(); for (const url of previewImages) URL.revokeObjectURL(url); previewImages.clear();
   $("image-viewer").close(); $("image-full").removeAttribute("src");
 }
 async function imageUrl(file) {
@@ -1680,7 +1660,11 @@ async function openImage(file) {
     if (generation !== sessionGeneration) return;
     $('image-download').href=url.startsWith('/api/')?url+'?download=1':url;$('image-download').download=file.name;
     $("image-name").textContent = file.name;const display=$('image-full'),preview=url.startsWith('/api/')?url+'?preview=1':url;display.alt=file.name;display.dataset.original=url;
-    display.onload=()=>{display.onload=null;repairTicketPreview(file,display);};display.src=preview;
+    display.onload=async()=>{display.onload=null;if(!url.startsWith('/api/'))return;
+      try{const cached=await fetch(preview,{cache:'force-cache'});const ready=cached.headers.get('X-Media-Preview')==='ready';await cached.body?.cancel();if(!ready||generation!==sessionGeneration||display.dataset.original!==url)return;
+        const full=new Image();full.decoding='async';full.onload=()=>{if(generation===sessionGeneration&&display.dataset.original===url)display.src=url;};full.src=url;
+      }catch{}
+    };display.src=preview;
     $("image-stage").classList.remove("natural-size");
     if (!$("image-viewer").open) $("image-viewer").showModal();
   } catch (error) { toast("Unable to load image. Try again."); }
@@ -1689,8 +1673,8 @@ $("add-moment").onclick = () => addOccurrence("point");
 $("add-range").onclick = () => addOccurrence("range");
 $("image-close").onclick = () => $("image-viewer").close();
 $("image-fit").onclick = () => $("image-stage").classList.remove("natural-size");
-$("image-zoom").onclick = () => {const image=$('image-full');if(image.dataset.original)image.src=image.dataset.original;$("image-stage").classList.add("natural-size");};
-$("image-full").ondblclick = () => {if(!$('image-stage').classList.contains('natural-size')&&$('image-full').dataset.original)$('image-full').src=$('image-full').dataset.original;$("image-stage").classList.toggle("natural-size");};
+$("image-zoom").onclick = () => $("image-stage").classList.add("natural-size");
+$("image-full").ondblclick = () => $("image-stage").classList.toggle("natural-size");
 $("image-viewer").addEventListener("click", event => { if (event.target === $("image-viewer")) $("image-viewer").close(); });
 window.addEventListener("beforeunload", clearImages);
 
@@ -1715,7 +1699,7 @@ function inlineImageFile(file){
   const button=el("button",undefined,"inline-report-image");button.type="button";
   button.setAttribute("aria-label",`${t("View image")}: ${file.name}`);
   const image=document.createElement("img");image.alt=file.name;image.loading="lazy";button.append(image);
-  image.addEventListener('load',()=>repairTicketPreview(file,image),{once:true});imageUrl(file).then(url=>{if(button.isConnected){image.src=url.startsWith('/api/')?url+'?preview=1':url;image.decoding='async';}}).catch(()=>{button.append(el("span",t("Image unavailable. Click to retry.")));});
+  imageUrl(file).then(url=>{if(button.isConnected){image.src=url.startsWith('/api/')?url+'?preview=1':url;image.decoding='async';}}).catch(()=>{button.append(el("span",t("Image unavailable. Click to retry.")));});
   button.onclick=()=>openImage(file);return button;
 }
 const feedbackEditor = createRichEditor($("description-input"), {
@@ -1770,7 +1754,7 @@ if (state.preview) {
   updateIdentity();
 } else if (configured) {
   initializeBackend();
-  watchAuth(handleAuth,onDataError);
+  watchAuth(handleAuth);
   renderDirectories();
   renderAll();
   updateIdentity();

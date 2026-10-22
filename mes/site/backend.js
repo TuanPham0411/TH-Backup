@@ -4,46 +4,33 @@ import {uploadChunks} from "./uploads.js";
 let listener;
 let tester = sessionStorage.getItem('th-mes-tester') === 'true';
 const watchers = new Set();
-let loading = false,refreshTimer,watcherVersion=0;
-function scheduleRefresh(){if(refreshTimer!==undefined)return;refreshTimer=setTimeout(()=>{refreshTimer=undefined;refreshRecords();},0);}
+let loading = false;
 export async function refreshRecords() {
   if (loading || !watchers.size || document.hidden) return;
   loading = true;
-  const active = [...watchers],version=watcherVersion;
+  const active = [...watchers];
   try {
-    const result = await api("readBundle", { paths: [...new Map(active.map(w=>[w.path+":"+(w.order||""),{path:w.path,order:w.order}])).values()] });
+    const result = await api("readBundle", { paths: active.map(w => ({ path: w.path, order: w.order })) });
     for (const w of active) if (watchers.has(w)) w.onData(result.snapshots[w.path].rows);
   } catch (error) { for (const w of active) if (watchers.has(w)) w.onError(error); }
-  finally { loading = false;if(version!==watcherVersion&&watchers.size)scheduleRefresh(); }
+  finally { loading = false; }
 }
 export function initializeBackend() {}
 export async function api(name, data = {}) {
-  const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),15000);
-  try{
   const response = await fetch('/api/mes', {
-    signal:controller.signal,
     method: 'POST',
     credentials: 'same-origin',
     headers: { 'Content-Type': 'application/json', ...(tester ? { 'X-MES-Tester': 'true' } : {}) },
     body: JSON.stringify({ name, data }),
   });
-  let body;try{body=await response.json();}catch{throw Object.assign(new Error('The server returned a non-JSON response.'),{code:response.headers.get('cf-mitigated')==='challenge'?'edge-challenge':'gateway-response',status:response.status,requestId:response.headers.get('X-Request-ID')});}
-  if (!response.ok) throw Object.assign(new Error(body.error || 'Request failed'), { code: body.code || 'unavailable',status:response.status });
-  if (!['getDashboardPreferences','getProfile','getAppearanceDefaults','getAppearancePreferences','read','readBundle','getDirectory','getSession','listDevices','downloadUrl','uploadUrl'].includes(name))
-    scheduleRefresh();
+  const body = await response.json();
+  if (!response.ok) throw Object.assign(new Error(body.error || 'Request failed'), { code: body.code || 'unavailable' });
+  if (!['getAppearanceDefaults','getAppearancePreferences','read','readBundle','getDirectory','getSession','listDevices','downloadUrl','uploadUrl'].includes(name))
+    setTimeout(refreshRecords, 0);
   return body;
-  }catch(error){if(error.name==='AbortError')error.code='request-timeout';else if(error.name==='TypeError'&&!error.code)error.code='network-error';error.action=name;throw error;}finally{clearTimeout(timeout);}
 }
-export function watchAuth(callback,onError=()=>{}) {
- listener=callback;
- setTimeout(async()=>{
-  let user;
-  try{const session=await api('getSession');user={id:'local',session};}
-  catch(error){if(error.status===401||error.code==='unauthenticated')user=null;else{onError(error);return;}}
-  try{await callback(user);}catch(error){onError(error);}
- },0);
-}
-export async function ownerLogin() { location.href='/api/oauth/start'+(new URLSearchParams(location.search).get('returnTo')==='/quick-access'?'?returnTo=%2Fquick-access':''); }
+export function watchAuth(callback) { listener = callback; setTimeout(async () => { try { await api('getSession'); await callback({ id: 'local' }); } catch { await callback(null); } }, 0); }
+export async function ownerLogin() { location.href='/api/oauth/start'; }
 export async function managedLogin() { tester = false; sessionStorage.removeItem('th-mes-tester'); await listener?.({ id: 'local' }); }
 export async function setTesterMode(enabled) {
   tester = enabled;
@@ -55,10 +42,10 @@ export async function logout() {
 }
 export function watchRecords(path, onData, onError, order) {
   const watcher = { path, onData, onError, order };
-  watchers.add(watcher);watcherVersion++;
-  scheduleRefresh();
+  watchers.add(watcher);
+  setTimeout(refreshRecords, 0);
   return () => {
-    if(watchers.delete(watcher))watcherVersion++;
+    watchers.delete(watcher);
   };
 }
 export async function uploadAttachment(path, file, type) {

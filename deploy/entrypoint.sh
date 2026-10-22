@@ -3,8 +3,13 @@
 set -euo pipefail
 [[ $(id -u) == 0 ]] || exit 1
 if [[ ${1:-} == --check ]]; then exit 0; fi
-if [[ ${1:-} == --tune-tunnel ]]; then
- exec /bin/bash /opt/th-app/current/deploy/tunnel-transport.sh
+if [[ ${1:-} == --inspect-status ]]; then
+ systemctl show th-status.service -p ActiveState -p SubState -p User -p TTYPath --no-pager
+ if [[ -c /dev/tty0 ]]; then /usr/bin/python3 /opt/th-app/current/deploy/rpi-status.py --active; fi
+ exit 0
+fi
+if [[ ${1:-} == --restore-tunnel ]]; then
+ exec /bin/bash /opt/th-app/current/deploy/restore-tunnel.sh
 fi
 if [[ ${1:-} == --inspect-routing ]]; then
  exec /bin/bash /opt/th-app/current/deploy/install.sh --inspect-routing

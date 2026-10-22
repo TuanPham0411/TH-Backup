@@ -8,7 +8,6 @@ export function oauthRouter(pool) {
  const cookie={httpOnly:true,secure:true,sameSite:'lax',path:'/api/oauth',maxAge:600000};
  r.get('/start',(req,res)=>{
   if(!process.env.GOOGLE_CLIENT_ID||!process.env.GOOGLE_CLIENT_SECRET)return res.status(503).send('Google login is not configured.');
-  res.cookie('oauth_return',req.hostname===hostOf(req.app.locals.sites.mes)&&req.query.returnTo==='/quick-access'?'/quick-access':'/',cookie);
   const state=token(),verifier=token();res.cookie('oauth_state',state,cookie);res.cookie('oauth_verifier',verifier,cookie);
   const params=new URLSearchParams({client_id:process.env.GOOGLE_CLIENT_ID,redirect_uri:`${publicOrigin(req)}/api/oauth/callback`,response_type:'code',scope:'openid email profile',state,code_challenge:createHash('sha256').update(verifier).digest('base64url'),code_challenge_method:'S256'});
   res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params}`);
@@ -30,8 +29,7 @@ export function oauthRouter(pool) {
    await pool.query('delete from portfolio.sessions where uid=$1',[u.id]);
    const value=token();await pool.query('insert into portfolio.sessions(hash,uid) values($1,$2)',[hash(value),u.id]);setPortfolioCookie(res,value);
   }
-  const destination=req.hostname===hostOf(req.app.locals.sites.mes)&&req.cookies.oauth_return==='/quick-access'?'/quick-access':'/';
-  res.clearCookie('oauth_return',cookie);res.redirect(destination);
+  res.redirect('/');
  });
  return r;
 }

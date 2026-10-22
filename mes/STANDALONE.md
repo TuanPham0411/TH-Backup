@@ -33,13 +33,3 @@ Core accounts, ticket CRUD/history, comments, dashboards, content tabs, personal
 ## Move existing data
 
 The standalone branch contains source only. To move a live instance, schedule a write pause; take a PostgreSQL custom-format dump and a complete media copy with original paths; restore them into the target database/media volume, run pending migrations, then verify ticket IDs, history, file links and range playback before switching DNS. If files are on Google Drive, preserve the cloud mappings and securely reconnect the same Google account (or transfer the private token file separately). Existing SD/USB storage broker mappings need to be flattened into the portable media root. Keep the Pi and its backups intact until the new instance is verified. This export does not migrate or delete live data.
-
-## Quick Access
-
-The source and runtime include `/quick-access/`, protected by the same MES login. It defaults to MES Night and retains private per-user Drive preferences. All account management remains in MES. Configure existing source-folder read access and Drive consent as described in [Quick Access setup](quick-access/README.md).
-
-## Media loading
-
-Drive image reads use a disposable private disk cache under `FILES_ROOT/.cache/drive-media` (128 MiB, at most 512 entries; images up to 12 MiB). Set `MEDIA_CACHE_ROOT` to a writable private directory and `MEDIA_CACHE_MAX_BYTES=0` to disable it. Every read still checks current MES permissions. Drive originals and database mappings remain authoritative; deleting the cache does not delete evidence. Videos retain byte-range streaming. The viewer loads display previews first and fetches full-resolution images on zoom or download.
-
-New ticket forms require at least one supported image or video. Creation API requests declare attachment metadata in `evidence`; document-only submissions are rejected. Creation still uses the existing two-phase upload flow: if an upload fails after ticket allocation, the UI reports the retained ticket ID so the evidence upload can be recovered. Existing tickets are preserved.

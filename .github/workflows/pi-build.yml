@@ -2,7 +2,6 @@ name: Build and deploy Pi
 on:
   push:
     branches: [main, feat/mes-quick-access]
-    paths-ignore: [.github/workflows/mes-performance.yml]
   pull_request:
   workflow_dispatch:
 permissions:
@@ -34,7 +33,8 @@ jobs:
           cache: npm
       - run: npm ci
       - run: python3 deploy/test-storage.py
-      - run: python3 deploy/test-tunnel-transport.py
+      - run: python3 deploy/test-restore-tunnel.py
+      - run: python3 deploy/test-rpi-status.py
       - run: npm test
       - run: npm run test:pi
         env:
@@ -98,48 +98,12 @@ jobs:
           mkdir unpacked
           tar -xzf release.tar.gz -C unpacked
           sudo -n /usr/local/sbin/th-deploy "$PWD/unpacked" "$RELEASE_ID"
-      - name: Verify preferred tunnel transport
-        run: sudo -n /usr/local/sbin/th-deploy --tune-tunnel
+      - name: Restore original tunnel transport
+        run: sudo -n /usr/local/sbin/th-deploy --restore-tunnel
+      - name: Verify physical Pi status console
+        run: sudo -n /usr/local/sbin/th-deploy --inspect-status
       - name: Inspect routing without credentials
         run: sudo -n /usr/local/sbin/th-deploy --inspect-routing
-      - name: Measure API and media after rollout
-        run: |
-          python3 - <<'PY'
-          import concurrent.futures,json,time,urllib.request,urllib.parse
-          origin='http://127.0.0.1:3000'
-          def request(label,path,body=None,media=False):
-            started=time.monotonic();headers={'Host':'mes.th.io.vn','Content-Type':'application/json'}
-            if media:headers['Range']='bytes=0-262143'
-            try:
-              req=urllib.request.Request(origin+path,data=json.dumps(body).encode() if body else None,headers=headers)
-              with urllib.request.urlopen(req,timeout=25) as response:
-                first=response.read(1);ttfb=time.monotonic()-started
-                data=first+response.read(262143 if media else 8*1024*1024)
-                print(json.dumps({'metric':label,'status':response.status,'ttfb_ms':round(ttfb*1000),'total_ms':round((time.monotonic()-started)*1000),'bytes':len(data),'preview':response.headers.get('X-Media-Preview'),'cache':response.headers.get('X-Media-Cache'),'content_length':response.headers.get('Content-Length')}),flush=True)
-                return json.loads(data) if response.headers.get('Content-Type','').startswith('application/json') else None
-            except Exception as error:
-              print(json.dumps({'metric':label,'error':type(error).__name__,'total_ms':round((time.monotonic()-started)*1000)}),flush=True)
-          bundle=None
-          for attempt in range(2):
-            request('health.'+str(attempt),'/api/health')
-            bundle=request('tickets.'+str(attempt),'/api/mes',{'name':'readBundle','data':{'paths':[{'path':'departments'},{'path':'issues','order':'desc'}]}}) or bundle
-            request('workspace.'+str(attempt),'/api/mes/workspace',{'action':'read'})
-            request('appearance.'+str(attempt),'/api/mes',{'name':'getAppearanceDefaults'})
-          images=[]
-          for ticket in (bundle or {}).get('snapshots',{}).get('issues',{}).get('rows',[]):
-            for item in ticket.get('attachments',[]):
-              path=item.get('path','');parts=path.split('/')
-              if item.get('type','').startswith('image/') and len(parts)==3 and parts[0]=='issues':
-                url='/api/mes/attachments/'+'/'.join(urllib.parse.quote(p,safe='') for p in parts[1:])+'?preview=1'
-                if url not in images:images.append(url)
-          for i,url in enumerate(images[:3]):
-            request('image.prime.'+str(i),url)
-          with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
-            pending=[executor.submit(request,'image.'+str(i),url,None,True) for i,url in enumerate(images[:3])]
-            request('health.during-media','/api/health')
-            for future in pending:future.result()
-          print(json.dumps({'metric':'summary','tickets':len((bundle or {}).get('snapshots',{}).get('issues',{}).get('rows',[])),'sample_images':len(images[:3])}),flush=True)
-          PY
       - name: Remove downloaded artifact
         if: always()
         shell: bash
@@ -165,15 +129,10 @@ jobs:
             -H 'Content-Type: application/json' --data '{"name":"getDirectory"}' \
             https://mes.th.io.vn/api/mes | python3 -c 'import json,sys; assert json.load(sys.stdin).get("apiVersion") == "accounts-v1"'
 
-          status=$(curl --silent --show-error --max-time 20 -o /dev/null -w '%{http_code}' https://mes.th.io.vn/quick-access/)
-          test "$status" = 302
-          status=$(curl --silent --show-error --max-time 20 -o /dev/null -w '%{http_code}' https://mes.th.io.vn/quick-access/api/config)
-          test "$status" = 401
           curl --fail --silent --show-error --max-time 20 https://mes.th.io.vn/ | python3 -c 'import sys; page=sys.stdin.read(); assert all("id=\""+key+"\"" in page for key in ["theme-toggle","notice-board","workspace-video","issue-type-select","announcement-files"]); assert "network-targets" not in page and "network-target-form" not in page'
           status=$(curl --silent --show-error --max-time 20 -o /dev/null -w '%{http_code}' -H 'Content-Type: application/json' --data '{"action":"read"}' https://mes.th.io.vn/api/mes/workspace)
           test "$status" = 200
           curl --fail --silent --show-error --max-time 20 -H 'Content-Type: application/json' --data '{"name":"read","data":{"path":"issues"}}' https://mes.th.io.vn/api/mes | python3 -c 'import json,sys; data=json.load(sys.stdin); assert isinstance(data.get("rows"),list); assert all("uploadSlots" not in row and "reporterUsername" not in row for row in data["rows"])'
-          curl --fail --silent --show-error --max-time 20 -H 'Content-Type: application/json' --data '{"name":"readBundle","data":{"paths":[{"path":"departments"},{"path":"issues"}]}}' https://mes.th.io.vn/api/mes | python3 -c 'import json,sys; data=json.load(sys.stdin); assert all(isinstance(data["snapshots"][path]["rows"],list) for path in ["departments","issues"])'
           status=$(curl --silent --show-error --max-time 20 -o /dev/null -w '%{http_code}' -H 'Content-Type: application/json' --data '{"name":"addComment","data":{"issueId":"viewer-probe","text":"blocked"}}' https://mes.th.io.vn/api/mes)
           test "$status" = 401
           reference=$(curl --fail --silent --show-error --max-time 20 -H 'Content-Type: application/json' --data '{"name":"read","data":{"path":"issues"}}' https://mes.th.io.vn/api/mes | python3 -c 'import json,sys; rows=json.load(sys.stdin)["rows"]; print(next((r["ticketNumber"] for r in rows if r.get("ticketNumber")),""))')

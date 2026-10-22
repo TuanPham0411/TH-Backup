@@ -4,8 +4,6 @@ After=network.target postgresql.service th-storage.service th-storage-mounts.ser
 Requires=postgresql.service th-storage-mounts.service
 
 [Service]
-Environment=QUICK_ACCESS_ROOT=/opt/th-app/current/server/quick-access/site
-Environment=QUICK_ACCESS_DATA_ROOT=/opt/th-app/current/server/quick-access
 Type=simple
 User=thapp
 Group=thapp

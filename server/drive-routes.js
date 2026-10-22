@@ -9,7 +9,7 @@ export function driveRouter(pool){
  router.get('/drive/connect',async(req,res)=>{
   await owner(req);if(!driveConfigured())return res.status(503).send('Google OAuth credentials are not configured on the Pi.');
   const state=randomBytes(32).toString('hex'),verifier=randomBytes(32).toString('hex');for(const [key,value]of pending)if(value.expires<Date.now())pending.delete(key);
-  pending.set(state,{verifier,session:req.cookies.th_mes,expires:Date.now()+600000});res.cookie('drive_state',state,{httpOnly:true,secure:true,sameSite:'lax',path:'/api/mes/drive',maxAge:600000});res.redirect(driveAuthorization(state,verifier,{sourceRead:req.query.source==='quick-access'}));
+  pending.set(state,{verifier,session:req.cookies.th_mes,expires:Date.now()+600000});res.cookie('drive_state',state,{httpOnly:true,secure:true,sameSite:'lax',path:'/api/mes/drive',maxAge:600000});res.redirect(driveAuthorization(state,verifier));
  });
  router.get('/drive/callback',async(req,res)=>{
   const state=req.query.state,value=pending.get(state);pending.delete(state);res.clearCookie('drive_state',{path:'/api/mes/drive',httpOnly:true,secure:true,sameSite:'lax'});
