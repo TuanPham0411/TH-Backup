@@ -5,6 +5,8 @@ export function compactDashboard(){
  for(const id of ['status-chart','resolution-insights','recent-issues'])overview.append(document.getElementById(id).closest('article'));
  timeline.after(overview);overview.after(board);
  const details=document.createElement('details');details.className='dashboard-extra';details.id='dashboard-extra';const summary=document.createElement('summary');summary.textContent='Additional analysis';details.append(summary);
- for(const grid of [...page.querySelectorAll(':scope > .chart-grid,:scope > #detailed-analytics')])details.append(grid);
+ const classification=document.createElement('div');classification.className='chart-grid dashboard-classification-row';
+ for(const id of ['priority-chart','issue-type-chart','department-progress'])classification.append(document.getElementById(id).closest('article'));
+ for(const grid of [...page.querySelectorAll(':scope > .chart-grid,:scope > #detailed-analytics')]){if(grid.classList.contains('operations-grid'))details.append(classification);if(grid.children.length)details.append(grid);else grid.remove();}
  page.append(details);
 }
