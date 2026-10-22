@@ -3,6 +3,11 @@
 Quick Access is a child application at `/quick-access/`. It uses the existing MES
 accounts and HttpOnly `th_mes` session cookie. There is no separate user database,
 default password, Windows identity header, or Quick Access login service.
+The interface shares the MES Operations Studio palette and navigation, starts
+in Night mode, and preserves existing account-specific appearance choices.
+The toolbar Day/Night switch saves to the current user’s Drive preferences.
+Account/profile and administrator links open the matching MES screens; no
+account-creation or password-reset forms exist inside Quick Access.
 
 Opening the application without a session redirects to `/?returnTo=/quick-access`.
 Password and Google owner login return to Quick Access after authentication.

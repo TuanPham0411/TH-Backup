@@ -1,25 +1,28 @@
 <!doctype html>
-<html lang="vi">
+<html lang="vi" data-theme="dark">
 <head>
   <meta charset="utf-8">
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
   <title>MES Quick Access</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#101317">
   <link rel="stylesheet" href="./styles.css?v=4.0.0">
   <link rel="stylesheet" href="./workspace.css?v=4.0.0">
+  <link rel="stylesheet" href="./mes.css?v=1">
 </head>
 <body>
   <header class="app-header">
-    <div class="brand-mark">MES</div>
+    <a class="brand-mark" href="/" aria-label="MES workspace">M</a>
     <div class="brand-copy">
-      <h1>MES Quick Access</h1>
-      <span>Vietnam · Manufacturing operations</span>
+      <h1>[TH] P+F MES</h1>
+      <span>QUICK ACCESS WORKSPACE</span>
     </div>
     <div class="header-status"><span class="status-dot"></span><span id="workspaceEnvironment">LIVE workspace</span></div>
     <a class="small" href="/">MES workspace</a>
-    <button class="small" id="settingsBtn" type="button" aria-controls="settingsPanel" aria-expanded="false">Settings</button>
+    <button class="small" id="theme-toggle" type="button" aria-label="Switch to day mode">☀ Day mode</button>
+    <button class="small" id="settingsBtn" type="button" aria-controls="settingsPanel" aria-expanded="false">Preferences</button>
     <button class="small" id="manageContentBtn" type="button" hidden>Manage content</button>
     <button class="chip account-button" id="userBadge" type="button" title="MES account">Loading MES account…</button>
   </header>
@@ -144,7 +147,7 @@
   <!-- Settings Panel -->
   <div id="settingsPanel" class="panel" role="dialog" aria-label="Workspace settings" style="display:none;">
     <div id="settingsHead">
-      <div style="font-weight:700;">Settings</div>
+      <div><strong>Workspace preferences</strong><small>Your account · your workspace</small></div>
       <div>
         <button class="small2" id="settingsApply">Apply</button>
         <button class="small2" id="settingsSave">Save</button>
@@ -158,8 +161,7 @@
       <button class="tab-btn" data-tab="text">Text</button>
       <button class="tab-btn" data-tab="badge">Badge</button>
       <button class="tab-btn" data-tab="colors">Colors</button>
-      <button class="tab-btn admin-only" data-tab="admin" style="display:none;">Admin</button>
-      <button class="tab-btn" data-tab="profile">Profile</button>
+      <button class="tab-btn" data-tab="profile">MES account</button>
     </div>
 
     <div id="settingsBody">
@@ -206,7 +208,7 @@
       <div class="tab-pane" data-pane="colors" style="display:none;">
         <div class="gridSmall">
           <label>Theme</label>
-          <select id="inpTheme"><option value="custom" selected>Custom</option><option value="light">Light</option><option value="dark">Dark</option><option value="high">High-contrast</option></select>
+          <select id="inpTheme"><option value="dark" selected>MES Night</option><option value="light">MES Day</option><option value="custom">Custom</option><option value="high">High-contrast</option></select>
           <label>Header A</label><input id="inpHdrA" type="color" value="#34495e">
           <label>Header B</label><input id="inpHdrB" type="color" value="#2c3e50">
         </div>
@@ -225,56 +227,13 @@
         </div>
       </div>
 
-      <!-- Pane: Admin -->
-      <div class="tab-pane" data-pane="admin" style="display:none;">
-        <div class="grid2">
-          <label>New user</label><input id="admNewUser" type="text">
-          <label>Init password</label><input id="admNewPass" type="password">
-          <div></div><button class="small2" id="btnAdmCreateUser">Create User</button>
-
-          <hr class="sep" style="grid-column:1/-1;">
-
-          <label>Reset user</label><input id="admResetUser" type="text">
-          <label>New password</label><input id="admResetPass" type="password">
-          <div></div><button class="small2" id="btnAdmResetPass">Reset Password</button>
-        </div>
-      </div>
-
-      <!-- Pane: Profile -->
+      <!-- Account access is managed in MES; preferences remain private to this user. -->
       <div class="tab-pane" data-pane="profile" style="display:none;">
-        <div class="windows-profile"><span class="eyebrow">SYSTEM ACCOUNT</span><h3 id="windowsAccountName">Detecting…</h3><p id="windowsAccountMode">Signed in with your MES account</p><p>Your workspace preferences are saved for this account. Content management is available to the MES owner.</p><p><a href="/#profile">Manage MES account</a> · <button type="button" id="mesSignOut">Sign out</button></p></div>
-        <div class="grid2" hidden>
-          <label>Username</label><input id="inpUsername" type="text">
-          <label>Password</label><input id="inpPassword" type="password">
-          <div></div><button class="small2" id="btnLogin">Login</button>
-
-          <hr class="sep" style="grid-column:1/-1;">
-
-          <label>Current password</label><input id="inpCurPass" type="password">
-          <label>New password</label><input id="inpNewPass" type="password">
-          <div></div><button class="small2" id="btnChangePass">Change Password</button>
-
-          <hr class="sep" style="grid-column:1/-1;">
-
-          <div></div><button class="small2" id="btnLogout">Logout</button>
-        </div>
+        <div class="mes-profile"><span class="eyebrow">CONNECTED MES ACCOUNT</span><h3 id="mesAccountName">Loading…</h3><p id="mesAccountMode">Signed in with your MES account</p><p>Your Quick Access preferences are saved privately to Drive. Accounts, passwords and access permissions are managed in MES.</p>
+        <div class="account-actions"><a class="small2" href="/?view=profile">My MES profile ↗</a><a class="small2" id="mesAdministrationLink" href="/?view=settings" hidden>MES administration ↗</a><button class="small2" type="button" id="mesSignOut">Sign out</button></div></div>
       </div>
     </div>
-  </div>
-
-  <!-- Login Modal (overlay) -->
-  <div id="loginModal" aria-hidden="true">
-    <div class="login-card" role="dialog" aria-modal="true" aria-labelledby="loginTitle">
-      <div class="login-head" id="loginTitle">Sign in</div>
-      <div class="login-body">
-        <input id="mUser" type="text" placeholder="Username">
-        <input id="mPass" type="password" placeholder="Password">
-      </div>
-      <div class="login-actions">
-        <button id="mCancel" class="secondary">Cancel</button>
-        <button id="mOk">Sign in</button>
-      </div>
-    </div>
+    <div id="preferences-status" role="status" aria-live="polite">Personal preferences · saved to your MES account on Drive</div>
   </div>
 
 <script type="module" src="./bootstrap.js"></script>

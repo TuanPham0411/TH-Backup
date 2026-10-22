@@ -1578,7 +1578,7 @@ async function handleAuth(user) {
   updateIdentity();
   if (!user) {
     await loadDirectory();
-    if(new URLSearchParams(location.search).get('returnTo')==='/quick-access')openAccount();
+    if(new URLSearchParams(location.search).get('returnTo')==='/quick-access'||['profile','settings'].includes(new URLSearchParams(location.search).get('view')))openAccount();
     if(generation===sessionGeneration){await loadDashboardPreferences(null);await loadAppearancePreferences(null);subscribeLive();}
     return;
   }
@@ -1591,6 +1591,8 @@ async function handleAuth(user) {
     await Promise.all([loadDashboardPreferences(state.user),loadAppearancePreferences(state.user)]);
     state.isOwner = session.isOwner;
     state.requiresWindows = false;
+    const requestedView=new URLSearchParams(location.search).get('view');
+    if(requestedView==='profile'||requestedView==='settings'&&state.isOwner){navigate(requestedView);history.replaceState(null,'',location.pathname);}
     message("");
     updateIdentity();
     renderDirectories();

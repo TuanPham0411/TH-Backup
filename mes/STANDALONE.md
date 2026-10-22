@@ -33,3 +33,7 @@ Core accounts, ticket CRUD/history, comments, dashboards, content tabs, personal
 ## Move existing data
 
 The standalone branch contains source only. To move a live instance, schedule a write pause; take a PostgreSQL custom-format dump and a complete media copy with original paths; restore them into the target database/media volume, run pending migrations, then verify ticket IDs, history, file links and range playback before switching DNS. If files are on Google Drive, preserve the cloud mappings and securely reconnect the same Google account (or transfer the private token file separately). Existing SD/USB storage broker mappings need to be flattened into the portable media root. Keep the Pi and its backups intact until the new instance is verified. This export does not migrate or delete live data.
+
+## Quick Access
+
+The source and runtime include `/quick-access/`, protected by the same MES login. It defaults to MES Night and retains private per-user Drive preferences. All account management remains in MES. Configure existing source-folder read access and Drive consent as described in [Quick Access setup](quick-access/README.md).

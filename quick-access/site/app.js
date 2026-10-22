@@ -1,4 +1,4 @@
-// app.js — clean, no refresh button, login = modal overlay
+// Quick Access uses MES sessions; only workspace preferences are managed here.
 
 // ---- Elements
 const select = document.getElementById('lineSelect');
@@ -22,7 +22,6 @@ const settingsReset = document.getElementById('settingsReset');
 
 const tabs = Array.from(document.querySelectorAll('.tab-btn'));
 const panes = Array.from(document.querySelectorAll('.tab-pane'));
-const adminTabBtn = document.querySelector('.tab-btn.admin-only');
 
 // Settings inputs
 const inpFontBase = document.getElementById('inpFontBase');
@@ -53,30 +52,6 @@ const inpTheme= document.getElementById('inpTheme');
 
 const colIdsA = [ 'col1A','col2A','col3A','col4A','col5A' ];
 const colIdsB = [ 'col1B','col2B','col3B','col4B','col5B' ];
-
-// Profile tab
-const inpUsername = document.getElementById('inpUsername');
-const inpPassword = document.getElementById('inpPassword');
-const btnLogin    = document.getElementById('btnLogin');
-const btnLogout   = document.getElementById('btnLogout');
-const inpCurPass  = document.getElementById('inpCurPass');
-const inpNewPass  = document.getElementById('inpNewPass');
-const btnChangePass = document.getElementById('btnChangePass');
-
-// Admin tab
-const admNewUser = document.getElementById('admNewUser');
-const admNewPass = document.getElementById('admNewPass');
-const btnAdmCreateUser = document.getElementById('btnAdmCreateUser');
-const admResetUser = document.getElementById('admResetUser');
-const admResetPass = document.getElementById('admResetPass');
-const btnAdmResetPass = document.getElementById('btnAdmResetPass');
-
-// Login modal
-const loginModal = document.getElementById('loginModal');
-const mUser = document.getElementById('mUser');
-const mPass = document.getElementById('mPass');
-const mCancel = document.getElementById('mCancel');
-const mOk = document.getElementById('mOk');
 
 // ---- Centralized MES config
 const MES_CONFIG = window.MES_CONFIG || { lines: [], environments: {}, urls: {} };
@@ -157,12 +132,12 @@ function escapeHtml(value){ return String(value ?? '').replace(/[&<>"']/g, char 
 function applyThemePreset(val){
   const root = document.documentElement;
   if (val === 'light'){
-    root.style.setProperty('--bg', '#f3f5f7'); root.style.setProperty('--card', '#ffffff');
-    root.style.setProperty('--ink', '#1f2a37'); root.style.setProperty('--ink-dim', '#4b5563');
+    root.style.setProperty('--bg', '#f4f1eb'); root.style.setProperty('--card', '#fffefb');
+    root.style.setProperty('--ink', '#202727'); root.style.setProperty('--ink-dim', '#6e7671');
     root.style.setProperty('--accent-a', '#34495e'); root.style.setProperty('--accent-b', '#2c3e50');
   } else if (val === 'dark'){
-    root.style.setProperty('--bg', '#111827'); root.style.setProperty('--card', '#1f2937');
-    root.style.setProperty('--ink', '#e5e7eb'); root.style.setProperty('--ink-dim', '#cbd5e1');
+    root.style.setProperty('--bg', '#101317'); root.style.setProperty('--card', '#1a1f24');
+    root.style.setProperty('--ink', '#f0f1e9'); root.style.setProperty('--ink-dim', '#9aa8a7');
     root.style.setProperty('--accent-a', '#0f172a'); root.style.setProperty('--accent-b', '#334155');
   } else if (val === 'high'){
     root.style.setProperty('--bg', '#ffffff'); root.style.setProperty('--card', '#ffffff');
@@ -178,10 +153,9 @@ function buildBadgeWithFallback(btn){
   const override = (badgeUrlOverride || '').trim();
   const isFile = location.protocol === 'file:';
   const fileCandidates = [
-    'file://///pfvn-netapp1/files/70-IT/_Public/TP/ATL/Quick-Access/manufacture.png',
     './manufacture.png','manufacture.png','../public/manufacture.png'
   ];
-  const httpCandidates = ['/assets/manufacture.png','/manufacture.png','./manufacture.png'];
+  const httpCandidates = ['./manufacture.png'];
   let candidates = []; if (override) candidates.push(override);
   candidates = candidates.concat(isFile ? fileCandidates : httpCandidates);
   let idx = 0;
@@ -216,15 +190,19 @@ function collectSettingsFromForm(){
     badgeUrl: (inpBadgeUrl.value || '').trim(),
     hdrA: inpHdrA.value || '#34495e',
     hdrB: inpHdrB.value || '#2c3e50',
-    theme: inpTheme.value || 'custom',
+    theme: inpTheme.value || 'dark',
     colA: colIdsA.map(id => document.getElementById(id).value),
     colB: colIdsB.map(id => document.getElementById(id).value)
   };
 }
 function applySettingsToCSS(s){
   const root = document.documentElement;
-  root.dataset.theme = s.theme || 'custom';
-  applyThemePreset(s.theme === 'custom' ? 'light' : s.theme);
+  const theme=['dark','light','custom','high'].includes(s.theme)?s.theme:'dark';
+  root.dataset.theme = theme;
+  applyThemePreset(theme === 'custom' ? 'light' : theme);
+  document.getElementById('theme-toggle').textContent=theme==='dark'?'☀ Day mode':'☾ Night mode';
+  document.getElementById('theme-toggle').setAttribute('aria-label',theme==='dark'?'Switch to day mode':'Switch to night mode');
+  document.querySelector('meta[name="theme-color"]').content=theme==='dark'?'#101317':'#f4f1eb';
   root.style.setProperty('--accent-a', s.hdrA || '#34495e');
   root.style.setProperty('--accent-b', s.hdrB || '#2c3e50');
   const setVar = (k, v) => root.style.setProperty(k, v);
@@ -284,7 +262,7 @@ function loadSettingsIntoForm(s){
   inpBadgeUrl.value     = s.badgeUrl ?? '';
   inpHdrA.value = s.hdrA ?? '#34495e';
   inpHdrB.value = s.hdrB ?? '#2c3e50';
-  inpTheme.value= s.theme ?? 'custom';
+  inpTheme.value= s.theme ?? 'dark';
   if (Array.isArray(s.colA) && s.colA.length===5) s.colA.forEach((v,i)=> document.getElementById(colIdsA[i]).value = v);
   if (Array.isArray(s.colB) && s.colB.length===5) s.colB.forEach((v,i)=> document.getElementById(colIdsB[i]).value = v);
 }
@@ -310,27 +288,14 @@ async function refreshMe(){
   document.getElementById('manageContentBtn').hidden = !me.isOwner || !!me.mustChangePassword;
   userBadge.textContent = me.username && me.username !== 'Guest' ? `${me.username} · ${me.role}` : 'MES session unavailable';
   userBadge.title = [me.username || 'Guest', me.authMode || 'none', me.windowsIdentity || ''].filter(Boolean).join(' | ');
-  adminTabBtn.style.display = 'none';
-  document.getElementById('windowsAccountName').textContent = me.username || 'Guest';
-  document.getElementById('windowsAccountMode').textContent = 'Signed in with your MES account';
+  document.getElementById('mesAdministrationLink').hidden=!me.isOwner;
+  document.getElementById('mesAccountName').textContent = me.username || 'Guest';
+  document.getElementById('mesAccountMode').textContent = 'Signed in with your MES account';
 }
 
-let firstLoginTempPassword = '';
-
-async function login(){location.href='/?returnTo=%2Fquick-access';}
-async function confirmFirstPasswordChange(){location.href='/#profile';}
 async function logout(){
   const j = await api('/quick-access/api/logout','POST');
   location.replace('/?returnTo=%2Fquick-access');
-}
-async function changeMyPassword(currentPassword, newPassword){
-  location.href='/#profile'; return {ok:true};
-}
-async function adminCreateUser(username, password){
-  return api('/quick-access/api/admin/users','POST',{ username, password });
-}
-async function adminResetPassword(username, newPassword){
-  return api(`/quick-access/api/admin/users/${encodeURIComponent(username)}/password`, 'PATCH', { newPassword });
 }
 async function loadUserSettings(username){
   return api(`/quick-access/api/settings/${encodeURIComponent(username)}`, 'GET');
@@ -341,7 +306,7 @@ async function saveUserSettings(username, settingsObj){
 
 // Settings UI wiring
 function openSettings(){ settingsPanel.style.display='block'; settingsBtn.setAttribute('aria-expanded','true'); settingsClose.focus(); }
-function closeSettings(){ settingsPanel.style.display='none'; settingsBtn.setAttribute('aria-expanded','false'); }
+function closeSettings(){ settingsPanel.style.display='none'; settingsBtn.setAttribute('aria-expanded','false');settingsBtn.focus(); }
 settingsBtn.addEventListener('click', openSettings);
 settingsClose.addEventListener('click', closeSettings);
 document.addEventListener('keydown', (e)=>{ if (e.key==='Escape') closeSettings(); });
@@ -357,63 +322,12 @@ settingsSave.addEventListener('click', async ()=>{
   await saveUserSettings(currentUser.username, settings);
   applySettingsToCSS(settings);
   clientLog('settings_save', { targetUser: currentUser.username });
-  alert('Saved.');
+  document.getElementById('preferences-status').textContent='Preferences saved to your account on Drive.';
   } catch(error) { alert(error.message || 'Unable to save settings.'); }
 });
 settingsReset.addEventListener('click', ()=> { clientLog('settings_reset_reload', { targetUser: currentUser.username || 'Guest' }); location.reload(); });
 
-// Login modal overlay
-function showLoginModal(){if(currentUser.username&&currentUser.username!=='Guest'){openSettings();activateTab('profile');}else location.href='/?returnTo=%2Fquick-access';}
-function hideLoginModal(){ loginModal.classList.remove('show'); loginModal.setAttribute('aria-hidden','true'); userBadge.focus(); }
-userBadge.addEventListener('click', () => { openSettings(); activateTab('profile'); });
-mCancel.addEventListener('click', hideLoginModal);
-loginModal.addEventListener('click', (e)=>{ if (e.target === loginModal) hideLoginModal(); });
-document.addEventListener('keydown', (e)=>{ if (e.key==='Escape' && loginModal.classList.contains('show')) hideLoginModal(); });
-
-function showForceChangePassword(username) {
-    const loginSection = document.getElementById('loginSection');
-    const forceChangeSection = document.getElementById('forceChangeSection');
-    const settingsTabs = document.getElementById('settingsTabs');
-    const currentUserLabel = document.getElementById('forceChangeUsername');
-
-    if (loginSection) loginSection.style.display = 'none';
-    if (settingsTabs) settingsTabs.style.display = 'none';
-    if (forceChangeSection) forceChangeSection.style.display = 'block';
-    if (currentUserLabel) currentUserLabel.textContent = username || '';
-
-    const newPwd = document.getElementById('forceNewPassword');
-    const confirmPwd = document.getElementById('forceConfirmPassword');
-    if (newPwd) newPwd.value = '';
-    if (confirmPwd) confirmPwd.value = '';
-}
-
-mOk.addEventListener('click', async () => {
-  const u=(mUser.value||'').trim(), p=(mPass.value||'').trim();
-  if (!u){ alert('Username is required.'); return; }
-  try{ await login(u,p); hideLoginModal(); }catch(e){ clientLog('login_failed', { username: u, source: 'modal', message: e.message || 'login error' }); alert(e.message); }
-});
-btnLogin.addEventListener('click', async () => {
-  const u=(inpUsername.value||'').trim(), p=(inpPassword.value||'').trim();
-  if (!u){ alert('Username is required.'); return; }
-  try{ await login(u,p); alert('Logged in.'); }catch(e){ clientLog('login_failed', { username: u, source: 'profile', message: e.message || 'login error' }); alert(e.message); }
-});
-btnLogout.addEventListener('click', async ()=>{ try{ await logout(); alert(currentUser.authMode==='windows-admin' ? 'Windows admin remains signed in.' : 'Logged out.'); }catch(e){ alert(e.message); }});
-btnChangePass.addEventListener('click', async ()=>{
-  if (currentUser.username==='Guest'){ alert('Please log in first.'); return; }
-  const cur=(inpCurPass.value||'').trim(), nw=(inpNewPass.value||'').trim();
-  if (!cur || !nw){ alert('Current and new passwords are required.'); return; }
-  try{ await changeMyPassword(cur,nw); clientLog('change_password', { username: currentUser.username }); alert('Password updated.'); inpCurPass.value=''; inpNewPass.value=''; }catch(e){ alert(e.message); }
-});
-btnAdmCreateUser.addEventListener('click', async ()=>{
-  const u=(admNewUser.value||'').trim(), p=(admNewPass.value||'').trim();
-  if (!u || !p){ alert('Username and initial password required.'); return; }
-  try{ await adminCreateUser(u,p); clientLog('admin_create_user', { target: u }); alert('User created.'); admNewUser.value=''; admNewPass.value=''; }catch(e){ alert(e.message); }
-});
-btnAdmResetPass.addEventListener('click', async ()=>{
-  const u=(admResetUser.value||'').trim(), p=(admResetPass.value||'').trim();
-  if (!u || !p){ alert('Target username and new password required.'); return; }
-  try{ await adminResetPassword(u,p); clientLog('admin_reset_password', { target: u }); alert('Password reset.'); admResetUser.value=''; admResetPass.value=''; }catch(e){ alert(e.message); }
-});
+userBadge.addEventListener('click',()=>{openSettings();activateTab('profile');});
 
 // PC per-user (UI only)
 pcSaveBtn.addEventListener('click', ()=>{ const name=pcInput.value.trim(); setPcLabel(name); setStatus('Saved'); });
@@ -596,9 +510,9 @@ function loadButtons(){
     if (currentUser.username && currentUser.username!=='Guest'){
       const s = await loadUserSettings(currentUser.username);
       loadSettingsIntoForm(s); applySettingsToCSS(s);
-      adminTabBtn.style.display='none';
+
     }else{
-      adminTabBtn.style.display='none';
+
     }
   }catch(e){ console.warn('init error:', e.message); }
 
@@ -1086,3 +1000,12 @@ const savedMainPage = localStorage.getItem('mesQuickAccessPage');
 activateMainPage(['atl','layout','guideline'].includes(savedMainPage) ? savedMainPage : 'atl');
 
 document.getElementById('mesSignOut').addEventListener('click',()=>logout().catch(error=>alert(error.message)));
+
+document.getElementById('theme-toggle').addEventListener('click',async event=>{
+ const previous=collectSettingsFromForm();
+ const next={...previous,theme:document.documentElement.dataset.theme==='dark'?'light':'dark'};
+ event.currentTarget.disabled=true;
+ try{await saveUserSettings(currentUser.username,next);loadSettingsIntoForm(next);applySettingsToCSS(next);document.getElementById('preferences-status').textContent='Theme saved to your account on Drive.';}
+ catch(error){document.getElementById('preferences-status').textContent=error.message;openSettings();}
+ finally{document.getElementById('theme-toggle').disabled=false;}
+});
