@@ -207,3 +207,7 @@ discard uncompleted `mes_uploads` rows, expired grants and old sessions, then ru
 the migration runner to reapply runtime grants. Test sign-in and representative
 attachments before switching the service to that replacement. Restoring is an
 explicit operator procedure; deployment never invokes it automatically.
+
+## Tunnel transport
+
+The Pi uses a dedicated systemd drop-in `cloudflared.service.d/50-th-transport.conf` to prefer HTTP/2 over IPv4 after reproducible QUIC request stalls on its Wi-Fi uplink. No token, ingress route, DNS record or SSH setting is rewritten. The first application installs this preference, restarts the tunnel, requires two registered HTTP/2 connections and checks both public health endpoints three times. A failed check restores the previous drop-in and restarts the previous transport. Later deployments leave an identical transport preference running. To return to automatic transport, remove only this drop-in and reload/restart cloudflared; remove the preferred-transport deployment step as well to keep it automatic.

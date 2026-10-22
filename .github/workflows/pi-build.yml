@@ -34,6 +34,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: python3 deploy/test-storage.py
+      - run: python3 deploy/test-tunnel-transport.py
       - run: npm test
       - run: npm run test:pi
         env:
@@ -97,6 +98,8 @@ jobs:
           mkdir unpacked
           tar -xzf release.tar.gz -C unpacked
           sudo -n /usr/local/sbin/th-deploy "$PWD/unpacked" "$RELEASE_ID"
+      - name: Verify preferred tunnel transport
+        run: sudo -n /usr/local/sbin/th-deploy --tune-tunnel
       - name: Inspect routing without credentials
         run: sudo -n /usr/local/sbin/th-deploy --inspect-routing
       - name: Measure API and media after rollout

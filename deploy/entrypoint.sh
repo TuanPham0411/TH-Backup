@@ -3,6 +3,9 @@
 set -euo pipefail
 [[ $(id -u) == 0 ]] || exit 1
 if [[ ${1:-} == --check ]]; then exit 0; fi
+if [[ ${1:-} == --tune-tunnel ]]; then
+ exec /bin/bash /opt/th-app/current/deploy/tunnel-transport.sh
+fi
 if [[ ${1:-} == --inspect-routing ]]; then
  exec /bin/bash /opt/th-app/current/deploy/install.sh --inspect-routing
 fi
