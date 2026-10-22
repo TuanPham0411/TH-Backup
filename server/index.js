@@ -1,3 +1,4 @@
+import {connectionCheck,requestTiming} from './connection-check.js';
 import {resolve} from 'node:path';
 import {runtimeSites,hostOf} from './sites.js';
 import express from 'express';
@@ -21,6 +22,8 @@ import {oauthRouter} from './oauth.js';
 export function createApp(pool,filesRoot,{sites=runtimeSites(),mesOnly=process.env.APP_MODE==='mes',webRoot=process.env.MES_WEB_ROOT,quickAccessWritePool=pool}={}) {
  const app=express();app.disable('x-powered-by');app.set('trust proxy',(process.env.TRUST_PROXY||'loopback').split(',').map(v=>v.trim()));app.locals.sites=sites;app.locals.mesOnly=mesOnly;
  app.use((req,res,next)=>{res.set({'Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});if(![hostOf(sites.mes),...(!mesOnly?[hostOf(sites.portfolio)]:[]),'127.0.0.1'].includes(req.hostname))return res.sendStatus(400);next();});
+ app.use('/api',requestTiming);
+ app.get('/api/connection-check',(req,res)=>res.type('html').set('Content-Security-Policy',"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'").send(connectionCheck));
  app.get('/api/health',async(req,res)=>{await pool.query('select 1');res.json({ok:true});});
  app.use('/api',sameOrigin,cookieParser(),rateLimit({windowMs:60000,limit:180,skip:req=>['GET','PATCH'].includes(req.method)&&/^\/api\/mes\/(media|uploads)\/[a-f0-9-]{36}(?:\?|$)/.test(req.originalUrl),standardHeaders:'draft-7',legacyHeaders:false}));
  const authLimit=rateLimit({windowMs:900000,limit:30,standardHeaders:'draft-7',legacyHeaders:false});

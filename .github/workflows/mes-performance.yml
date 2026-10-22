@@ -35,6 +35,23 @@ jobs:
           systemctl show cloudflared -p ActiveState -p SubState -p NRestarts --no-pager
           journalctl -u th-app --since '30 minutes ago' --no-pager -o cat 2>/dev/null | grep -E 'Database connection interrupted|API request failed|Quick Access coordination' | tail -25 || true
           journalctl -u cloudflared --since '30 minutes ago' --no-pager -o cat 2>/dev/null | grep -E 'timeout|failed|ERR|connection.*closed' | tail -20 || true
+      - name: Compare DNS resolvers without changing host settings
+        run: |
+          python3 - <<'PYDNS'
+          import concurrent.futures,json,socket,struct,time,os
+          def query(server,host):
+            query_id=os.urandom(2);packet=query_id+struct.pack('!HHHHH',256,1,0,0,0)+b''.join(bytes([len(p)])+p.encode() for p in host.split('.'))+b'\x00'+struct.pack('!HH',1,1)
+            start=time.monotonic()
+            try:
+              with socket.socket(socket.AF_INET,socket.SOCK_DGRAM) as client:
+                client.settimeout(2);client.sendto(packet,(server,53));answer=client.recv(4096)
+              result={'ok':answer[:2]==query_id and answer[3]&15==0}
+            except Exception as error:result={'error':type(error).__name__}
+            print(json.dumps({'metric':'dns','resolver':server,'host':host,'ms':round((time.monotonic()-start)*1000),**result}),flush=True)
+          with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+            pending=[executor.submit(query,server,host) for attempt in range(2) for server in ['192.168.1.1','123.23.23.23','1.1.1.1','8.8.8.8'] for host in ['region1.v2.argotunnel.com','www.googleapis.com']]
+            for future in pending:future.result()
+          PYDNS
       - name: Measure API and media without logging ticket contents
         run: |
           python3 - <<'PY'

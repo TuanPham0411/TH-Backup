@@ -27,12 +27,12 @@ export async function api(name, data = {}) {
     headers: { 'Content-Type': 'application/json', ...(tester ? { 'X-MES-Tester': 'true' } : {}) },
     body: JSON.stringify({ name, data }),
   });
-  const body = await response.json();
+  let body;try{body=await response.json();}catch{throw Object.assign(new Error('The server returned a non-JSON response.'),{code:response.headers.get('cf-mitigated')==='challenge'?'edge-challenge':'gateway-response',status:response.status,requestId:response.headers.get('X-Request-ID')});}
   if (!response.ok) throw Object.assign(new Error(body.error || 'Request failed'), { code: body.code || 'unavailable',status:response.status });
   if (!['getDashboardPreferences','getProfile','getAppearanceDefaults','getAppearancePreferences','read','readBundle','getDirectory','getSession','listDevices','downloadUrl','uploadUrl'].includes(name))
     scheduleRefresh();
   return body;
-  }finally{clearTimeout(timeout);}
+  }catch(error){if(error.name==='AbortError')error.code='request-timeout';else if(error.name==='TypeError'&&!error.code)error.code='network-error';error.action=name;throw error;}finally{clearTimeout(timeout);}
 }
 export function watchAuth(callback,onError=()=>{}) {
  listener=callback;

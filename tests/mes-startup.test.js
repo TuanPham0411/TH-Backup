@@ -34,3 +34,8 @@ test('startup passes the verified session to the UI without requiring a second s
  await settle();assert.equal(requests.length,1);assert.equal(requests[0].data.paths.length,2);assert.equal(delivered,3);
  await app.api('getDashboardPreferences');await settle();assert.equal(requests.filter(r=>r.name==='readBundle').length,1);stops.forEach(stop=>stop());
  });
+
+test('MES identifies edge HTML responses instead of hiding the failure as a JSON error',async()=>{
+ const app=backend(async()=>({ok:false,status:502,headers:{get:()=>null},json:async()=>{throw new SyntaxError('HTML response');}}));
+ await assert.rejects(app.api('getSession'),error=>error.code==='gateway-response'&&error.status===502&&error.action==='getSession');
+});

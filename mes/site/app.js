@@ -94,6 +94,7 @@ function toast(message) {
 }
 function errorMessage(e) {
   const c = String(e?.code || "");
+  if (["request-timeout","network-error","gateway-response","edge-challenge"].includes(c)) return `Connection error: ${e.action || "startup"} · ${c}${e.status ? " · HTTP " + e.status : ""}. Open connection check for details.`;
   if (["invalid-credentials", "rate-limited", "password-policy", "P0099", "P0409"].includes(c)) return e.message;
   if (c === "owner-required") return "This Google account is not accepted as the MES owner. Use eric.scorp93@gmail.com. Reset sign-in session to switch accounts.";
   if (c === "backend-not-ready") return "Account service update required. Deploy the MES accounts SQL installer and the matching API.";
@@ -915,6 +916,7 @@ function onDataError(error) {
   state.connectionError=true;
   $("connection-state").textContent=t("Connection failed. Press Refresh to retry.");
   message(errorMessage(error));
+  const check=document.createElement("a");check.href="/api/connection-check";check.textContent=" · Kiểm tra kết nối / Connection check";$("global-message").append(check);
   if (["permission-denied", "unauthenticated"].includes(String(error.code)) && state.user) {
     stopLive();
     toast(
@@ -1589,7 +1591,7 @@ async function handleAuth(user) {
   if (!user) {
     await loadDirectory();
     if(new URLSearchParams(location.search).get('returnTo')==='/quick-access'||['profile','settings'].includes(new URLSearchParams(location.search).get('view')))openAccount();
-    if(generation===sessionGeneration){await loadDashboardPreferences(null);await loadAppearancePreferences(null);subscribeLive();}
+    if(generation===sessionGeneration){subscribeLive();Promise.all([loadDashboardPreferences(null),loadAppearancePreferences(null)]).catch(()=>{});}
     return;
   }
   try {

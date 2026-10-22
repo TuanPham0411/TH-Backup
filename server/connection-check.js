@@ -1,0 +1,23 @@
+import {randomUUID} from 'node:crypto';
+export function requestTiming(req,res,next){
+ const started=performance.now(),id=randomUUID(),original=res.writeHead;
+ res.setHeader('X-Request-ID',id);
+ res.writeHead=function(...args){res.setHeader('Server-Timing',`app;dur=${(performance.now()-started).toFixed(1)}`);return original.apply(this,args);};
+ res.once('finish',()=>{const elapsed=Math.round(performance.now()-started);if(elapsed>=2000||res.statusCode>=500)console.warn('MES request timing',JSON.stringify({id,status:res.statusCode,ms:elapsed,method:req.method,action:/^[A-Za-z]{1,64}$/.test(req.body?.name||'')?req.body.name:undefined}));});
+ res.once('close',()=>{const elapsed=Math.round(performance.now()-started);if(!res.writableFinished&&elapsed>=2000)console.warn('MES request timing',JSON.stringify({id,status:res.statusCode,ms:elapsed,aborted:true,method:req.method,action:/^[A-Za-z]{1,64}$/.test(req.body?.name||'')?req.body.name:undefined}));});
+ next();
+}
+export const connectionCheck=`<!doctype html><html lang="vi"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Kiểm tra kết nối MES</title><style>body{background:#101416;color:#eee;font:16px system-ui;max-width:900px;margin:32px auto;padding:20px}button,a{color:#ff965e}button{background:#222;padding:12px;border:1px solid #777;border-radius:8px;cursor:pointer}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#192321;padding:18px}p{line-height:1.6}</style><h1>Kiểm tra kết nối</h1><p>Trang nhẹ này chỉ đọc dữ liệu để đo kết nối. Báo cáo không chứa tên người dùng, cookie, mật khẩu hoặc nội dung ticket.</p><button id="run">Đo lại</button> <button id="copy">Sao chép báo cáo</button> <a href="/">Về trang chính</a><p id="status" role="status"></p><pre id="report"></pre><script>
+const output=document.getElementById('report'),status=document.getElementById('status'),button=document.getElementById('run');let report;
+function show(){output.textContent=JSON.stringify(report,null,2);}
+async function probe(label,path,body){const started=performance.now(),controller=new AbortController(),timer=setTimeout(()=>controller.abort(),15000);let data;
+ const row={test:label};report.requests.push(row);status.textContent='Đang đo: '+label;show();
+ try{const response=await fetch(path,{method:body?'POST':'GET',credentials:'same-origin',cache:'no-store',headers:body?{'Content-Type':'application/json'}:{},body:body?JSON.stringify(body):undefined,signal:controller.signal});row.status=response.status;row.ttfb_ms=Math.round(performance.now()-started);row.server=response.headers.get('Server-Timing');row.request_id=response.headers.get('X-Request-ID');row.cloudflare=response.headers.get('CF-Ray');row.mitigated=response.headers.get('cf-mitigated');const text=await response.text();row.bytes=new TextEncoder().encode(text).length;try{data=JSON.parse(text);}catch{row.error='non-json-response';}if(data?.code)row.code=data.code;if(data?.snapshots)row.snapshots=Object.fromEntries(Object.entries(data.snapshots).map(([key,value])=>[key,Array.isArray(value.rows)?value.rows.length:null]));}
+ catch(error){row.error=error.name==='AbortError'?'timeout-15s':error.name;}
+ finally{clearTimeout(timer);row.total_ms=Math.round(performance.now()-started);const resource=performance.getEntriesByType('resource').filter(entry=>entry.name===new URL(path,location.href).href).at(-1);row.protocol=resource?.nextHopProtocol;show();}return data;
+}
+async function run(){button.disabled=true;const navigation=performance.getEntriesByType('navigation')[0];report={time:new Date().toISOString(),origin:location.origin,navigation:navigation?{dns_ms:Math.round(navigation.domainLookupEnd-navigation.domainLookupStart),ttfb_ms:Math.round(navigation.responseStart-navigation.requestStart),protocol:navigation.nextHopProtocol}:null,requests:[]};
+ try{await probe('health','/api/health');const session=await probe('session','/api/mes',{name:'getSession'});const paths=[{path:'departments'},{path:'issues',order:'desc'}];if(session?.user){paths.push({path:'teamLeaders'},{path:'myIssues',order:'desc'},{path:'settings/policy'});if(session.isOwner)paths.push({path:'users'});}await probe('ticket-bundle','/api/mes',{name:'readBundle',data:{paths}});await probe('workspace','/api/mes/workspace',{action:'read'});status.textContent='Đã đo xong. Sao chép báo cáo và gửi trong cuộc trò chuyện.';}
+ finally{button.disabled=false;show();}}
+button.onclick=run;document.getElementById('copy').onclick=async()=>{try{await navigator.clipboard.writeText(output.textContent);status.textContent='Đã sao chép báo cáo.';}catch{status.textContent='Chọn phần báo cáo bên dưới và sao chép thủ công.';}};run();
+</script></html>`;
