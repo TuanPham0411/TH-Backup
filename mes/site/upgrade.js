@@ -1,3 +1,4 @@
+import {analysisGroup} from './analysis-groups.js';
 import {uploadPreview} from './media-preview.js';
 import {t,getLanguage} from './i18n.js';
 const $=id=>document.getElementById(id);
@@ -16,23 +17,23 @@ function bars(card,rows){
  for(const row of rows){const wrap=make('div',undefined,'detail-bar-row'),head=make('div');head.append(make('span',row.label),make('strong',row.value));const track=make('div',undefined,'detail-bar-track');const fill=make('i');fill.style.width=`${row.value/max*100}%`;track.append(fill);wrap.append(head,track);card.append(wrap);}
 }
 export function renderDetailedAnalytics(issues){
- const host=$('detailed-analytics');if(!host)return;host.replaceChildren();
+ const host=$('detailed-analytics');if(!host)return;const distribution=$('department-chart').closest('article');distribution.remove();host.replaceChildren();distribution.id='department-distribution-analysis';
  const now=Date.now(),open=issues.filter(i=>!complete(i));
- const age=chartCard('Backlog age','Open tickets by age');
+ const age=chartCard('Backlog age','Open tickets by age');age.id='aging-analysis';
  const ageBins=[{label:'Under 1 day',low:0,high:1},{label:'1–3 days',low:1,high:3},{label:'3–7 days',low:3,high:7},{label:'7–14 days',low:7,high:14},{label:'14+ days',low:14,high:Infinity}];
  bars(age,ageBins.map(b=>({label:b.label,value:open.filter(i=>{const v=(now-clock(i.createdAt))/86400000;return v>=b.low&&v<b.high;}).length})));age.append(make('p','Current age of open tickets in the selected submission cohort.','helper'));
- const priority=chartCard('Priority × status','Workload by priority');
+ const priority=chartCard('Priority × status','Workload by priority');priority.id='priority-analysis';
  const legend=make('p','Open / Completed','helper');priority.append(legend);
  const max=Math.max(1,...['Critical','High','Medium','Low'].map(p=>issues.filter(i=>i.priority===p).length));
  for(const p of ['Critical','High','Medium','Low']){const items=issues.filter(i=>i.priority===p),done=items.filter(complete).length;const row=make('div',undefined,'detail-bar-row');const head=make('div');head.append(make('span',p),make('strong',`${items.length-done} / ${done}`));const track=make('div',undefined,'detail-bar-track stacked');track.setAttribute('aria-label',`${t(p)}: ${items.length-done} ${t('Open')}, ${done} ${t('Completed')}`);for(const [n,cls]of[[items.length-done,'open'],[done,'done']]){const fill=make('i',undefined,cls);fill.style.width=`${n/max*100}%`;track.append(fill);}row.append(head,track);priority.append(row);}
- const resolution=chartCard('Resolution time','Completed tickets by handling time');
+ const resolution=chartCard('Resolution time','Completed tickets by handling time');resolution.id='resolution-analysis';
  const resolved=issues.filter(complete).filter(i=>clock(i.resolvedAt)>=clock(i.createdAt)&&clock(i.resolvedAt)>0);
  bars(resolution,[{label:'Under 4 hours',low:0,high:4},{label:'4–24 hours',low:4,high:24},{label:'1–3 days',low:24,high:72},{label:'3–7 days',low:72,high:168},{label:'7+ days',low:168,high:Infinity}].map(b=>({label:b.label,value:resolved.filter(i=>{const hours=(clock(i.resolvedAt)-clock(i.createdAt))/3600000;return hours>=b.low&&hours<b.high;}).length})));
  resolution.append(make('p','Uses recorded creation and resolution times; tickets without a resolution timestamp are excluded.','helper'));
- const department=chartCard('Department detail','Department workload and completion');department.classList.add('department-detail');const wrap=make('div',undefined,'table-wrap'),table=make('table');const head=make('tr');for(const title of ['Department','Total','Open','Completed','Completion rate','Average resolution (hours)'])head.append(make('th',title));const thead=make('thead');thead.append(head);table.append(thead);const body=make('tbody');
+ const department=chartCard('Department detail','Department workload and completion');department.id='department-detail-analysis';department.classList.add('department-detail');const wrap=make('div',undefined,'table-wrap'),table=make('table');const head=make('tr');for(const title of ['Department','Total','Open','Completed','Completion rate','Average resolution (hours)'])head.append(make('th',title));const thead=make('thead');thead.append(head);table.append(thead);const body=make('tbody');
  const groups=new Map();for(const i of issues){const key=i.departmentId||'__none';if(!groups.has(key))groups.set(key,{name:i.departmentName||t('Unclassified'),items:[]});groups.get(key).items.push(i);}
  for(const group of [...groups.values()].sort((a,b)=>b.items.length-a.items.length)){const list=group.items,done=list.filter(complete).length,times=list.filter(complete).map(i=>(clock(i.resolvedAt)-clock(i.createdAt))/3600000).filter(n=>Number.isFinite(n)&&n>=0);const row=make('tr');for(const value of [group.name,list.length,list.length-done,done,`${Math.round(done/list.length*100)}%`,times.length?(times.reduce((a,b)=>a+b,0)/times.length).toFixed(1):'—']){const cell=make('td',value);cell.dataset.userContent='';row.append(cell);}body.append(row);}table.append(body);wrap.append(table);department.append(wrap);if(!issues.length)department.append(make('p','No tickets in this period.','helper'));
- host.append(age,priority,resolution,department);
+ const row=make('div',undefined,'dashboard-analysis-row');row.append(analysisGroup('workload-analysis','Workload distribution',[['By department',distribution],['By priority',priority]]),analysisGroup('duration-analysis','Ticket time distribution',[['Open ticket age',age],['Resolution time',resolution]]));host.append(row,department);
 }
 export function initUpgrade(){
  const analytics=make('section',undefined,'detailed-analytics');analytics.id='detailed-analytics';$('dashboard-page').append(analytics);

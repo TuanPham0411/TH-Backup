@@ -287,3 +287,5 @@ Object.assign(vi, {"INCIDENT INTELLIGENCE": "PHÂN TÍCH SỰ CỐ", "Severity l
 Object.assign(vi, {'New starts / interval':'Ticket bắt đầu / khung'});
 
 Object.assign(vi, {'No time intervals match these frequency filters.':'Không có khung thời gian phù hợp với bộ lọc tần số này.'});
+
+Object.assign(vi, {'Workload distribution':'Phân bố công việc','Ticket time distribution':'Thời gian ticket','By priority':'Theo mức ưu tiên','Open ticket age':'Tuổi ticket tồn đọng'});

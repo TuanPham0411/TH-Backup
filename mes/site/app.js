@@ -1,3 +1,4 @@
+import {initAnalysisGroups} from './analysis-groups.js';
 import {compactDashboard} from './dashboard-layout.js';
 import {initSettingsTabs} from './settings-tabs.js';
 import {initWifiSettings} from './wifi-settings.js';
@@ -9,7 +10,7 @@ import {initDriveStorage} from './drive-storage.js';
 import {initDashboardPreferences,loadDashboardPreferences,applyDashboardPreferences} from './dashboard-preferences.js';
 import { initWorkspace, progressView, ticketProgress } from "./workspace.js";
 import { revealPage, animateDashboard } from "./motion.js";
-import { activitySeries, resolutionSummary, submissionCohort } from "./analytics.js";
+import { resolutionSummary, submissionCohort } from "./analytics.js";
 import { createRichEditor } from "./rich-editor.js";
 import { documentText, renderDocument } from "./rich-document.js";
 import { t, initializeLanguage, getLanguage } from "./i18n.js";
@@ -278,7 +279,6 @@ function renderDashboard() {
     $("metrics").append(card);
   }
   incidentTimeline.render();
-  renderActivity(scopedIssues());
   renderOperations(issues);
   workspace.renderCharts(issues);
   renderDetailedAnalytics(issues);
@@ -313,43 +313,6 @@ function renderDashboard() {
       ),
     );
   if (changed) animateDashboard($("dashboard-page"));
-}
-function renderActivity(issues) {
-  const counts = activitySeries(issues, $("dashboard-period").value);
-  $("activity-caption").textContent = $("dashboard-period").value === "all" ? "Submissions and resolutions · full recorded history" : `Submissions and resolutions · last ${$("dashboard-period").value} days`;
-  const max = Math.max(1, ...counts.flatMap((d) => [d.created, d.resolved]));
-  const axis = el("div", undefined, "chart-y");
-  axis.append(
-    el("span", String(max)),
-    el("span", max > 1 ? String(Math.floor(max / 2)) : ""),
-    el("span", "0"),
-  );
-  const grid = el("div", undefined, "activity-grid");
-  for (const d of counts) {
-    const day = el("div", undefined, "activity-day"),
-      bars = el("div", undefined, "activity-bars");
-    for (const [name, count] of [
-      ["Submitted", d.created],
-      ["Resolved", d.resolved],
-    ]) {
-      const bar = el("span");
-      bar.style.height = `${(count / max) * 100}%`;
-      bar.title = `${d.day.toLocaleDateString(getLanguage() === "vi" ? "vi-VN" : "en-GB")} – ${new Date(d.end.getTime()-1).toLocaleDateString(getLanguage() === "vi" ? "vi-VN" : "en-GB")}: ${count} ${t(name)}`;
-      bar.setAttribute("aria-label", bar.title);
-      bar.tabIndex = 0;
-      bar.dataset.tooltip = bar.title;
-      bars.append(bar);
-    }
-    day.append(
-      bars,
-      el(
-        "small",
-        d.day.toLocaleDateString(getLanguage() === "vi" ? "vi-VN" : "en-GB", { day: "2-digit", month: "short" }),
-      ),
-    );
-    grid.append(day);
-  }
-  $("activity-chart").replaceChildren(axis, grid);
 }
 function renderDonut(issues) {
   const counts = statuses.map(
@@ -1736,6 +1699,7 @@ const workspace = initWorkspace({state,toast,run,addEvidence(files) {
 document.querySelector(".topbar .brand").onclick = event => { event.preventDefault(); navigate("dashboard"); };
 const incidentTimeline=initIncidentTimeline(scopedIssues,()=>state.ready,openIssue);
 setInterval(()=>{if(!state.preview&&!document.hidden&&incidentTimeline.visible())refreshRecords();},60000);
+initAnalysisGroups(()=>({user:state.user,preview:state.preview}));
 initUpgrade();
 initDriveStorage();
 initWifiSettings(()=>({isOwner:state.isOwner,preview:state.preview,page:state.page}));
