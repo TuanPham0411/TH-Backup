@@ -1578,6 +1578,7 @@ async function handleAuth(user) {
   updateIdentity();
   if (!user) {
     await loadDirectory();
+    if(new URLSearchParams(location.search).get('returnTo')==='/quick-access')openAccount();
     if(generation===sessionGeneration){await loadDashboardPreferences(null);await loadAppearancePreferences(null);subscribeLive();}
     return;
   }
@@ -1585,6 +1586,7 @@ async function handleAuth(user) {
     const session = await callable("getSession");
     if (generation !== sessionGeneration) return;
     if (session.accountVersion !== 1) throw Object.assign(new Error("Account service update required"), { code: "backend-not-ready" });
+    if(new URLSearchParams(location.search).get('returnTo')==='/quick-access'&&!session.user.isTester){location.replace('/quick-access/');return;}
     state.user = session.user;
     await Promise.all([loadDashboardPreferences(state.user),loadAppearancePreferences(state.user)]);
     state.isOwner = session.isOwner;

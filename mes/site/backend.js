@@ -30,7 +30,7 @@ export async function api(name, data = {}) {
   return body;
 }
 export function watchAuth(callback) { listener = callback; setTimeout(async () => { try { await api('getSession'); await callback({ id: 'local' }); } catch { await callback(null); } }, 0); }
-export async function ownerLogin() { location.href='/api/oauth/start'; }
+export async function ownerLogin() { location.href='/api/oauth/start'+(new URLSearchParams(location.search).get('returnTo')==='/quick-access'?'?returnTo=%2Fquick-access':''); }
 export async function managedLogin() { tester = false; sessionStorage.removeItem('th-mes-tester'); await listener?.({ id: 'local' }); }
 export async function setTesterMode(enabled) {
   tester = enabled;

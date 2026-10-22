@@ -1,0 +1,918 @@
+{
+  "defaultLine": "interface",
+  "environments": {
+    "LIVE": "mes-vn.ot.pepperl-fuchs.com",
+    "TEST": "mes-test-vn.ot.pepperl-fuchs.com"
+  },
+  "urls": {
+    "managementPath": "/Apriso/Portal/Kiosk/Login.aspx?BackToStartPage=true",
+    "taskPath": "/Apriso/Portal/Kiosk/LoginSwipe.aspx?BackToStartPage=true&ReturnUrl=%2FApriso%2FPortal%2FUIService.aspx%3FAlias%3DVF_ADVANCED_TASK_LIST%26WorkCenter="
+  },
+  "lines": [
+    {
+      "id": "interface",
+      "name": "INTERFACE",
+      "stations": [
+        {
+          "operation": "PREPARATION MATERIAL",
+          "workCenter": "VN16105R01PREPARATION MATERIAL",
+          "displayWorkCenter": "VN16105R01",
+          "pcs": [
+            "VNR01-310",
+            "VNR01-311",
+            "VNR01-321"
+          ]
+        },
+        {
+          "operation": "SELECTING MATERIAL",
+          "workCenter": "VN16105R01SELECTING MATERIAL",
+          "displayWorkCenter": "VN16105R01",
+          "pcs": [
+            "VNR01-307"
+          ]
+        },
+        {
+          "operation": "PRINTING TAMPON 1",
+          "workCenter": "VN16101R01PRINTING TAMPON 1",
+          "displayWorkCenter": "VN16101R01",
+          "pcs": [
+            "VNR01-296",
+            "VNR01-423"
+          ]
+        },
+        {
+          "operation": "PRINTING TAMPON 2",
+          "workCenter": "VN16101R01PRINTING TAMPON 2",
+          "displayWorkCenter": "VN16101R01",
+          "pcs": [
+            "VNR01-296",
+            "VNR01-423"
+          ]
+        },
+        {
+          "operation": "ASSEMBLY-THR",
+          "workCenter": "VN16100R01ASSEMBLY-THR",
+          "displayWorkCenter": "VN16100R01",
+          "pcs": [
+            "VNR01-308",
+            "VNR01-309",
+            "VNR01-312",
+            "VNR01-314",
+            "VNR01-316",
+            "VNR01-319",
+            "VNR01-407",
+            "VNR01-411",
+            "VNR01-412",
+            "VNR01-413",
+            "VNR01-414",
+            "VNR01-415",
+            "VNR01-418",
+            "VNR01-420"
+          ]
+        },
+        {
+          "operation": "ASSEMBLY",
+          "workCenter": "VN16100R01ASSEMBLY",
+          "displayWorkCenter": "VN16100R01",
+          "pcs": [
+            "VNR01-313",
+            "VNR01-317"
+          ]
+        },
+        {
+          "operation": "SOLDERING WAVE",
+          "workCenter": "VN16102R01SOLDERING WAVE",
+          "displayWorkCenter": "VN16102R01",
+          "pcs": []
+        },
+        {
+          "operation": "VISUAL CHECK SOLDERING",
+          "workCenter": "VN16100R01VISUAL CHECK SOLDERING",
+          "displayWorkCenter": "VN16100R01",
+          "pcs": [
+            "VNR01-345",
+            "VNR01-318",
+            "VNR01-315",
+            "VNR01-323",
+            "VNR01-417",
+            "VNR01-435",
+            "VNR01-408",
+            "VNR01-416",
+            "VNR01-430",
+            "VNR01-419"
+          ]
+        },
+        {
+          "operation": "TESTING PRE 1",
+          "workCenter": "VN16104R01TESTING PRE 1",
+          "displayWorkCenter": "VN16104R01",
+          "pcs": []
+        },
+        {
+          "operation": "MERGING",
+          "workCenter": "VN16100R01MERGING",
+          "displayWorkCenter": "VN16100R01",
+          "pcs": [
+            "VNR01-320",
+            "VNR01-322"
+          ]
+        },
+        {
+          "operation": "TESTING HV",
+          "workCenter": "VN16103R01TESTING HV",
+          "displayWorkCenter": "VN16103R01",
+          "pcs": [
+            "920-A009-018-VN",
+            "920-A009-021-VN",
+            "920-A009-034-VN",
+            "920-A009-035-VN"
+          ]
+        },
+        {
+          "operation": "TESTING FINAL",
+          "workCenter": "VN16104R01TESTING FINAL",
+          "displayWorkCenter": "VN16104R01",
+          "pcs": [
+            "920-0013-055-VN",
+            "920-0013-070-VN",
+            "920-0013-097-VN",
+            "920-0013-100-VN",
+            "920-0013-056-VN",
+            "920-0013-058-VN",
+            "920-0013-098-VN",
+            "920-0013-099-VN",
+            "920-0013-052-VN",
+            "920-0013-096-VN"
+          ]
+        },
+        {
+          "operation": "PASTING LABEL",
+          "workCenter": "VN16100R01PASTING LABEL",
+          "displayWorkCenter": "VN16100R01",
+          "pcs": []
+        },
+        {
+          "operation": "PACKING",
+          "workCenter": "VN16100R01PACKING",
+          "displayWorkCenter": "VN16100R01",
+          "pcs": [
+            "2008VND019",
+            "2309VND086",
+            "2309VND978",
+            "2003VND987",
+            "2008VND020"
+          ]
+        },
+        {
+          "operation": "PRODUCTION REWORK",
+          "workCenter": "OFFLINE_REWORKPRODUCTION REWORK",
+          "displayWorkCenter": "OFFLINE_REWORKPRODUCTION REWORK",
+          "pcs": [
+            "VNR01-299"
+          ]
+        },
+        {
+          "operation": "QMFA REWORK",
+          "workCenter": "OFFLINE_REWORKQMFA REWORK",
+          "displayWorkCenter": "OFFLINE_REWORKQMFA REWORK",
+          "pcs": []
+        },
+        {
+          "operation": "GLUING",
+          "workCenter": "VN16100R01GLUING",
+          "displayWorkCenter": "VN16100R01",
+          "pcs": []
+        },
+        {
+          "operation": "COATING AUTO",
+          "workCenter": "VN16106R01COATING AUTO",
+          "displayWorkCenter": "VN16106R01",
+          "pcs": []
+        },
+        {
+          "operation": "VISUAL CHECK LACQUERING",
+          "workCenter": "VN16100R01VISUAL CHECK LACQUERING",
+          "displayWorkCenter": "VN16100R01",
+          "pcs": []
+        },
+        {
+          "operation": "TESTING PRE 1 /PCBA",
+          "workCenter": "VN16104R01TESTING PRE 1 /PCBA",
+          "displayWorkCenter": "VN16104R01",
+          "pcs": []
+        },
+        {
+          "operation": "TEAM LEADER",
+          "workCenter": "MANAGEMENT",
+          "displayWorkCenter": "MANAGEMENT",
+          "pcs": [],
+          "type": "management"
+        }
+      ]
+    },
+    {
+      "id": "varikont",
+      "name": "VARIKONT",
+      "stations": [
+        {
+          "operation": "MAIN ASSEMBLY 1",
+          "workCenter": "VN15220R01MAIN ASSEMBLY 1",
+          "displayWorkCenter": "VN15220R01",
+          "pcs": []
+        },
+        {
+          "operation": "MAIN ASSEMBLY 2",
+          "workCenter": "VN15220R01MAIN ASSEMBLY 2",
+          "displayWorkCenter": "VN15220R01",
+          "pcs": []
+        },
+        {
+          "operation": "MAIN ASSEMBLY 3",
+          "workCenter": "VN15220R01MAIN ASSEMBLY 3",
+          "displayWorkCenter": "VN15220R01",
+          "pcs": []
+        },
+        {
+          "operation": "FUNCTION TEST",
+          "workCenter": "VN15221R01FUNCTION TEST",
+          "displayWorkCenter": "VN15221R01",
+          "pcs": []
+        },
+        {
+          "operation": "FILLING",
+          "workCenter": "VN15230R01FILLING",
+          "displayWorkCenter": "VN15230R01",
+          "pcs": []
+        },
+        {
+          "operation": "FILLING 1",
+          "workCenter": "VN15230R01FILLING 1",
+          "displayWorkCenter": "VN15230R01",
+          "pcs": []
+        },
+        {
+          "operation": "FILLING 2",
+          "workCenter": "VN15230R01FILLING 2",
+          "displayWorkCenter": "VN15230R01",
+          "pcs": []
+        },
+        {
+          "operation": "FILLING 3",
+          "workCenter": "VN15230R01FILLING 3",
+          "displayWorkCenter": "VN15230R01",
+          "pcs": []
+        },
+        {
+          "operation": "VACUUMING",
+          "workCenter": "VN15229R01VACUUMING",
+          "displayWorkCenter": "VN15229R01",
+          "pcs": []
+        },
+        {
+          "operation": "VACUUMING 1",
+          "workCenter": "VN15229R01VACUUMING 1",
+          "displayWorkCenter": "VN15229R01",
+          "pcs": []
+        },
+        {
+          "operation": "OVEN CURING",
+          "workCenter": "VN15231R01OVEN CURING",
+          "displayWorkCenter": "VN15231R01",
+          "pcs": []
+        },
+        {
+          "operation": "OVEN CURING 1",
+          "workCenter": "VN15231R01OVEN CURING 1",
+          "displayWorkCenter": "VN15231R01",
+          "pcs": []
+        },
+        {
+          "operation": "OVEN CURING 2",
+          "workCenter": "VN15231R01OVEN CURING 2",
+          "displayWorkCenter": "VN15231R01",
+          "pcs": []
+        },
+        {
+          "operation": "HV TEST /NO TEST RECORD",
+          "workCenter": "VN15226R01HV TEST /NO TEST RECORD",
+          "displayWorkCenter": "VN15226R01",
+          "pcs": []
+        },
+        {
+          "operation": "PRINTING TAMPON",
+          "workCenter": "VN15223R01PRINTING TAMPON",
+          "displayWorkCenter": "VN15223R01",
+          "pcs": []
+        },
+        {
+          "operation": "SOCKET ASSEMBLY",
+          "workCenter": "VN15220R01SOCKET ASSEMBLY",
+          "displayWorkCenter": "VN15220R01",
+          "pcs": []
+        },
+        {
+          "operation": "FINAL TEST",
+          "workCenter": "VN15221R01FINAL TEST",
+          "displayWorkCenter": "VN15221R01",
+          "pcs": []
+        },
+        {
+          "operation": "PACKING/LABELLING",
+          "workCenter": "VN15220R01PACKING/LABELLING",
+          "displayWorkCenter": "VN15220R01",
+          "pcs": []
+        },
+        {
+          "operation": "COIL ASSEMBLY",
+          "workCenter": "VN15220R01COIL ASSEMBLY",
+          "displayWorkCenter": "VN15220R01",
+          "pcs": []
+        },
+        {
+          "operation": "MATERIALS PREPARATION",
+          "workCenter": "VN15220R01MATERIALS PREPARATION",
+          "displayWorkCenter": "VN15220R01",
+          "pcs": []
+        },
+        {
+          "operation": "HEAD ASSEMBLY",
+          "workCenter": "VN15220R01HEAD ASSEMBLY",
+          "displayWorkCenter": "VN15220R01",
+          "pcs": []
+        },
+        {
+          "operation": "CUP PREPARATION",
+          "workCenter": "VN15220R01CUP PREPARATION",
+          "displayWorkCenter": "VN15220R01",
+          "pcs": []
+        },
+        {
+          "operation": "LASER TRIMMING",
+          "workCenter": "VN15225R01LASER TRIMMING",
+          "displayWorkCenter": "VN15225R01",
+          "pcs": []
+        },
+        {
+          "operation": "PRE-TEST /NO TEST RECORD",
+          "workCenter": "VN15224R01PRE-TEST /NO TEST RECORD",
+          "displayWorkCenter": "VN15224R01",
+          "pcs": []
+        },
+        {
+          "operation": "OFFLINE_REWORK_VARIKONT_PROD",
+          "workCenter": "OFFLINE_REWORK_VARIKONT_PROD",
+          "displayWorkCenter": "OFFLINE_REWORK_VARIKONT_PROD",
+          "pcs": []
+        },
+        {
+          "operation": "OFFLINE_REWORK_VARIKONT_QMFA",
+          "workCenter": "OFFLINE_REWORK_VARIKONT_QMFA",
+          "displayWorkCenter": "OFFLINE_REWORK_VARIKONT_QMFA",
+          "pcs": []
+        },
+        {
+          "operation": "TEAM LEADER",
+          "workCenter": "MANAGEMENT",
+          "displayWorkCenter": "MANAGEMENT",
+          "pcs": [],
+          "type": "management"
+        }
+      ]
+    },
+    {
+      "id": "pxv",
+      "name": "PxV",
+      "stations": [
+        {
+          "operation": "WELDING ULTRA",
+          "workCenter": "VN15125R01WELDING ULTRA",
+          "displayWorkCenter": "VN15125R01",
+          "pcs": []
+        },
+        {
+          "operation": "ADJUSTMENT /TRIMMING TEST",
+          "workCenter": "VN15133R01ADJUSTMENT /TRIMMING TEST",
+          "displayWorkCenter": "VN15133R01",
+          "pcs": []
+        },
+        {
+          "operation": "ADJUSTMENT/TRIMMING TEST /PCBA",
+          "workCenter": "VN15133R01ADJUSTMENT/TRIMMING TEST /PCBA",
+          "displayWorkCenter": "VN15133R01",
+          "pcs": []
+        },
+        {
+          "operation": "FINAL TEST",
+          "workCenter": "VN15133R01FINAL TEST",
+          "displayWorkCenter": "VN15133R01",
+          "pcs": []
+        },
+        {
+          "operation": "FINAL TEST /PASTE SERIAL #",
+          "workCenter": "VN15133R01FINAL TEST /PASTE SERIAL #",
+          "displayWorkCenter": "VN15133R01",
+          "pcs": []
+        },
+        {
+          "operation": "PRE-TEST",
+          "workCenter": "VN15133R01PRE-TEST",
+          "displayWorkCenter": "VN15133R01",
+          "pcs": []
+        },
+        {
+          "operation": "RADICAL TEST /NO TEST RECORD",
+          "workCenter": "VN15174R01RADICAL TEST /NO TEST RECORD",
+          "displayWorkCenter": "VN15174R01",
+          "pcs": []
+        },
+        {
+          "operation": "RADICAL TEST \\NO TEST RECORD",
+          "workCenter": "VN15174R01RADICAL TEST \\NO TEST RECORD",
+          "displayWorkCenter": "VN15174R01",
+          "pcs": []
+        },
+        {
+          "operation": "WELDING ULTRA",
+          "workCenter": "VN15174R01WELDING ULTRA",
+          "displayWorkCenter": "VN15174R01",
+          "pcs": []
+        },
+        {
+          "operation": "CLEANING",
+          "workCenter": "VN15180R01CLEANING",
+          "displayWorkCenter": "VN15180R01",
+          "pcs": []
+        },
+        {
+          "operation": "GLUING",
+          "workCenter": "VN15180R01GLUING",
+          "displayWorkCenter": "VN15180R01",
+          "pcs": []
+        },
+        {
+          "operation": "MAIN ASSEMBLY",
+          "workCenter": "VN15180R01MAIN ASSEMBLY",
+          "displayWorkCenter": "VN15180R01",
+          "pcs": []
+        },
+        {
+          "operation": "MERGING",
+          "workCenter": "VN15180R01MERGING",
+          "displayWorkCenter": "VN15180R01",
+          "pcs": []
+        },
+        {
+          "operation": "PACKING",
+          "workCenter": "VN15180R01PACKING",
+          "displayWorkCenter": "VN15180R01",
+          "pcs": []
+        },
+        {
+          "operation": "PACKING/LABELLING/QC SCAN",
+          "workCenter": "VN15180R01PACKING/LABELLING/QC SCAN",
+          "displayWorkCenter": "VN15180R01",
+          "pcs": []
+        },
+        {
+          "operation": "PLASMA/ULTRASONIC PLASMA",
+          "workCenter": "VN15180R01PLASMA/ULTRASONIC PLASMA",
+          "displayWorkCenter": "VN15180R01",
+          "pcs": []
+        },
+        {
+          "operation": "PRE-ASSEMBLY",
+          "workCenter": "VN15180R01PRE-ASSEMBLY",
+          "displayWorkCenter": "VN15180R01",
+          "pcs": []
+        },
+        {
+          "operation": "SUB-ASSEMBLY",
+          "workCenter": "VN15180R01SUB-ASSEMBLY",
+          "displayWorkCenter": "VN15180R01",
+          "pcs": []
+        },
+        {
+          "operation": "PRINT THERMO TRANSFER1",
+          "workCenter": "VN15181R01PRINT THERMO TRANSFER1",
+          "displayWorkCenter": "VN15181R01",
+          "pcs": []
+        },
+        {
+          "operation": "PRINT THERMO TRANSFER2",
+          "workCenter": "VN15181R01PRINT THERMO TRANSFER2",
+          "displayWorkCenter": "VN15181R01",
+          "pcs": []
+        },
+        {
+          "operation": "PRINT THERMO TRANSFER3",
+          "workCenter": "VN15181R01PRINT THERMO TRANSFER3",
+          "displayWorkCenter": "VN15181R01",
+          "pcs": []
+        },
+        {
+          "operation": "PRINT THERMO TRANSFER4",
+          "workCenter": "VN15181R01PRINT THERMO TRANSFER4",
+          "displayWorkCenter": "VN15181R01",
+          "pcs": []
+        },
+        {
+          "operation": "FINAL TEST",
+          "workCenter": "VN15184R01FINAL TEST",
+          "displayWorkCenter": "VN15184R01",
+          "pcs": []
+        },
+        {
+          "operation": "WELDING ULTRA",
+          "workCenter": "VN15187R01WELDING ULTRA",
+          "displayWorkCenter": "VN15187R01",
+          "pcs": []
+        },
+        {
+          "operation": "OFFLINE_REWORK_PxV_PROD",
+          "workCenter": "OFFLINE_REWORK_PxV_PROD",
+          "displayWorkCenter": "OFFLINE_REWORK_PxV_PROD",
+          "pcs": []
+        },
+        {
+          "operation": "OFFLINE_REWORK_PxV_QMFA",
+          "workCenter": "OFFLINE_REWORK_PxV_QMFA",
+          "displayWorkCenter": "OFFLINE_REWORK_PxV_QMFA",
+          "pcs": []
+        },
+        {
+          "operation": "TEAM LEADER",
+          "workCenter": "MANAGEMENT",
+          "displayWorkCenter": "MANAGEMENT",
+          "pcs": [],
+          "type": "management"
+        }
+      ]
+    },
+    {
+      "id": "ems1b",
+      "name": "EMS 1B",
+      "stations": [
+        {
+          "operation": "MATERIALS PREPARATION",
+          "workCenter": "VN15210R01MATERIALS PREPARATION",
+          "displayWorkCenter": "VN15210R01",
+          "pcs": []
+        },
+        {
+          "operation": "MATERIALS PREP_CUTTING TUBE",
+          "workCenter": "VN15210R01MATERIALS PREP_CUTTING TUBE",
+          "displayWorkCenter": "VN15210R01",
+          "pcs": []
+        },
+        {
+          "operation": "ASSEMBLY 1",
+          "workCenter": "VN15210R01ASSEMBLY 1",
+          "displayWorkCenter": "VN15210R01",
+          "pcs": []
+        },
+        {
+          "operation": "ASSEMBLY 2",
+          "workCenter": "VN15210R01ASSEMBLY 2",
+          "displayWorkCenter": "VN15210R01",
+          "pcs": []
+        },
+        {
+          "operation": "ASSEMBLY 3",
+          "workCenter": "VN15210R01ASSEMBLY 3",
+          "displayWorkCenter": "VN15210R01",
+          "pcs": []
+        },
+        {
+          "operation": "ASSEMBLY 4",
+          "workCenter": "VN15210R01ASSEMBLY 4",
+          "displayWorkCenter": "VN15210R01",
+          "pcs": []
+        },
+        {
+          "operation": "CHANGE PCBA_SHORTEN PCBA",
+          "workCenter": "VN15210R01CHANGE PCBA_SHORTEN PCBA",
+          "displayWorkCenter": "VN15210R01",
+          "pcs": []
+        },
+        {
+          "operation": "CLEANING",
+          "workCenter": "VN15210R01CLEANING",
+          "displayWorkCenter": "VN15210R01",
+          "pcs": []
+        },
+        {
+          "operation": "HEATING SHRINKING TUBE",
+          "workCenter": "VN15210R01HEATING SHRINKING TUBE",
+          "displayWorkCenter": "VN15210R01",
+          "pcs": []
+        },
+        {
+          "operation": "PACKING",
+          "workCenter": "VN15210R01PACKING",
+          "displayWorkCenter": "VN15210R01",
+          "pcs": []
+        },
+        {
+          "operation": "PRINTING TAMPON",
+          "workCenter": "VN15245R01PRINTING TAMPON",
+          "displayWorkCenter": "VN15245R01",
+          "pcs": []
+        },
+        {
+          "operation": "PASTE LABEL",
+          "workCenter": "VN15210R01PASTE LABEL",
+          "displayWorkCenter": "VN15210R01",
+          "pcs": []
+        },
+        {
+          "operation": "PLASMA/ULTRASONIC",
+          "workCenter": "VN15211R01PLASMA/ULTRASONIC",
+          "displayWorkCenter": "VN15211R01",
+          "pcs": []
+        },
+        {
+          "operation": "LASER MARKING",
+          "workCenter": "VN15212R01LASER MARKING",
+          "displayWorkCenter": "VN15212R01",
+          "pcs": []
+        },
+        {
+          "operation": "FILLING 1",
+          "workCenter": "VN15213R01FILLING 1",
+          "displayWorkCenter": "VN15213R01",
+          "pcs": []
+        },
+        {
+          "operation": "FILLING 2",
+          "workCenter": "VN15213R01FILLING 2",
+          "displayWorkCenter": "VN15213R01",
+          "pcs": []
+        },
+        {
+          "operation": "FINAL FILLING",
+          "workCenter": "VN15213R01FINAL FILLING",
+          "displayWorkCenter": "VN15213R01",
+          "pcs": []
+        },
+        {
+          "operation": "MANUAL FILLING",
+          "workCenter": "VN15213R01MANUAL FILLING",
+          "displayWorkCenter": "VN15213R01",
+          "pcs": []
+        },
+        {
+          "operation": "CURING 1",
+          "workCenter": "VN15215R01CURING 1",
+          "displayWorkCenter": "VN15215R01",
+          "pcs": []
+        },
+        {
+          "operation": "CURING 2",
+          "workCenter": "VN15215R01CURING 2",
+          "displayWorkCenter": "VN15215R01",
+          "pcs": []
+        },
+        {
+          "operation": "FINAL CURING",
+          "workCenter": "VN15215R01FINAL CURING",
+          "displayWorkCenter": "VN15215R01",
+          "pcs": []
+        },
+        {
+          "operation": "PRE-CURING",
+          "workCenter": "VN15215R01PRE-CURING",
+          "displayWorkCenter": "VN15215R01",
+          "pcs": []
+        },
+        {
+          "operation": "PRE-CURING 2",
+          "workCenter": "VN15215R01PRE-CURING 2",
+          "displayWorkCenter": "VN15215R01",
+          "pcs": []
+        },
+        {
+          "operation": "PRESSING",
+          "workCenter": "VN15215R01PRESSING",
+          "displayWorkCenter": "VN15215R01",
+          "pcs": []
+        },
+        {
+          "operation": "HV TEST",
+          "workCenter": "VN15217R01HV TEST",
+          "displayWorkCenter": "VN15217R01",
+          "pcs": []
+        },
+        {
+          "operation": "HV TEST",
+          "workCenter": "VN15267R01HV TEST",
+          "displayWorkCenter": "VN15267R01",
+          "pcs": []
+        },
+        {
+          "operation": "ELECTRONIC TRIMMING",
+          "workCenter": "VN15219R01ELECTRONIC TRIMMING",
+          "displayWorkCenter": "VN15219R01",
+          "pcs": []
+        },
+        {
+          "operation": "FINAL TEST",
+          "workCenter": "VN15218R01FINAL TEST",
+          "displayWorkCenter": "VN15218R01",
+          "pcs": []
+        },
+        {
+          "operation": "FINAL TEST",
+          "workCenter": "VN15268R01FINAL TEST",
+          "displayWorkCenter": "VN15268R01",
+          "pcs": []
+        },
+        {
+          "operation": "PACKING",
+          "workCenter": "VN15260R01PACKING",
+          "displayWorkCenter": "VN15260R01",
+          "pcs": []
+        },
+        {
+          "operation": "PACKING/LABELLING",
+          "workCenter": "VN15210R01PACKING/LABELLING",
+          "displayWorkCenter": "VN15210R01",
+          "pcs": []
+        },
+        {
+          "operation": "TEAM LEADER",
+          "workCenter": "MANAGEMENT",
+          "displayWorkCenter": "MANAGEMENT",
+          "pcs": [],
+          "type": "management"
+        }
+      ]
+    }
+  ],
+  "layouts": {
+    "interface": {
+      "name": "INTERFACE",
+      "image": "./resources/interface_layout.png"
+    },
+    "varikont": {
+      "name": "VARIKONT",
+      "image": "./resources/varikont_layout.png"
+    },
+    "pxv": {
+      "name": "PxV",
+      "image": "./resources/pxv_layout.png"
+    },
+    "ems1b": {
+      "name": "EMS 1B",
+      "image": "./resources/ems1b_layout.png"
+    }
+  },
+  "guidelines": [
+    {
+      "title": "Setup wireless scanner + Samsung tablet via Bluetooth",
+      "category": "Scanner",
+      "type": "PDF",
+      "path": "./resources/bluetooth_setup.pdf",
+      "description": "Quick setup and Bluetooth pairing instructions."
+    },
+    {
+      "title": "Configure Pepperl+Fuchs scanner",
+      "category": "Scanner",
+      "type": "Image",
+      "path": "./resources/P+F scanner setting.png",
+      "description": "Configuration reference for Pepperl+Fuchs scanners."
+    },
+    {
+      "title": "Wired scanner manual",
+      "category": "Scanner",
+      "type": "PDF",
+      "path": "./resources/wires_scanner_manual.pdf",
+      "description": "Full manual for wired scanner configuration and operation."
+    },
+    {
+      "title": "New thermal printing operations",
+      "category": "Printing",
+      "type": "PDF",
+      "path": "./resources/new thermal printing operations.pdf",
+      "description": "Standard operating guide for the thermal printing process."
+    },
+    {
+      "title": "Label Printing SEW",
+      "category": "Printing",
+      "type": "PDF",
+      "path": "./resources/Label Printing SEW.pdf",
+      "description": "Instructions for SEW label printing."
+    },
+    {
+      "title": "MES KANBAN MO Label Printing",
+      "category": "Printing",
+      "type": "PDF",
+      "path": "./resources/Tai_lieu_huong_dan_MES_Kanban_MO_Printing_Tool.pdf",
+      "description": "Instructions for MES KANBAN MO label printing."
+    },
+    {
+      "title": "Launch MES",
+      "category": "MES Tools",
+      "type": "BAT",
+      "path": "./resources/MES/Lauch_MES.bat",
+      "description": "Launcher for the MES application."
+    },
+    {
+      "title": "Apriso Login",
+      "category": "MES Tools",
+      "type": "PowerShell",
+      "path": "./resources/MES/Apriso_Login.ps1",
+      "description": "Apriso sign-in script."
+    },
+    {
+      "title": "Apriso Login for PC",
+      "category": "MES Tools",
+      "type": "PowerShell",
+      "path": "./resources/MES/Apriso_Login_PC.ps1",
+      "description": "Apriso sign-in script using the workstation context."
+    },
+    {
+      "title": "Zint user manual",
+      "category": "Barcode",
+      "type": "PDF",
+      "path": "./resources/Zint/zint-2.16.0/manual.pdf",
+      "description": "Zint Barcode Studio reference manual."
+    },
+    {
+      "title": "Zint Barcode Studio 2.16.0",
+      "category": "Barcode",
+      "type": "Application",
+      "path": "./resources/Zint/zint-2.16.0/qtZint.exe",
+      "description": "Download the Windows barcode application."
+    },
+    {
+      "title": "Zint command-line 2.16.0",
+      "category": "Barcode",
+      "type": "Application",
+      "path": "./resources/Zint/zint-2.16.0/zint.exe",
+      "description": "Download the command-line barcode tool."
+    },
+    {
+      "title": "Swiss 721 font package",
+      "category": "Barcode",
+      "type": "ZIP",
+      "path": "./resources/qrcode_font/swis721-bt.zip",
+      "description": "Download and extract the font package."
+    },
+    {
+      "title": "Barcode 39 font",
+      "category": "Barcode",
+      "type": "Font",
+      "path": "./resources/qrcode_font/barcode 39.ttf",
+      "description": "Download the barcode font."
+    },
+    {
+      "title": "Barcode EAN13 font",
+      "category": "Barcode",
+      "type": "Font",
+      "path": "./resources/qrcode_font/barcode ean13.ttf",
+      "description": "Download the barcode font."
+    },
+    {
+      "title": "Barcode EAN8 font",
+      "category": "Barcode",
+      "type": "Font",
+      "path": "./resources/qrcode_font/barcode ean8.ttf",
+      "description": "Download the barcode font."
+    },
+    {
+      "title": "Barcode Industrial 2 of 5 font",
+      "category": "Barcode",
+      "type": "Font",
+      "path": "./resources/qrcode_font/barcode ind 25.ttf",
+      "description": "Download the barcode font."
+    },
+    {
+      "title": "Barcode Interleaved 2 of 5 font",
+      "category": "Barcode",
+      "type": "Font",
+      "path": "./resources/qrcode_font/barcode int 25.ttf",
+      "description": "Download the barcode font."
+    },
+    {
+      "title": "Code39 font",
+      "category": "Barcode",
+      "type": "Font",
+      "path": "./resources/qrcode_font/Code39.ttf",
+      "description": "Download the barcode font."
+    },
+    {
+      "title": "Zebra Barcode font",
+      "category": "Barcode",
+      "type": "Font",
+      "path": "./resources/qrcode_font/ZebraBarcode.ttf",
+      "description": "Download the barcode font."
+    },
+    {
+      "title": "MES shortcut",
+      "category": "MES Tools",
+      "type": "Shortcut",
+      "path": "./resources/MES/MES.lnk",
+      "description": "Download the MES workstation shortcut."
+    }
+  ]
+}

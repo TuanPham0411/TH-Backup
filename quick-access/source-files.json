@@ -1,0 +1,224 @@
+[
+  {
+    "path": "./resources/MES/Icon/TVConsole.ico",
+    "id": "1vsIrf9gmu4-e3N1AkSbjO3RYfWl0q6tb",
+    "type": "image/x-icon",
+    "size": 186974
+  },
+  {
+    "path": "./resources/MES/Icon/3ds_logo.ico",
+    "id": "1Xv8Zqn-NCCdU61Mm791NruMj1_dXq4oS",
+    "type": "image/x-icon",
+    "size": 175158
+  },
+  {
+    "path": "./resources/MES/Icon/SF.ico",
+    "id": "111hAoj2IyviD2tXUlkSjyHOAqf12WaKW",
+    "type": "image/x-icon",
+    "size": 270398
+  },
+  {
+    "path": "./resources/MES/Lauch_MES.bat",
+    "id": "14B7XG-Fn2yJoYWJdNxWiC3ln_5hgMl_f",
+    "type": "application/x-msdos-program",
+    "size": 483
+  },
+  {
+    "path": "./resources/MES/Apriso_Login_PC.ps1",
+    "id": "1jqmVkSZkmO3b0TTZXxfABfl0LGuMcoQs",
+    "type": "application/octet-stream",
+    "size": 583
+  },
+  {
+    "path": "./resources/MES/Apriso_Login.ps1",
+    "id": "1pPHKwX_Bumc-Zi5c0d0O_yhrXimGnFsF",
+    "type": "application/octet-stream",
+    "size": 3197
+  },
+  {
+    "path": "./resources/MES/MES.lnk",
+    "id": "11t3N4jLGC7frrugkiygk6quU3NlC0iZD",
+    "type": "application/x-ms-shortcut",
+    "size": 2775
+  },
+  {
+    "path": "./resources/Zint/zint-2.16.0/tcl/demo/demo.tcl",
+    "id": "1NFeJnkczk2OvCTfxLrKRLtL5o5fG3sQB",
+    "type": "text/x-tcl",
+    "size": 2191
+  },
+  {
+    "path": "./resources/Zint/zint-2.16.0/tcl/zint2.16.0/zint2160t.dll",
+    "id": "1LdC14K6wt21V99iUQ0ogaBJNsT8ytt2O",
+    "type": "application/x-dosexec",
+    "size": 786944
+  },
+  {
+    "path": "./resources/Zint/zint-2.16.0/tcl/zint2.16.0/tcl9zint2160.dll",
+    "id": "1ClMuL8KA6bHbL-AfPQo0aBmoPxWyZqFd",
+    "type": "application/x-dosexec",
+    "size": 992768
+  },
+  {
+    "path": "./resources/Zint/zint-2.16.0/tcl/zint2.16.0/pkgIndex.tcl",
+    "id": "19RgbizTWIYfjcP46g_w293q_XwdIZdMF",
+    "type": "text/x-tcl",
+    "size": 223
+  },
+  {
+    "path": "./resources/Zint/zint-2.16.0/tcl/readme.txt",
+    "id": "1IZYgy-_-mWmhIJ9bkO6FyqEumrmCILz2",
+    "type": "text/plain",
+    "size": 1224
+  },
+  {
+    "path": "./resources/Zint/zint-2.16.0/tcl/licence.txt",
+    "id": "1Wh6NdI_7Dg9z9TwLNaa03G4CCgzxJm5x",
+    "type": "text/plain",
+    "size": 728
+  },
+  {
+    "path": "./resources/Zint/zint-2.16.0/zint.exe",
+    "id": "1XNPOMSIIxJQP7U0S5uMd94wIMNTW6ewk",
+    "type": "application/x-dosexec",
+    "size": 1313792
+  },
+  {
+    "path": "./resources/Zint/zint-2.16.0/manual.pdf",
+    "id": "12RBY3y83HxP4eUCLOWgfwstyg64a7s9-",
+    "type": "application/pdf",
+    "size": 3190866
+  },
+  {
+    "path": "./resources/Zint/zint-2.16.0/manual.txt",
+    "id": "1HqAu9UbvkeEZsWaHCAvPoBJ0rTyNQh3b",
+    "type": "text/plain",
+    "size": 240974
+  },
+  {
+    "path": "./resources/Zint/zint-2.16.0/ChangeLog.txt",
+    "id": "1aZvI651z_R1yB5p-LMX5P8BJ0yRXySTp",
+    "type": "text/plain",
+    "size": 58365
+  },
+  {
+    "path": "./resources/Zint/zint-2.16.0/qtZint.exe",
+    "id": "1vRko5I4e502CWcj-mXajvr8tvfpt75xV",
+    "type": "application/x-dosexec",
+    "size": 14167552
+  },
+  {
+    "path": "./resources/Zint/zint-2.16.0/README.txt",
+    "id": "1CEAiVPSUPtAgJ5Jf4ksn9hh1XOvhP0lo",
+    "type": "text/plain",
+    "size": 4459
+  },
+  {
+    "path": "./resources/qrcode_font/swis721-bt.zip",
+    "id": "1s0mxJE5QWHt79lofueVASra6rZHZUvNe",
+    "type": "application/zip",
+    "size": 25081
+  },
+  {
+    "path": "./resources/qrcode_font/ZebraBarcode.ttf",
+    "id": "1Q04WSfCiBfpTzyaHeQTQv_5v0YzN9Uhw",
+    "type": "application/x-font-ttf",
+    "size": 45568
+  },
+  {
+    "path": "./resources/qrcode_font/barcode 39.ttf",
+    "id": "1wafipL2LBWDSKsHkpLMmWiCNo6MtuoLM",
+    "type": "application/x-font-ttf",
+    "size": 15596
+  },
+  {
+    "path": "./resources/qrcode_font/barcode ean13.ttf",
+    "id": "1iZaCFgPSZ5A99OZSCZKnhF-LUiDCZKj8",
+    "type": "application/x-font-ttf",
+    "size": 15596
+  },
+  {
+    "path": "./resources/qrcode_font/barcode ean8.ttf",
+    "id": "119qIBIwdq3oDS777IEMzjr9cdCyrjbEN",
+    "type": "application/x-font-ttf",
+    "size": 15596
+  },
+  {
+    "path": "./resources/qrcode_font/barcode ind 25.ttf",
+    "id": "1RqQj9lHacdU0lT72bJtKeadQC81lqMNr",
+    "type": "application/x-font-ttf",
+    "size": 15596
+  },
+  {
+    "path": "./resources/qrcode_font/barcode int 25.ttf",
+    "id": "1YCSfAryTP_WHEyvBwP1NulI3un9bLNo-",
+    "type": "application/x-font-ttf",
+    "size": 15596
+  },
+  {
+    "path": "./resources/qrcode_font/Code39.ttf",
+    "id": "17zgmSKBgCQVNzFuAvrqWq8UsKcp1GZ8t",
+    "type": "application/x-font-ttf",
+    "size": 16976
+  },
+  {
+    "path": "./resources/Tai_lieu_huong_dan_MES_Kanban_MO_Printing_Tool.pdf",
+    "id": "1kbgfoMCZbx0XKzRqKosh2VhuHhYqdjr6",
+    "type": "application/pdf",
+    "size": 583844
+  },
+  {
+    "path": "./resources/Label Printing SEW.pdf",
+    "id": "1Wr0eehOfoUGs2QFd8YraARCG-HuFidou",
+    "type": "application/pdf",
+    "size": 251797
+  },
+  {
+    "path": "./resources/P+F scanner setting.png",
+    "id": "1crqPof6WOvca33XRcllx4u6xuxVvh3se",
+    "type": "image/png",
+    "size": 250289
+  },
+  {
+    "path": "./resources/pxv_layout.png",
+    "id": "1fy-SOX7clxHeGE7P9rh6h8L4a8cXz97n",
+    "type": "image/png",
+    "size": 322510
+  },
+  {
+    "path": "./resources/varikont_layout.png",
+    "id": "1W4vb_FkKaLLctZzxTHZttdOBwxGFGVZD",
+    "type": "image/png",
+    "size": 334593
+  },
+  {
+    "path": "./resources/bluetooth_setup.pdf",
+    "id": "1_8_QS6pRFnhmSY5lJ-4_hgRusm2o2J9j",
+    "type": "application/pdf",
+    "size": 250573
+  },
+  {
+    "path": "./resources/interface_layout.png",
+    "id": "16SgnhcpRt3HXPHNBR6EonXLKe7-0i-Ab",
+    "type": "image/png",
+    "size": 218143
+  },
+  {
+    "path": "./resources/ems1b_layout.png",
+    "id": "1nwLz45njDxtI9Ys6JLrSrD15Dj950KsG",
+    "type": "image/png",
+    "size": 528069
+  },
+  {
+    "path": "./resources/new thermal printing operations.pdf",
+    "id": "1gapA18Df7Uur00siLin5v4-DTfKAWRAv",
+    "type": "application/pdf",
+    "size": 1046385
+  },
+  {
+    "path": "./resources/wires_scanner_manual.pdf",
+    "id": "1OZi8_tB4zD0Bb-1YnPu5-hRUg3Z21qhl",
+    "type": "application/pdf",
+    "size": 15217713
+  }
+]

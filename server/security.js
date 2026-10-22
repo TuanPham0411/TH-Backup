@@ -13,3 +13,4 @@ export function sameOrigin(req,res,next) {
   if (req.headers['sec-fetch-site'] === 'cross-site') return res.status(403).json({error:'Origin denied'});
   next();
 }
+

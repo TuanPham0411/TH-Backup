@@ -15,6 +15,7 @@ import {previewRouter} from './media.js';
 import {adminRouter} from './admin.js';
 import {translationRouter} from './translation.js';
 import {maintenanceGate,backupActive} from './storage.js';
+import {quickAccessRouter} from './quick-access.js';
 import {oauthRouter} from './oauth.js';
 export function createApp(pool,filesRoot,{sites=runtimeSites(),mesOnly=process.env.APP_MODE==='mes',webRoot=process.env.MES_WEB_ROOT}={}) {
  const app=express();app.disable('x-powered-by');app.set('trust proxy',(process.env.TRUST_PROXY||'loopback').split(',').map(v=>v.trim()));app.locals.sites=sites;app.locals.mesOnly=mesOnly;
@@ -30,6 +31,8 @@ export function createApp(pool,filesRoot,{sites=runtimeSites(),mesOnly=process.e
  app.use('/api/portfolio',(req,res,next)=>!mesOnly&&req.hostname===hostOf(sites.portfolio)?next():res.sendStatus(404));
  app.use('/api/mes',(req,res,next)=>req.hostname===hostOf(sites.mes)?next():res.sendStatus(404));
  app.use((req,res,next)=>['login','register','reset','consumeToken'].includes(req.body?.action)||['passwordLogin','activateAccount'].includes(req.body?.name)?authLimit(req,res,next):next());
+ app.get('/quick-access',(req,res)=>res.redirect(308,'/quick-access/'));
+ app.use('/quick-access',rateLimit({windowMs:60000,limit:180,standardHeaders:'draft-7',legacyHeaders:false}),quickAccessRouter(pool));
  app.use('/api/mes',driveRouter(pool));app.use('/api/mes',pagesRouter(pool));
  app.use('/api/mes',previewRouter(pool,filesRoot));
  app.use('/api/mes/admin',adminRouter(pool,filesRoot,gate));app.use('/api/mes',translationRouter(pool));
