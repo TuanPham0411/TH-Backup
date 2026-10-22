@@ -30,9 +30,9 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{ou
 .account-button{background:var(--surface);border-color:var(--muted);max-width:220px;overflow:hidden;text-overflow:ellipsis}
 .app-header #theme-toggle{background:var(--soft);color:var(--ink-dim)}
 .main-nav{grid-column:1;grid-row:2;flex-direction:row;align-items:center;gap:8px;padding:8px clamp(20px,3vw,52px);border-right:0;border-bottom:1px solid var(--muted);background:var(--bg);overflow:auto;scrollbar-width:thin}
-.nav-label,.nav-footer{display:none}.main-tab{flex:0 0 auto;min-height:44px;padding:10px 16px;gap:9px;border-radius:10px;color:var(--ink-dim);font-size:.85rem;transform:none!important;white-space:nowrap}
+.nav-label,.nav-footer{display:none}.main-tab{flex:0 0 auto;min-height:44px;padding:10px 16px;gap:9px;border-radius:100px;color:var(--ink-dim);font-size:.85rem;transform:none!important;white-space:nowrap}
 .main-tab>span:not(.nav-icon){display:flex;align-items:center;gap:8px}.main-tab small{display:none}.main-tab .nav-icon{display:grid;flex:0 0 25px;width:25px;height:25px;background:transparent;color:inherit;border-radius:0;font-size:1.1rem}
-.main-tab.active{background:var(--accent);color:var(--accent-ink)}.main-tab.active .nav-icon{color:inherit;background:transparent}.main-tab.active::after{display:none}.main-tab:hover:not(.active){background:var(--surface);color:var(--ink)}
+.main-tab.active{background:var(--ink);color:var(--card)}.main-tab.active .nav-icon{color:inherit;background:transparent}.main-tab.active::after{display:none}.main-tab:hover:not(.active){background:var(--surface);color:var(--ink)}
 .app-main{grid-column:1;grid-row:3;min-height:0;min-width:0;background:var(--bg)}
 .workspace-heading{padding:28px clamp(20px,3vw,52px) 22px}.workspace-heading h2{font-weight:600;font-size:clamp(1.8rem,2.3vw,2.5rem);letter-spacing:-1.1px;margin:7px 0;line-height:1.15}.workspace-heading p{color:var(--ink-dim);font-size:.875rem}
 .eyebrow{font-size:.64rem;letter-spacing:.16em;color:var(--ink-dim)}#workspaceLine,.heading-dot{color:var(--accent)}

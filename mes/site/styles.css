@@ -1905,6 +1905,3 @@ dialog::backdrop { background:#14243c70; }
   .button:active:not(:disabled) { transform:translateY(1px) scale(.97); }
   @keyframes dialog-arrive { from { opacity:0; transform:translateY(48px) scale(.88); } to { opacity:1; transform:translateY(0) scale(1); } }
 }
-
-.sidebar nav a.nav-link {display:block;padding:12px 14px;color:inherit;text-decoration:none;border-radius:12px;font-weight:600;}
-.sidebar nav a.nav-link:hover {background:var(--surface-2,#e8edf2);}
