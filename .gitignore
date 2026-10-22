@@ -1,0 +1,8 @@
+node_modules/
+dist/
+mes/dist/
+.env
+.env.*
+!.env.example
+*.dump
+*.tar.gz

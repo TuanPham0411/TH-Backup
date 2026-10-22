@@ -1,0 +1,28 @@
+name: Build standalone MES
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: docker build -t mes-ticket:check .
+      - name: Verify fresh database and portable runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker tag mes-ticket:check th-mes-ticket:local
+          printf '%s\n' 'MES_ORIGIN=https://tickets.example.com' 'POSTGRES_PASSWORD=ci-admin-only' 'MES_DB_PASSWORD=ci-runtime-only' 'OWNER_EMAIL=owner@example.com' > .env
+          trap 'docker compose -p mes-source-ci down -v; rm -f .env' EXIT
+          docker compose -p mes-source-ci up -d --no-build --wait --wait-timeout 120
+          docker compose -p mes-source-ci exec -T mes node --input-type=module < ci/smoke.mjs
