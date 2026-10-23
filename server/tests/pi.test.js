@@ -503,3 +503,15 @@ test('owner assigns admin/user; widget defaults inherit without overwriting pers
  assert.equal((await api('saveDashboardDefaults',{hidden:[]},owner)).status,200);
  }finally{base=previousBase;await new Promise(r=>isolated.close(r));}
 });
+test('dashboard includes compact state history in the existing bundle without private timeline content',async()=>{
+ const id='analysis-history-test',at=Date.now();
+ await pool.query("insert into mes_private.records(collection,id,data) values('issues',$1,$2)",[id,{subject:'History projection',status:'Closed',priority:'Low',createdAt:at,resolvedAt:at+2000}]);
+ const events=[{kind:'handling',text:'Status: Acknowledged → Awaiting information. Priority: Critical → High. PRIVATE NOTE',authorUid:'PRIVATE AUTHOR',createdAt:at+1000},{kind:'edit',before:{priority:'High',status:'Awaiting information',description:'PRIVATE BEFORE'},after:{priority:'Low',status:'Closed',assessment:'PRIVATE ASSESSMENT'},createdAt:at+2000},{kind:'comment',text:'PRIVATE COMMENT',createdAt:at+3000}];
+ for(const [index,event]of events.entries())await pool.query('insert into mes_private.records(collection,id,data) values($1,$2,$3)',[`issues/${id}/timeline`,String(index),event]);
+ const listing=await api('readBundle',{paths:[{path:'issues'}]});assert.equal(listing.status,200);
+ const item=listing.body.snapshots.issues.rows.find(i=>i.id===id);assert.equal(item.analysisHistory.length,2);
+ assert.deepEqual(item.analysisHistory[0],{at:at+1000,beforePriority:'Critical',priority:'High',beforeStatus:'Acknowledged',status:'Awaiting information'});
+ assert.equal(item.analysisHistory[1].status,'Closed');assert.ok(!JSON.stringify(item.analysisHistory).includes('PRIVATE'));
+ assert.ok(!('authorUid' in item));
+ await pool.query("delete from mes_private.records where (collection='issues' and id=$1) or collection=$2",[id,`issues/${id}/timeline`]);
+});

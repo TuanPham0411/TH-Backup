@@ -1,3 +1,6 @@
+import './access-history.css';
+import './capture-buttons.css';
+import './dashboard-header.css';
 import './compact-metrics.css';
 import {initAnalysisGroups} from './analysis-groups.js';
 import {compactDashboard} from './dashboard-layout.js';
