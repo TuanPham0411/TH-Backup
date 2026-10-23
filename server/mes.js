@@ -124,8 +124,9 @@ export function mesRouter(pool,filesRoot) {
   }
   const result=await dispatch(name,data,actor);
   if(result.sessionToken) {
-   res.cookie('th_mes',result.sessionToken,{httpOnly:true,secure:true,sameSite:'lax',path:'/',maxAge:12*3600*1000});
+   res.cookie('th_mes',result.sessionToken,{httpOnly:true,secure:true,sameSite:'lax',path:'/',maxAge:(result.sessionMaxAgeSeconds===2592000?2592000:43200)*1000});
    delete result.sessionToken;
+   delete result.sessionMaxAgeSeconds;
   }
   if(name==='logout')res.clearCookie('th_mes',{path:'/',httpOnly:true,secure:true,sameSite:'lax'});
   if(name==='getDirectory')result.apiVersion='accounts-v1';

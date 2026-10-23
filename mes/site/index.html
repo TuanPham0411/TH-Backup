@@ -580,9 +580,10 @@
         <button id="user-login-tab" aria-pressed="true">User</button
         ><button id="admin-login-tab" aria-pressed="false">Owner</button>
       </div>
-      <form id="password-login-form" class="profile-form">
-        <label>Username<input id="account-username" required maxlength="64" autocomplete="username" autocapitalize="none" spellcheck="false" /></label>
-        <label>Password<input id="account-password" type="password" required autocomplete="current-password" /></label>
+      <form id="password-login-form" class="profile-form" method="post" autocomplete="on">
+        <label>Username<input id="account-username" name="username" required maxlength="64" autocomplete="username" autocapitalize="none" spellcheck="false" /></label>
+        <label>Password<input id="account-password" name="password" type="password" required autocomplete="current-password" /></label>
+        <label class="checkbox"><input id="account-remember" name="remember" type="checkbox" />Remember me for 30 days</label>
         <button class="button primary full">Sign in</button>
         <p class="helper">Accounts are provided by the administrator. First time or forgot your password? Ask for an activation link.</p>
         <button id="show-activation" type="button" class="text-button">Activate account</button>

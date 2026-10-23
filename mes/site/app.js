@@ -1313,7 +1313,7 @@ $("password-login-form").onsubmit = e => {
     const username = $("account-username").value.trim().toLowerCase();
     const password = $("account-password").value;
     try {
-      const result = await callable("passwordLogin", { username, password });
+      const result = await callable("passwordLogin", { username, password, remember: $("account-remember").checked });
       $("account-password").value = "";
       await managedLogin(result.sessionToken);
     } finally { $("account-password").value = ""; }
