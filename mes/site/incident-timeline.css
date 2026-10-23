@@ -82,7 +82,7 @@
 #incident-timeline .incident-legend{gap:6px 14px;padding:0 4px 8px;margin:0;min-height:25px}
 #incident-timeline .timeline-line-key,#incident-timeline .timeline-severity-key{font-size:.75rem;gap:6px}
 #incident-timeline .timeline-line-key{margin-right:4px;color:var(--ink)}
-#incident-timeline .timeline-line-key i{width:20px;border-color:#75c5fa}
+#incident-timeline .timeline-line-key i{width:20px;border-color:var(--incident-count-color,#f4f7fb);opacity:.95}
 #incident-timeline .timeline-severity-key i{width:7px;height:7px;border-radius:50%}
 #incident-timeline .timeline-severity-key{border-radius:4px;padding:2px 3px}
 #incident-timeline .timeline-severity-key:hover{background:color-mix(in srgb,var(--ink) 6%,transparent);color:var(--ink)}
@@ -134,3 +134,11 @@
 @media(max-width:1100px){#incident-timeline .incident-filter-bar{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:760px){#incident-timeline .incident-filter-bar{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:560px){#incident-timeline .incident-date-field{grid-column:1/-1}}
+#incident-timeline .timeline-color-swatch{display:inline-flex;align-items:center;justify-content:center;min-width:24px;width:24px;height:26px;padding:4px;border:1px solid transparent;border-radius:5px;background:transparent;cursor:pointer;vertical-align:middle}
+#incident-timeline .timeline-color-swatch:hover,#incident-timeline .timeline-color-swatch:focus-visible{border-color:var(--incident-count-color);background:rgba(128,128,128,.12)}
+#incident-timeline .timeline-line-key{display:inline-flex;align-items:center;gap:3px}
+#incident-timeline .timeline-color-swatch i{display:block;flex-shrink:0}
+.timeline-color-dialog{max-width:420px;border:1px solid #66747b;border-radius:14px;padding:22px;color:var(--ink);background:var(--card,#1b2227);font:inherit}
+.timeline-color-dialog h2{font-size:1.2rem;margin:0 0 10px}.timeline-color-dialog p{line-height:1.5}.timeline-color-dialog input[type=color]{width:100%;height:48px;margin:8px 0 16px;cursor:pointer}.timeline-color-dialog::backdrop{background:#0008}
+
+#incident-timeline .timeline-color-swatch i{width:8px;height:8px;border-radius:50%}#incident-timeline .timeline-line-key .timeline-color-swatch i{width:20px;height:0;border-radius:0}

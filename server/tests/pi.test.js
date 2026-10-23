@@ -515,3 +515,18 @@ test('dashboard includes compact state history in the existing bundle without pr
  assert.ok(!('authorUid' in item));
  await pool.query("delete from mes_private.records where (collection='issues' and id=$1) or collection=$2",[id,`issues/${id}/timeline`]);
 });
+test('incident colors persist per authenticated account and reject invalid colors',async()=>{
+ const pref=(name,data,cookie)=>api(name,data,cookie,'mes.th.io.vn',{'x-forwarded-for':'192.0.2.83'});
+ const owner='th_mes='+(await pool.query("select mes_private.open_account_session('mes-owner') result")).rows[0].result.sessionToken;
+ const uid=(await pool.query("select id from mes_private.records where collection='users' and data->>'username'='comment.b'")).rows[0].id;
+ const other='th_mes='+(await pool.query('select mes_private.open_account_session($1) result',[uid])).rows[0].result.sessionToken;
+ for(const name of ['getIncidentColors','saveIncidentColors'])assert.notEqual((await pref(name,{departments:{}})).status,200);
+ const value={line:'#a17c00',departments:{dept:'#428c91'}};
+ assert.equal((await pref('saveIncidentColors',{...value,uid:'mes-owner'},other)).status,200);
+ assert.deepEqual((await pref('getIncidentColors',{},owner)).body,{});
+ const fresh='th_mes='+(await pool.query('select mes_private.open_account_session($1) result',[uid])).rows[0].result.sessionToken;
+ assert.deepEqual((await pref('getIncidentColors',{},fresh)).body,value);
+ for(const data of [{line:'red',departments:{}},{line:null,departments:{}},{departments:[]},{departments:{dept:'url(evil)'}},{departments:{dept:123}}])assert.notEqual((await pref('saveIncidentColors',data,other)).status,200);
+ assert.deepEqual((await pref('getIncidentColors',{},other)).body,value);
+ assert.deepEqual((await pref('saveIncidentColors',{departments:{}},other)).body,{departments:{}});
+});

@@ -1,3 +1,4 @@
+import {initIncidentColors} from './incident-colors.js';
 import './access-history.css';
 import './capture-buttons.css';
 import './dashboard-header.css';
@@ -1703,6 +1704,7 @@ const workspace = initWorkspace({state,toast,run,addEvidence(files) {
   state.files.push(...files); renderFiles(); return true;
 }});
 document.querySelector(".topbar .brand").onclick = event => { event.preventDefault(); navigate("dashboard"); };
+initIncidentColors(()=>({user:state.user,preview:state.preview}));
 const incidentTimeline=initIncidentTimeline(scopedIssues,()=>state.ready,openIssue);
 setInterval(()=>{if(!state.preview&&!document.hidden&&incidentTimeline.visible())refreshRecords();},60000);
 initAnalysisGroups(()=>({user:state.user,preview:state.preview}));
