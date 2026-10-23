@@ -17,16 +17,17 @@ export function priorityAt(entry,time){let p=entry.history.find(h=>severityOrder
 export function incidentLoad(issues,options={}){
  const {start,end,now=Date.now(),continuePoints=true,department='All',issueType='All',severity='All'}=options;
  const filtered=issues.filter(i=>(department==='All'||(i.departmentId||'__none')===department)&&(issueType==='All'||(i.issueTypeId||'__none')===issueType)&&(severity==='All'||(severityOrder.includes(i.priority)?i.priority:'Unclassified')===severity));
- const {buckets}=incidentSeries([],{...options,frequency:'all'}),events=new Map(),entries=[],seen=new Set();let missing=0;
+ const {buckets}=incidentSeries([],{...options,frequency:'all'}),events=new Map(),entries=[],candidates=[],seen=new Set();let missing=0;
  const event=time=>{if(!events.has(time))events.set(time,{add:[],remove:[]});return events.get(time);};event(Number(start));event(Number(end));
  for(const [index,issue]of filtered.entries()){
   const id=issue.id??index;if(seen.has(id))continue;seen.add(id);
+  const history=stateHistory(issue);
   const valid=(Array.isArray(issue.occurrences)?issue.occurrences:[]).flatMap(o=>{
    if(!o||!['point','range'].includes(o.kind)||!o.start||(o.kind==='range'&&!o.end))return [];
    const from=timestamp(o.start),actualEnd=o.kind==='range'?timestamp(o.end):from;
    if(!Number.isFinite(from)||!Number.isFinite(actualEnd)||actualEnd<from)return [];
    if(o.kind==='range'||!continuePoints)return [{start:from,end:actualEnd,kind:o.kind,reportedEnd:actualEnd,completedAt:o.kind==='range'?actualEnd:null}];
-   const history=stateHistory(issue),closed=status=>['Resolved','Closed'].includes(status),resolved=timestamp(issue.resolvedAt),periods=[];
+   const closed=status=>['Resolved','Closed'].includes(status),resolved=timestamp(issue.resolvedAt),periods=[];
    let opened=from;
    for(const h of history){if(h.at<from||h.at>now||!h.status)continue;
     if(closed(h.status)&&opened!==null){periods.push({start:opened,end:h.at,completedAt:h.at,column:opened===from});opened=null;}
@@ -36,12 +37,13 @@ export function incidentLoad(issues,options={}){
    return periods.map(p=>({...p,kind:o.kind,reportedEnd:actualEnd}));
   });
   if(!valid.length){missing++;continue;}
+  candidates.push({id,issue,priority:severityOrder.includes(issue.priority)?issue.priority:'Unclassified',history,reported:valid});
   const visible=valid.filter(r=>r.start<end&&(r.end>=start));if(!visible.length)continue;
   const priority=severityOrder.includes(issue.priority)?issue.priority:'Unclassified';
   const ranges=visible.map(r=>({start:Math.max(Number(start),r.start),end:Math.min(Number(end),r.end===r.start?r.end+1:r.end)})).filter(r=>r.start<r.end).sort((a,b)=>a.start-b.start);
   const merged=[];for(const r of ranges){const last=merged.at(-1);if(last&&r.start<=last.end)last.end=Math.max(last.end,r.end);else merged.push({...r});}
   if(!merged.length)continue;
-  const entry={id,issue,priority,history:stateHistory(issue),ranges:merged,reported:visible};entries.push(entry);
+  const entry={id,issue,priority,history,ranges:merged,reported:visible};entries.push(entry);
   for(const r of merged){event(r.start).add.push(entry);event(r.end).remove.push(entry);}
  }
  const active=new Map(),segments=[],times=[...events.keys()].sort((a,b)=>a-b);let peak=0;
@@ -58,5 +60,5 @@ export function incidentLoad(issues,options={}){
   for(const e of entries){if(e.ranges.some(r=>r.start<b.end&&r.end>b.start))b.tickets.push(e.issue);if(e.reported.some(r=>r.start>=b.start&&r.start<b.end)){b.starts++;b.startCounts[e.priority]++;}}
   b.matches=options.frequency==='high'?b.count>=Number(options.threshold??3):options.frequency==='low'?b.count<=Number(options.threshold??3):true;
  }
- return {segments,buckets,entries,peak,missing,total:entries.length,ranked:buckets.filter(b=>b.matches).sort((a,b)=>(options.frequency==='low'?a.count-b.count:b.count-a.count)||a.start-b.start)};
+ return {segments,buckets,entries,candidates,peak,missing,frequency:options.frequency,frequencyThreshold:Number(options.threshold??3),total:entries.length,ranked:buckets.filter(b=>b.matches).sort((a,b)=>(options.frequency==='low'?a.count-b.count:b.count-a.count)||a.start-b.start)};
 }

@@ -50,3 +50,6 @@
 #incident-timeline #incident-tooltip strong{font-weight:600}
 @media(max-width:850px){#incident-timeline .incident-controls{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:560px){#incident-timeline{padding:14px}#incident-timeline .incident-controls{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}#incident-timeline .timeline-heading{align-items:flex-start;gap:8px}#incident-timeline .timeline-heading p{max-width:220px}#incident-timeline .incident-tickets{grid-template-columns:1fr}#incident-timeline .timeline-meta{gap:8px}#incident-timeline #incident-summary{gap:10px}}
+
+#incident-timeline .incident-options{grid-template-columns:repeat(4,minmax(0,1fr))}
+@media(max-width:560px){#incident-timeline .incident-options{grid-template-columns:repeat(2,minmax(0,1fr))}}
