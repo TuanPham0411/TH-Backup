@@ -10,3 +10,6 @@
 #dashboard-page #customize-dashboard{white-space:nowrap;background:color-mix(in srgb,var(--card) 88%,var(--ink) 12%)}
 @media(max-width:900px){#dashboard-page>.workspace-hero{align-items:flex-start;flex-direction:column;padding:16px 18px;gap:12px}#dashboard-page>.workspace-hero .heading-actions{justify-content:flex-start;width:100%}}
 @media(max-width:480px){#dashboard-page>.workspace-hero{padding:14px}#dashboard-page>.workspace-hero .date-range{font-size:0;gap:0}#dashboard-page>.workspace-hero select{width:140px}#dashboard-page>.workspace-hero .heading-actions{gap:8px}#dashboard-page #customize-dashboard{font-size:.75rem}}
+/* Main and the legacy page padding must not add two gaps above the hero. */
+main:has(>#dashboard-page:not([hidden])){padding-top:16px}
+#dashboard-page{padding-top:0}
