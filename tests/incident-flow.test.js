@@ -9,7 +9,8 @@ test('multiple incident reports create one ticket column, and each new ticket sn
  const result=run([ticket('a',4,{occurrences:[point(1),point(2),point(2)]}),ticket('b',8)]);
  assert.deepEqual(result.flow.columns.map(c=>[c.entry.id,c.time,c.reason]),[['a',at(4),'created'],['a',at(8),'snapshot'],['b',at(8),'created']]);
  assert.equal(result.flow.columns.filter(c=>c.entry.id==='a'&&c.reason==='created').length,1);
- const line=result.flow.line;assert.equal(line.find(p=>p.time===at(1)).count,0);assert.equal(line.find(p=>p.time===at(4)).count,1);assert.equal(line.find(p=>p.time===at(8)).count,2);
+ const line=result.flow.line;assert.equal(line[0].count,0);assert.ok(!line.some(p=>p.time===at(1)));assert.equal(line.filter(p=>p.time===at(4)).at(-1).count,1);assert.equal(line.filter(p=>p.time===at(8)).at(-1).count,2);assert.equal(result.entries[0].cycles[0].incidentStart,at(1));assert.equal(result.entries[0].ranges[0].start,at(4));
+ assert.ok(line.every(p=>Number.isInteger(p.count)));for(let i=1;i<line.length;i++)assert.ok(line[i].time===line[i-1].time||line[i].count===line[i-1].count,'Count changes vertically at lifecycle events, never as reporting-delay ramps');
 });
 test('Resolved stops active progression; Closed is a separate recorded milestone',()=>{
  const result=run([ticket('a',4,{status:'Closed',resolvedAt:at(12),analysisHistory:[{at:at(12),beforeStatus:'New',status:'Resolved',beforePriority:'Medium',priority:'Medium'},{at:at(18),beforeStatus:'Resolved',status:'Closed',beforePriority:'Medium',priority:'Medium'}]})]);

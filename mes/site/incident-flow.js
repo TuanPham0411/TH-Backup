@@ -2,7 +2,7 @@ import {priorityAt,severityOrder} from './incident-load.js';
 const stamp=value=>typeof value==='number'?value:Date.parse(value);
 const finished=status=>['Resolved','Closed'].includes(status);
 // A ticket has one creation milestone. Occurrence reports establish the start
-// of reporting delay, rather than manufacturing another ticket creation.
+// of the issue trajectory, independently of the ticket-count series.
 export function incidentFlow(base,{start,end,now=Date.now()}={}){
  const tickets=[];
  for(const candidate of base.candidates||base.entries){
@@ -21,7 +21,7 @@ export function incidentFlow(base,{start,end,now=Date.now()}={}){
    previous=event.status;
   }
   for(const c of cycles)c.activeEnd??=c.until;
-  const spans=cycles.map((c,i)=>({start:i===0?incidentStart:c.start,end:c.activeEnd})).filter(r=>r.end>r.start);
+  const spans=cycles.map(c=>({start:c.start,end:c.activeEnd})).filter(r=>r.end>r.start);
   const lifecycleEnd=cycles.at(-1).closedAt??now;
   if(Math.min(born,incidentStart)>=end||lifecycleEnd<start)continue;
   const ranges=spans.map(r=>({start:Math.max(start,r.start),end:Math.min(end,r.end)})).filter(r=>r.end>r.start);
@@ -36,9 +36,9 @@ export function incidentFlow(base,{start,end,now=Date.now()}={}){
  const eventTimes=new Set([start,end]);for(const ticket of tickets)for(const r of ticket.ranges){eventTimes.add(r.start);eventTimes.add(r.end);}
  const times=[...eventTimes].sort((a,b)=>a-b),segments=[];let peak=0;
  for(let i=0;i<times.length-1;i++){const time=times[i],active=tickets.filter(e=>e.ranges.some(r=>r.start<=time&&time<r.end)),counts=Object.fromEntries(severityOrder.map(p=>[p,0]));for(const e of active)counts[priorityAt(e,time)]++;peak=Math.max(peak,active.length);segments.push({start:time,end:times[i+1],count:active.length,counts});}
- const ramps=tickets.flatMap(entry=>entry.cycles.map((cycle,i)=>({start:i?cycle.start:entry.incidentStart,created:Math.max(cycle.start,i?cycle.start:entry.incidentStart),end:cycle.activeEnd,ended:cycle.resolvedAt!==null||cycle.closedAt!==null||cycle.until<now}))).filter(r=>r.end>r.start);
- const lineEnd=Math.min(end,now),lineTimes=new Set(start<=lineEnd?[start,lineEnd]:[]);for(const r of ramps)for(const time of [r.start,r.created,r.end])if(time>=start&&time<=lineEnd)lineTimes.add(time);
- const valueAt=(time,before=false)=>ramps.reduce((count,r)=>{if(time<r.start||time>r.end||(!before&&time===r.end&&r.ended)||(before&&time===r.start))return count;return count+(r.created>r.start?Math.min(1,Math.max(0,(time-r.start)/(r.created-r.start))):1);},0);
+ const countRanges=tickets.flatMap(entry=>entry.cycles.map(cycle=>({start:cycle.start,end:cycle.activeEnd,ended:cycle.resolvedAt!==null||cycle.closedAt!==null||cycle.until<now}))).filter(r=>r.end>r.start);
+ const lineEnd=Math.min(end,now),lineTimes=new Set(start<=lineEnd?[start,lineEnd]:[]);for(const r of countRanges)for(const time of [r.start,r.end])if(time>=start&&time<=lineEnd)lineTimes.add(time);
+ const valueAt=(time,before=false)=>countRanges.reduce((count,r)=>{if(time<r.start||time>r.end||(!before&&time===r.end&&r.ended)||(before&&time===r.start))return count;return count+1;},0);
  const line=[];for(const time of [...lineTimes].sort((a,b)=>a-b)){const before=valueAt(time,true),after=valueAt(time);line.push({time,count:before});if(after!==before)line.push({time,count:after});}
  const buckets=base.buckets.map(b=>{const overlapping=segments.filter(s=>s.start<b.end&&s.end>b.start),best=overlapping.reduce((a,v)=>v.count>a.count?v:a,{count:0,counts:Object.fromEntries(severityOrder.map(p=>[p,0]))}),started=tickets.filter(e=>e.born>=b.start&&e.born<b.end),startCounts=Object.fromEntries(severityOrder.map(p=>[p,0]));for(const e of started)startCounts[priorityAt(e,e.born)]++;
  return {...b,count:best.count,counts:best.counts,starts:started.length,startCounts,tickets:tickets.filter(e=>e.ranges.some(r=>r.start<b.end&&r.end>b.start)).map(e=>e.issue)};});
