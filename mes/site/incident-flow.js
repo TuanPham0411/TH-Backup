@@ -40,8 +40,9 @@ export function incidentFlow(base,{start,end,now=Date.now()}={}){
  const lineEnd=Math.min(end,now),lineTimes=new Set(start<=lineEnd?[start,lineEnd]:[]);for(const r of countRanges)for(const time of [r.start,r.end])if(time>=start&&time<=lineEnd)lineTimes.add(time);
  const valueAt=(time,before=false)=>countRanges.reduce((count,r)=>{if(time<r.start||time>r.end||(!before&&time===r.end&&r.ended)||(before&&time===r.start))return count;return count+1;},0);
  const line=[];for(const time of [...lineTimes].sort((a,b)=>a-b)){const before=valueAt(time,true),after=valueAt(time);line.push({time,count:before});if(after!==before)line.push({time,count:after});}
+ const lineRuns=[];let run=null;for(const point of line){if(point.count<=0){run=null;continue;}if(!run){run=[];lineRuns.push(run);}run.push(point);}
  const buckets=base.buckets.map(b=>{const overlapping=segments.filter(s=>s.start<b.end&&s.end>b.start),best=overlapping.reduce((a,v)=>v.count>a.count?v:a,{count:0,counts:Object.fromEntries(severityOrder.map(p=>[p,0]))}),started=tickets.filter(e=>e.born>=b.start&&e.born<b.end),startCounts=Object.fromEntries(severityOrder.map(p=>[p,0]));for(const e of started)startCounts[priorityAt(e,e.born)]++;
  return {...b,count:best.count,counts:best.counts,starts:started.length,startCounts,tickets:tickets.filter(e=>e.ranges.some(r=>r.start<b.end&&r.end>b.start)).map(e=>e.issue)};});
  const threshold=base.frequencyThreshold??3,frequency=base.frequency||'all';for(const b of buckets)b.matches=frequency==='high'?b.count>=threshold:frequency==='low'?b.count<=threshold:true;
- return {...base,entries:tickets,segments,peak,total:tickets.length,buckets,ranked:buckets.filter(b=>b.matches).sort((a,b)=>(frequency==='low'?a.count-b.count:b.count-a.count)||a.start-b.start),flow:{tickets,columns,line,statusAt}};
+ return {...base,entries:tickets,segments,peak,total:tickets.length,buckets,ranked:buckets.filter(b=>b.matches).sort((a,b)=>(frequency==='low'?a.count-b.count:b.count-a.count)||a.start-b.start),flow:{tickets,columns,line,lineRuns,statusAt}};
 }

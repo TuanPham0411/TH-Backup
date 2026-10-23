@@ -38,10 +38,15 @@ export function createIncidentChart(result,{width=960,fontSize=14,night=true,cou
   for(const cycle of entry.cycles){
    const from=Math.max(result.start,cycle.incidentStart),to=Math.min(result.end,cycle.activeEnd);
    if(to>from){
-    if(cycle.incidentStart>=result.start&&cycle.incidentStart<result.end){const onset=S('g',{class:'incident-onset','data-ticket':entry.id,'data-time':cycle.incidentStart,role:'button',tabindex:0,'aria-label':`${entry.issue.ticketNumber||entry.id} · ${t('Incident time')}`});onset.append(S('circle',{cx:x(cycle.incidentStart),cy:py(priorityAt(entry,cycle.incidentStart)),r:3*s,fill:color}),S('circle',{cx:x(cycle.incidentStart),cy:py(priorityAt(entry,cycle.incidentStart)),r:8*s,fill:'transparent'}));interactive(onset,{entry,report:{start:cycle.incidentStart}},cycle.incidentStart);paths.append(onset);}
-    let d=`M${x(from)},${py(priorityAt(entry,from))}`;
-    for(const change of entry.history){if(change.at<=from||change.at>to||!change.priority||change.priority===change.beforePriority)continue;d+=` H${x(change.at)} V${py(change.priority)}`;}
-    d+=` H${x(to)}`;if(cycle.closedAt!==null&&cycle.resolvedAt===null&&cycle.closedAt===to)d+=` V${bottom}`;addPath(d,cycle,'active');
+    if(cycle.incidentStart>=result.start&&cycle.incidentStart<result.end){const onset=S('g',{class:'incident-onset','data-ticket':entry.id,'data-time':cycle.incidentStart,role:'button',tabindex:0,'aria-label':`${entry.issue.ticketNumber||entry.id} · ${t('Incident time')}`});onset.append(S('circle',{cx:x(cycle.incidentStart),cy:bottom,r:3*s,fill:color}),S('circle',{cx:x(cycle.incidentStart),cy:bottom,r:8*s,fill:'transparent'}));interactive(onset,{entry,report:{start:cycle.incidentStart}},cycle.incidentStart);paths.append(onset);}
+    const riseEnd=Math.max(cycle.incidentStart,cycle.start),creationY=py(priorityAt(entry,cycle.start)),rampY=time=>riseEnd>cycle.incidentStart?bottom+(creationY-bottom)*Math.max(0,Math.min(1,(time-cycle.incidentStart)/(riseEnd-cycle.incidentStart))):creationY;
+    let d=`M${x(from)},${from===cycle.incidentStart?bottom:from<riseEnd?rampY(from):py(priorityAt(entry,from))}`;
+    if(from<riseEnd){const rampEnd=Math.min(to,riseEnd);d+=` L${x(rampEnd)},${rampY(rampEnd)}`;}
+    if(to>=riseEnd){if(from===riseEnd&&from===cycle.incidentStart)d+=` V${creationY}`;
+     for(const change of entry.history){if(change.at<=Math.max(from,riseEnd)||change.at>to||!change.priority||change.priority===change.beforePriority)continue;d+=` H${x(change.at)} V${py(change.priority)}`;}
+     d+=` H${x(to)}`;
+    }
+    if(cycle.closedAt!==null&&cycle.resolvedAt===null&&cycle.closedAt===to)d+=` V${bottom}`;addPath(d,cycle,'active');
    }
    if(cycle.resolvedAt!==null&&cycle.closedAt!==null&&cycle.closedAt>=result.start&&cycle.resolvedAt<result.end){
     const begin=cycle.resolvedAt,finish=cycle.closedAt,from=Math.max(begin,result.start),to=Math.min(finish,result.end),height=py(priorityAt(entry,begin)),at=time=>height+(bottom-height)*(time-begin)/Math.max(1,finish-begin);
@@ -58,9 +63,9 @@ export function createIncidentChart(result,{width=960,fontSize=14,night=true,cou
    arrow.append(S('circle',{cx:xx,cy:center,r:9*s,fill:c.bg,'fill-opacity':.96}),S('path',{d:`M${xx},${center-dir*7*s} V${center+dir*7*s} M${xx-4*s},${center+dir*2*s} L${xx},${center+dir*7*s} L${xx+4*s},${center+dir*2*s}`,fill:'none',stroke:color,'stroke-width':2.2*s,'stroke-linecap':'round','stroke-linejoin':'round'}),S('rect',{x:xx-10*s,y:center-12*s,width:20*s,height:24*s,fill:'transparent'}),S('title',{},`${entry.issue.ticketNumber||entry.id} · ${t(change.beforePriority)} → ${t(change.priority)}`));interactive(arrow,{entry,change},change.at);arrows.append(arrow);
   }
  }
- const d=result.flow.line.map((p,i)=>`${i?'L':'M'}${x(p.time)},${y(p.count)}`).join(' ');
- if(result.flow.line.length){const first=result.flow.line[0],last=result.flow.line.at(-1);layers.prepend(S('path',{d:`${d} L${x(last.time)},${bottom} L${x(first.time)},${bottom} Z`,fill:'url(#incident-count-fill)','pointer-events':'none',class:'incident-count-area'}));}
- layers.append(S('path',{d,fill:'none',stroke:c.line,'stroke-opacity':.8,'stroke-width':2.4*s,'stroke-linejoin':'round','stroke-linecap':'round',class:'incident-total-line','pointer-events':'none'}),arrows);
+ const runs=result.flow.lineRuns||[],d=runs.map(run=>run.map((p,i)=>`${i?'L':'M'}${x(p.time)},${y(p.count)}`).join(' ')).join(' ');
+ for(const run of runs){const first=run[0],last=run.at(-1),area=run.map((p,i)=>`${i?'L':'M'}${x(p.time)},${y(p.count)}`).join(' ');layers.prepend(S('path',{d:`${area} L${x(last.time)},${bottom} L${x(first.time)},${bottom} Z`,fill:'url(#incident-count-fill)','pointer-events':'none',class:'incident-count-area'}));}
+ if(d)layers.append(S('path',{d,fill:'none',stroke:c.line,'stroke-opacity':.8,'stroke-width':2.4*s,'stroke-linejoin':'round','stroke-linecap':'round',class:'incident-total-line','pointer-events':'none'}));layers.append(arrows);
  let previous=null;for(const time of [...new Set(result.flow.columns.map(c=>c.time))].sort((a,b)=>a-b)){
   const cols=result.flow.columns.filter(c=>c.time===time),count=result.entries.filter(e=>e.ranges.some(r=>r.start<=time&&time<r.end)).length;if(count===previous)continue;previous=count;
   const lowest=Math.max(...cols.map(c=>py(c.priority))),px=Math.min(right-9*s,Math.max(left+9*s,x(time))),yy=(lowest+bottom)/2,label=S('g',{class:'incident-count-label','data-time':time,'data-count':count,'pointer-events':'none'});

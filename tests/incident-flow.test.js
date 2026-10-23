@@ -43,3 +43,12 @@ test('a range extending into the future never draws a predicted count or false d
  const now=at(12),result=incidentFlow(incidentLoad([ticket('a',4)],{start,end,now,unit:'hour'}),{start,end,now});
  assert.equal(result.flow.line.at(-1).time,now);assert.equal(result.flow.line.at(-1).count,1);assert.ok(result.flow.line.every(p=>p.time<=now));
 });
+
+test('visible count runs skip zero intervals and never connect separate ticket bursts',()=>{
+ const result=run([ticket('a',4,{status:'Resolved',resolvedAt:at(8)}),ticket('b',14,{status:'Resolved',resolvedAt:at(18)})]);
+ assert.equal(result.flow.lineRuns.length,2);
+ assert.deepEqual(result.flow.lineRuns.map(run=>[run[0].time,run.at(-1).time]),[[at(4),at(8)],[at(14),at(18)]]);
+ assert.ok(result.flow.lineRuns.flat().every(point=>point.count>0));
+ const past=incidentFlow(incidentLoad([ticket('a',4,{status:'Resolved',resolvedAt:at(8)})],{start:at(12),end,now:end,unit:'hour'}),{start:at(12),end,now:end});
+ assert.deepEqual(past.flow.lineRuns,[]);
+});
