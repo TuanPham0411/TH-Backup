@@ -38,3 +38,7 @@ test('frequency filters use actual concurrent ticket totals after lifecycle proj
 test('open tickets keep their count at the current-time edge instead of dropping to zero',()=>{
  const result=run([ticket('a',4),ticket('b',8)]);assert.equal(result.flow.line.at(-1).time,end);assert.equal(result.flow.line.at(-1).count,2);
 });
+test('a range extending into the future never draws a predicted count or false decline',()=>{
+ const now=at(12),result=incidentFlow(incidentLoad([ticket('a',4)],{start,end,now,unit:'hour'}),{start,end,now});
+ assert.equal(result.flow.line.at(-1).time,now);assert.equal(result.flow.line.at(-1).count,1);assert.ok(result.flow.line.every(p=>p.time<=now));
+});
