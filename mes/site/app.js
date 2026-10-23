@@ -1,3 +1,4 @@
+import './compact-metrics.css';
 import {initAnalysisGroups} from './analysis-groups.js';
 import {compactDashboard} from './dashboard-layout.js';
 import {initSettingsTabs} from './settings-tabs.js';
@@ -270,12 +271,14 @@ function renderDashboard() {
     ["Critical open", "critical", "!", "Requires attention"],
   ]) {
     const card = el("article", undefined, "metric");
+    card.title = `${t(label)} · ${t(note)}`;
     card.append(
       el("p", label, "metric-label"),
       el("span", state.ready ? String(s[key]) : "—", "metric-value"),
       el("small", note, "metric-note"),
       el("span", icon, "metric-icon"),
     );
+    card.lastElementChild.setAttribute("aria-hidden", "true");
     $("metrics").append(card);
   }
   incidentTimeline.render();
