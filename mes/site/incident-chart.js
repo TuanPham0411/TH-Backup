@@ -48,7 +48,8 @@ export function createIncidentChart(result,{width=960,fontSize=14,night=true,uni
    const cycle=entry.cycles.find(c=>c.start<=change.at&&change.at<=c.activeEnd);if(!cycle)continue;
    const key=change.at+'@'+change.beforePriority+'@'+change.priority;if(seen.has(key))continue;seen.add(key);
    const upgrade=priorityHeight(change.priority)>priorityHeight(change.beforePriority),color=upgrade?'#ef626e':'#54cb85',xx=x(change.at),center=(py(change.priority)+py(change.beforePriority))/2,dir=upgrade?-1:1;
-   const arrow=S('g',{class:'incident-priority-arrow',role:'button',tabindex:0,'data-ticket':entry.id,'data-direction':upgrade?'up':'down','data-at':change.at,'aria-label':`${entry.issue.ticketNumber||entry.id} · ${t(change.beforePriority)} → ${t(change.priority)}`});
+   const arrowOffset=xx+26*s<=right?16*s:-16*s;
+   const arrow=S('g',{class:'incident-priority-arrow',transform:`translate(${arrowOffset} 0)`,role:'button',tabindex:0,'data-ticket':entry.id,'data-direction':upgrade?'up':'down','data-at':change.at,'aria-label':`${entry.issue.ticketNumber||entry.id} · ${t(change.beforePriority)} → ${t(change.priority)}`});
    arrow.append(S('circle',{cx:xx,cy:center,r:9*s,fill:c.bg,'fill-opacity':.96}),S('path',{d:`M${xx},${center-dir*7*s} V${center+dir*7*s} M${xx-4*s},${center+dir*2*s} L${xx},${center+dir*7*s} L${xx+4*s},${center+dir*2*s}`,fill:'none',stroke:color,'stroke-width':2.2*s,'stroke-linecap':'round','stroke-linejoin':'round'}),S('rect',{x:xx-10*s,y:center-12*s,width:20*s,height:24*s,fill:'transparent'}),S('title',{},`${entry.issue.ticketNumber||entry.id} · ${t(change.beforePriority)} → ${t(change.priority)}`));interactive(arrow,{entry,change},change.at);arrows.append(arrow);
   }
  }
