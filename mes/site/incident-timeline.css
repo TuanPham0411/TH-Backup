@@ -128,3 +128,9 @@
 #incident-timeline #incident-tooltip .tip-history-item.is-current{border-color:var(--ticket-color);background:color-mix(in srgb,var(--ticket-color) 6%,transparent)}
 @media(max-width:560px){#incident-timeline .timeline-meta{gap:10px}#incident-timeline .timeline-meta .incident-legend{justify-content:flex-start;width:100%}#incident-timeline .timeline-footer .timeline-guide{margin-left:auto}}
 @media(max-width:560px){#incident-timeline select,#incident-timeline input{min-height:40px;height:40px}#incident-timeline .incident-stat-warning{margin-top:8px}}
+/* Date boundaries are primary controls; presets remain available in More filters. */
+#incident-timeline .incident-filter-bar{grid-template-columns:repeat(2,minmax(190px,1.25fr)) repeat(3,minmax(100px,1fr))}
+#incident-timeline .incident-date-field input{font-variant-numeric:tabular-nums}
+@media(max-width:1100px){#incident-timeline .incident-filter-bar{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:760px){#incident-timeline .incident-filter-bar{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:560px){#incident-timeline .incident-date-field{grid-column:1/-1}}

@@ -305,3 +305,5 @@ Object.assign(vi,{"OPERATIONS / INCIDENT ANALYTICS":"VẬN HÀNH / PHÂN TÍCH S
 Object.assign(vi,{"Open the ticket to view the full priority history.":"Mở ticket để xem đầy đủ lịch sử thay đổi ưu tiên."});
 
 Object.assign(vi,{"Clear filters to try again.":"Xóa bộ lọc để xem lại.","A diagonal rise shows reporting delay, not fractional tickets. Solid columns mark creation; lighter columns refresh existing tickets when a new ticket arrives.":"Đoạn tăng chéo thể hiện khoảng trễ báo cáo, không phải số ticket lẻ. Cột đậm đánh dấu tạo mới; cột nhạt ghi nhận lại các ticket đang tồn tại khi có ticket mới."});
+
+Object.assign(vi,{"Quick range":"Khoảng chọn nhanh"});
