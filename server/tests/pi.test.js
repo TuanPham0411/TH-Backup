@@ -531,14 +531,15 @@ test('incident colors persist per authenticated account and reject invalid color
  assert.deepEqual((await pref('saveIncidentColors',{departments:{}},other)).body,{departments:{}});
 });
 test('remembered password login uses a private 30-day session and logout revokes it',async()=>{
- const login=data=>api('passwordLogin',{username:'hpham',password:'test-owner-password',...data},'','mes.th.io.vn',{'x-forwarded-for':'192.0.2.84'});
+ const request=(name,data={},cookie='')=>api(name,data,cookie,'mes.th.io.vn',{'x-forwarded-for':'192.0.2.84'});
+ const login=data=>request('passwordLogin',{username:'hpham',password:'test-owner-password',...data});
  const standard=await login({remember:false});assert.equal(standard.status,200,JSON.stringify(standard.body));assert.match(standard.headers.get('set-cookie'),/Max-Age=43200/);
  const remembered=await login({remember:true});assert.equal(remembered.status,200,JSON.stringify(remembered.body));const cookie=remembered.headers.get('set-cookie');assert.match(cookie,/Max-Age=2592000/);for(const flag of ['HttpOnly','Secure','SameSite=Lax'])assert.ok(cookie.includes(flag));assert.equal(remembered.body.sessionToken,undefined);assert.equal(remembered.body.sessionMaxAgeSeconds,undefined);
  async function remaining(session){const token=session.cookie.split('=')[1];return Number((await pool.query("select extract(epoch from expires_at-now()) seconds from mes_private.sessions where hash=$1",[hash(token)])).rows[0].seconds);}
  assert.ok(await remaining(standard)<=43200);assert.ok(await remaining(remembered)>29*86400);
  const forged=await login({remember:'true',sessionMaxAgeSeconds:2592000});assert.match(forged.headers.get('set-cookie'),/Max-Age=43200/);
- assert.equal((await api('getSession',{},remembered.cookie)).status,200);
- assert.equal((await api('logout',{},remembered.cookie)).status,200);
- assert.notEqual((await api('getSession',{},remembered.cookie)).status,200);
- assert.equal((await api('getSession',{},standard.cookie)).status,200);
+ assert.equal((await request('getSession',{},remembered.cookie)).status,200);
+ assert.equal((await request('logout',{},remembered.cookie)).status,200);
+ assert.notEqual((await request('getSession',{},remembered.cookie)).status,200);
+ assert.equal((await request('getSession',{},standard.cookie)).status,200);
 });
