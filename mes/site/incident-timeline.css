@@ -82,7 +82,7 @@
 #incident-timeline .incident-legend{gap:6px 14px;padding:0 4px 8px;margin:0;min-height:25px}
 #incident-timeline .timeline-line-key,#incident-timeline .timeline-severity-key{font-size:.75rem;gap:6px}
 #incident-timeline .timeline-line-key{margin-right:4px;color:var(--ink)}
-#incident-timeline .timeline-line-key i{width:20px;border-color:var(--incident-count-color,#f4f7fb);opacity:.95}
+#incident-timeline .timeline-line-key i{width:20px;border-color:var(--incident-count-color,#f4f7fb);opacity:.8}
 #incident-timeline .timeline-severity-key i{width:7px;height:7px;border-radius:50%}
 #incident-timeline .timeline-severity-key{border-radius:4px;padding:2px 3px}
 #incident-timeline .timeline-severity-key:hover{background:color-mix(in srgb,var(--ink) 6%,transparent);color:var(--ink)}

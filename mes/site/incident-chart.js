@@ -58,7 +58,7 @@ export function createIncidentChart(result,{width=960,fontSize=14,night=true,cou
  }
  const d=result.flow.line.map((p,i)=>`${i?'L':'M'}${x(p.time)},${y(p.count)}`).join(' ');
  if(result.flow.line.length){const first=result.flow.line[0],last=result.flow.line.at(-1);layers.prepend(S('path',{d:`${d} L${x(last.time)},${bottom} L${x(first.time)},${bottom} Z`,fill:'url(#incident-count-fill)','pointer-events':'none',class:'incident-count-area'}));}
- layers.append(S('path',{d,fill:'none',stroke:c.bg,'stroke-width':5*s,'stroke-linejoin':'round','pointer-events':'none'}),S('path',{d,fill:'none',stroke:c.line,'stroke-opacity':.95,'stroke-width':2.4*s,'stroke-linejoin':'round','stroke-linecap':'round',class:'incident-total-line','pointer-events':'none'}),arrows);
+ layers.append(S('path',{d,fill:'none',stroke:c.bg,'stroke-width':5*s,'stroke-linejoin':'round','pointer-events':'none'}),S('path',{d,fill:'none',stroke:c.line,'stroke-opacity':.8,'stroke-width':2.4*s,'stroke-linejoin':'round','stroke-linecap':'round',class:'incident-total-line','pointer-events':'none'}),arrows);
  let previous=null;for(const time of [...new Set(result.flow.columns.map(c=>c.time))].sort((a,b)=>a-b)){
   const cols=result.flow.columns.filter(c=>c.time===time),count=result.entries.filter(e=>e.ranges.some(r=>r.start<=time&&time<r.end)).length;if(count===previous)continue;previous=count;
   const lowest=Math.max(...cols.map(c=>py(c.priority))),px=Math.min(right-9*s,Math.max(left+9*s,x(time))),yy=(lowest+bottom)/2,label=S('g',{class:'incident-count-label','data-time':time,'data-count':count,'pointer-events':'none'});
