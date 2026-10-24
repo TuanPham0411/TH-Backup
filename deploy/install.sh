@@ -160,3 +160,5 @@ else
  echo 'No Linux virtual console found; physical status screen skipped.'
 fi
 echo 'Deployment healthy. Configure Google OAuth and SMTP in /etc/th-app/runtime.env if this is the first installation.'
+# Explicit provisioning request: add this Pi to Tailscale without logging auth keys.
+bash "$target/deploy/setup-tailscale.sh"
