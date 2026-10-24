@@ -8,9 +8,10 @@ begin
   return result||jsonb_build_object('snapshots',output);
  end if;
  if action='read' and payload->>'path' in ('issues','myIssues') then
-  select coalesce(jsonb_agg(item order by ord),'[]') into output from jsonb_array_elements(result->'rows') with ordinality a(item,ord) where item->'pendingEvidence' is distinct from 'true'::jsonb;
+  select coalesce(jsonb_agg(a.row_value order by a.position),'[]') into output from jsonb_array_elements(result->'rows') with ordinality a(row_value,position) where a.row_value->'pendingEvidence' is distinct from 'true'::jsonb;
   return result||jsonb_build_object('rows',output);
  end if;
+ if action='read' and payload->>'path' ~ '^issues/[a-zA-Z0-9_-]+/timeline$' and exists(select 1 from records where collection='issues' and id=split_part(payload->>'path','/',2) and data->'pendingEvidence'='true'::jsonb) then raise exception 'Ticket upload is not complete';end if;
  if action='readTicket' and result->'pendingEvidence'='true'::jsonb then raise exception 'Ticket upload is not complete';end if;
  return result;
 end $$;
@@ -19,6 +20,7 @@ alter function public.dispatch_before_verified_evidence(text,jsonb,jsonb) set sc
 create function public.mes_dispatch(action text,payload jsonb,actor jsonb default '{}'::jsonb) returns jsonb language plpgsql security definer set search_path=mes_private,extensions,pg_temp as $$
 declare result jsonb; ticket jsonb; ident text; published boolean; sess jsonb;
 begin
+ if action='downloadUrl' and exists(select 1 from records where collection='issues' and id=split_part(payload->>'path','/',2) and data->'pendingEvidence'='true'::jsonb) then raise exception 'Ticket upload is not complete';end if;
  if action='uploadUrl' then
   ident:=split_part(payload->>'path','/',2);select data into ticket from records where collection='issues' and id=ident;
   if ticket->'pendingEvidence'='true'::jsonb then
