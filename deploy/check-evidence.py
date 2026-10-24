@@ -1,10 +1,8 @@
 """Read-only production check: report evidence counts, never ticket content/accounts."""
 import json
-import urllib.request
+import sys
 
-request = urllib.request.Request('https://mes.th.io.vn/api/mes', data=json.dumps({'name':'read','data':{'path':'issues'}}).encode(), headers={'Content-Type':'application/json'})
-with urllib.request.urlopen(request, timeout=30) as response:
-    rows = json.load(response)['rows']
+rows = json.load(sys.stdin)['rows']
 for row in sorted(rows, key=lambda r: r.get('createdAt',0), reverse=True)[:10]:
     attachments = row.get('attachments') or []
     count = sum(str(f.get('type','')).startswith(('image/','video/')) for f in attachments)

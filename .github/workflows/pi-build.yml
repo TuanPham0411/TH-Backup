@@ -147,4 +147,6 @@ jobs:
           fi
 
       - name: Verify published ticket evidence metadata
-        run: python3 deploy/check-evidence.py
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --retry 3 --retry-delay 3 --max-time 20 -H 'Content-Type: application/json' --data '{"name":"read","data":{"path":"issues"}}' https://mes.th.io.vn/api/mes | python3 deploy/check-evidence.py
