@@ -23,6 +23,7 @@ if [[ -f $payload ]]; then
   chmod 600 "$workdir/auth-key"
   if ! tailscale up --auth-key="file:$workdir/auth-key" --accept-dns=false --force-reauth --timeout=40s >"$workdir/enroll.log" 2>&1; then
    echo 'Encrypted enrollment failed; credential and diagnostic output withheld'
+   tailscale status --json | python3 -c 'import json,sys; print("TAILSCALE_STATE="+json.load(sys.stdin).get("BackendState","Unknown"))'
    exit 1
   fi
   printf '%s\n' "$digest" >"$enrollment/consumed.sha256"
@@ -39,5 +40,5 @@ else
  openssl pkey -in "$enrollment/private.pem" -pubout 2>/dev/null
  echo TAILSCALE_ENROLLMENT_PUBLIC_KEY_END
 fi
-tailscale status --json | python3 -c 'import json,sys;s=json.load(sys.stdin);print("TAILSCALE_STATE="+s.get("BackendState","Unknown"));[print("TAILSCALE_IPV4="+ip) for ip in s.get("TailscaleIPs",[]) if ":" not in ip]'
+tailscale status --json | python3 -c 'import json,sys;s=json.load(sys.stdin);print("TAILSCALE_STATE="+s.get("BackendState","Unknown"));[print("TAILSCALE_IPV4="+ip) for ip in (s.get("TailscaleIPs") or []) if ":" not in ip]'
 systemctl is-active tailscaled
