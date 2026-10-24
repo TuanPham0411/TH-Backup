@@ -27,7 +27,7 @@ before(async()=>{
  const beforeUpgrade=(await pool.query("select collection,id,data from mes_private.records where id in ('preserved-upgrade-test','old-event') order by collection,id")).rows;
  const result=spawnSync(process.execPath,['server/migrate.js'],{env:{...process.env,DATABASE_URL:url},encoding:'utf8'});assert.equal(result.status,0,result.stderr);
  const twice=spawnSync(process.execPath,['server/migrate.js'],{env:{...process.env,DATABASE_URL:url},encoding:'utf8'});assert.equal(twice.status,0,twice.stderr);
- assert.deepEqual((await pool.query("select collection,id,case when collection='issues' then data-array['pendingEvidence','evidenceRequired'] else data end data from mes_private.records where id in ('preserved-upgrade-test','old-event') order by collection,id")).rows,beforeUpgrade,'Upgrade must preserve existing ticket data and history exactly');
+ assert.deepEqual((await pool.query("select collection,id,data from mes_private.records where id in ('preserved-upgrade-test','old-event') order by collection,id")).rows,beforeUpgrade,'Upgrade must preserve existing ticket data and history exactly');
  const boundary=(await pool.query("select issue_id,code from public.mes_ticket_codes where issue_id in ('boundary-before','boundary-after') order by issue_id")).rows;
  assert.deepEqual(boundary,[{issue_id:'boundary-after',code:'TH2601-01'},{issue_id:'boundary-before',code:'TH2512-01'}],'Backfill uses Vietnam calendar months and resets across December/January');
  await pool.query("delete from mes_private.records where id in ('preserved-upgrade-test','old-event','boundary-before','boundary-after')");
@@ -584,4 +584,12 @@ test('only the requester can complete private pending tickets and publish withou
  assert.ok(!(await request('read',{path:'issues'},'')).body.rows.some(r=>r.id===id));
  const saved=await request('completePendingTicket',data);assert.equal(saved.status,200,JSON.stringify(saved.body));assert.equal(saved.body.published,true);
  assert.ok(!(await request('getMyPendingTickets')).body.rows.some(r=>r.id===id));const published=await request('readTicket',{id},'');assert.equal(published.status,200);assert.equal(published.body.status,'Closed');assert.equal(published.body.priority,'High');assert.equal(published.body.process,'Updated OP 20');assert.equal(published.body.createdAt,pending.createdAt);assert.ok((await pool.query("select 1 from mes_private.records where collection=$1 and data->>'kind'='supplemented'",[`issues/${id}/timeline`])).rowCount>0);
+ const legacyId='legacy-waiting-fixture',legacy={reporterUid:uid,departmentId:department,process:'',description:'MO legacy requiring completion',status:'New',priority:'Medium',createdAt:123,updatedAt:123,attachments:[]};
+ await pool.query("insert into mes_private.records(collection,id,data) values('issues',$1,$2)",[legacyId,legacy]);await pool.query('insert into mes_private.pending_ticket_legacy values($1)',[legacyId]);
+ assert.deepEqual((await pool.query("select data from mes_private.records where collection='issues' and id=$1",[legacyId])).rows[0].data,legacy,'Queueing preserves original ticket JSON exactly');
+ const oldPending=(await request('getMyPendingTickets')).body.rows.find(r=>r.id===legacyId);assert.ok(oldPending);assert.ok(oldPending.missingRequirements.includes('Process / Station'));assert.ok(!(await request('read',{path:'issues'},'')).body.rows.some(r=>r.id===legacyId));
+ const newSlot=await request('reservePendingFiles',{id:legacyId,count:1}),newPath=newSlot.body.files[0].path,newGrant=await request('uploadUrl',{path:newPath});assert.equal(newGrant.status,200,JSON.stringify(newGrant.body));
+ assert.equal((await fetch(base+newGrant.body.url,{method:'PUT',headers:{'x-forwarded-host':'mes.th.io.vn','x-forwarded-for':'192.0.2.87','content-type':'image/png'},body:'legacy evidence'})).status,200);
+ const oldSaved=await request('completePendingTicket',{...data,id:legacyId,baseUpdatedAt:123,files:[{path:newPath,name:'legacy.png'}]});assert.equal(oldSaved.status,200,JSON.stringify(oldSaved.body));assert.equal((await pool.query('select 1 from mes_private.pending_ticket_legacy where issue_id=$1',[legacyId])).rowCount,0);assert.equal((await request('readTicket',{id:legacyId},'')).status,200);
+
 });

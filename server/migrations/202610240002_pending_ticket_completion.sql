@@ -8,7 +8,8 @@ begin
  if not exists(select 1 from jsonb_array_elements(coalesce(ticket->'attachments','[]')) a where nullif(a->>'path','') is not null and (a->>'type' like 'image/%' or a->>'type' like 'video/%')) then missing:=missing||'"Photo or video"'::jsonb;end if;
  return missing;
 end $$;
-update mes_private.records set data=data||'{"pendingEvidence":true,"evidenceRequired":true}'::jsonb where collection='issues' and not coalesce((data->>'deleting')::boolean,false) and jsonb_array_length(mes_private.ticket_missing_requirements(data))>0;
+create table if not exists mes_private.pending_ticket_legacy(issue_id text primary key);
+insert into mes_private.pending_ticket_legacy select id from mes_private.records where collection='issues' and not coalesce((data->>'deleting')::boolean,false) and jsonb_array_length(mes_private.ticket_missing_requirements(data))>0 on conflict do nothing;
 alter function public.mes_dispatch(text,jsonb,jsonb) rename to dispatch_before_pending_completion;
 alter function public.dispatch_before_pending_completion(text,jsonb,jsonb) set schema mes_private;
 create function public.mes_dispatch(action text,payload jsonb,actor jsonb default '{}'::jsonb) returns jsonb language plpgsql security definer set search_path=mes_private,extensions,pg_temp as $$
