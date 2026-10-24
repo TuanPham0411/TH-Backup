@@ -27,7 +27,7 @@ before(async()=>{
  const beforeUpgrade=(await pool.query("select collection,id,data from mes_private.records where id in ('preserved-upgrade-test','old-event') order by collection,id")).rows;
  const result=spawnSync(process.execPath,['server/migrate.js'],{env:{...process.env,DATABASE_URL:url},encoding:'utf8'});assert.equal(result.status,0,result.stderr);
  const twice=spawnSync(process.execPath,['server/migrate.js'],{env:{...process.env,DATABASE_URL:url},encoding:'utf8'});assert.equal(twice.status,0,twice.stderr);
- assert.deepEqual((await pool.query("select collection,id,data from mes_private.records where id in ('preserved-upgrade-test','old-event') order by collection,id")).rows,beforeUpgrade,'Upgrade must preserve existing ticket data and history exactly');
+ assert.deepEqual((await pool.query("select collection,id,case when collection='issues' then data-array['pendingEvidence','evidenceRequired'] else data end data from mes_private.records where id in ('preserved-upgrade-test','old-event') order by collection,id")).rows,beforeUpgrade,'Upgrade must preserve existing ticket data and history exactly');
  const boundary=(await pool.query("select issue_id,code from public.mes_ticket_codes where issue_id in ('boundary-before','boundary-after') order by issue_id")).rows;
  assert.deepEqual(boundary,[{issue_id:'boundary-after',code:'TH2601-01'},{issue_id:'boundary-before',code:'TH2512-01'}],'Backfill uses Vietnam calendar months and resets across December/January');
  await pool.query("delete from mes_private.records where id in ('preserved-upgrade-test','old-event','boundary-before','boundary-after')");
@@ -565,4 +565,23 @@ test('metadata-only and document-only drafts stay hidden until a real image or v
  await verifiedPhoto(draft,owner,1);
  for(const cookie of ['',owner]){const ticket=(await request('readTicket',{id:draft.id},cookie));assert.equal(ticket.status,200,JSON.stringify(ticket.body));assert.equal(ticket.body.pendingEvidence,false);assert.ok(ticket.body.attachments.some(f=>f.type==='image/png'));assert.ok((await request('read',{path:'issues'},cookie)).body.rows.some(i=>i.id===draft.id));}
  const edit=await request('saveTicketEdit',{id:draft.id,files:[]});assert.notEqual(edit.status,200);assert.ok((await request('readTicket',{id:draft.id})).body.attachments.some(f=>f.type==='image/png'));
+});
+test('only the requester can complete private pending tickets and publish without changing handling history',async()=>{
+ const uid=(await pool.query("select id from mes_private.records where collection='users' and data->>'username'='comment.b'")).rows[0].id;
+ const owner='th_mes='+(await pool.query("select mes_private.open_account_session('mes-owner') result")).rows[0].result.sessionToken,user='th_mes='+(await pool.query('select mes_private.open_account_session($1) result',[uid])).rows[0].result.sessionToken;
+ const request=(name,data={},cookie=user)=>api(name,data,cookie,'mes.th.io.vn',{'x-forwarded-for':'192.0.2.87'});
+ const department=(await pool.query("select id from mes_private.records where collection='departments' limit 1")).rows[0].id;
+ const created=await request('createIssue',{reporterUid:uid,departmentId:department,process:'Pending station',description:'MO 1234 serial ABC issue requiring evidence'});assert.equal(created.status,200,JSON.stringify(created.body));const id=created.body.id;
+ const listing=await request('getMyPendingTickets');assert.equal(listing.status,200,JSON.stringify(listing.body));let pending=listing.body.rows.find(r=>r.id===id);assert.ok(pending);assert.equal(pending.submissionState,'Waiting for completion');assert.ok(pending.missingRequirements.includes('Photo or video'));assert.equal(pending.uploadSlots,undefined);
+ assert.notEqual((await request('getMyPendingTickets',{},'')).status,200);assert.ok(!(await request('getMyPendingTickets',{},owner)).body.rows.some(r=>r.id===id));assert.notEqual((await request('reservePendingFiles',{id,count:1},owner)).status,200);
+ await pool.query("update mes_private.records set data=data||jsonb_build_object('createdAt',(extract(epoch from now()-interval '4 days')*1000)::bigint,'status','Closed','priority','High') where collection='issues' and id=$1",[id]);
+ pending=(await request('getMyPendingTickets')).body.rows.find(r=>r.id===id);
+ const slot=await request('reservePendingFiles',{id,count:1});assert.equal(slot.status,200,JSON.stringify(slot.body));const path=slot.body.files[0].path;
+ const grant=await request('uploadUrl',{path});assert.equal(grant.status,200,JSON.stringify(grant.body));assert.equal((await fetch(base+grant.body.url,{method:'PUT',headers:{'x-forwarded-host':'mes.th.io.vn','x-forwarded-for':'192.0.2.87','content-type':'image/png'},body:'uploaded evidence'})).status,200);
+ const data={id,baseUpdatedAt:pending.updatedAt,process:'Updated OP 20',departmentId:department,description:'MO 1234 serial ABC updated evidence',richDocument:{version:1,ops:[{insert:'MO 1234 serial ABC updated evidence\n'}]},files:[{path,name:'evidence.png'}],status:'New',priority:'Critical',reporterUid:'mes-owner'};
+ assert.notEqual((await request('completePendingTicket',data,owner)).status,200);
+ assert.notEqual((await request('completePendingTicket',{...data,files:[]})).status,200);
+ assert.ok(!(await request('read',{path:'issues'},'')).body.rows.some(r=>r.id===id));
+ const saved=await request('completePendingTicket',data);assert.equal(saved.status,200,JSON.stringify(saved.body));assert.equal(saved.body.published,true);
+ assert.ok(!(await request('getMyPendingTickets')).body.rows.some(r=>r.id===id));const published=await request('readTicket',{id},'');assert.equal(published.status,200);assert.equal(published.body.status,'Closed');assert.equal(published.body.priority,'High');assert.equal(published.body.process,'Updated OP 20');assert.equal(published.body.createdAt,pending.createdAt);assert.ok((await pool.query("select 1 from mes_private.records where collection=$1 and data->>'kind'='supplemented'",[`issues/${id}/timeline`])).rowCount>0);
 });

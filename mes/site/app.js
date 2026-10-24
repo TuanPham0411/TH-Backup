@@ -1,3 +1,4 @@
+import {initPendingTickets} from './pending-tickets.js';
 import {initIncidentColors} from './incident-colors.js';
 import './access-history.css';
 import './capture-buttons.css';
@@ -1687,6 +1688,7 @@ const workspace = initWorkspace({state,toast,run,addEvidence(files) {
 }});
 document.querySelector(".topbar .brand").onclick = event => { event.preventDefault(); navigate("dashboard"); };
 initIncidentColors(()=>({user:state.user,preview:state.preview}));
+initPendingTickets(()=>({user:state.user,preview:state.preview,page:state.page,departments:state.departments,types:workspace.types}));
 const incidentTimeline=initIncidentTimeline(scopedIssues,()=>state.ready,openIssue);
 setInterval(()=>{if(!state.preview&&!document.hidden&&incidentTimeline.visible())refreshRecords();},60000);
 initAnalysisGroups(()=>({user:state.user,preview:state.preview}));

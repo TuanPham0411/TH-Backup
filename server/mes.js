@@ -1,4 +1,4 @@
-import {validateEvidence} from '../mes/site/model.js';
+import {validateEvidence,validateIssue} from '../mes/site/model.js';
 import {driveApi} from './drive-client.js';
 import {serveCloudMedia,prepareCloudOriginal,commitCloudRecord,cloudRecord,removeCloudFile} from './cloud-media.js';
 import {publishFile} from './publish.js';
@@ -89,6 +89,14 @@ export function mesRouter(pool,filesRoot) {
    await dispatch('getSession',{},actor);
    const invalid=validateEvidence(data.evidence);
    if(invalid)return res.status(400).json({code:'invalid-evidence',error:invalid});
+  }
+  if(name==='completePendingTicket'){
+   await dispatch('getSession',{},actor);
+   data.richDocument=normalizeDocument(data.richDocument);data.description=documentText(data.richDocument);
+   const invalid=validateIssue(data);if(invalid)return res.status(400).json({code:'invalid-argument',error:invalid});
+   if(!Array.isArray(data.files)||data.files.length>5)return res.sendStatus(400);
+   const files=[];for(const file of data.files){if(!validPath(file.path)||typeof file.name!=='string')return res.sendStatus(400);const {rows:[info]}=await pool.query('select size,type from public.files where path=$1',[file.path]);if(!info)return res.sendStatus(400);if(!await cloudRecord(pool,file.path))await stat(await filePath(filesRoot,file.path));files.push({...file,size:Number(info.size),type:info.type});}
+   const evidence=validateEvidence(files);if(evidence)return res.status(400).json({code:'invalid-evidence',error:evidence});data.files=files;
   }
   if((name==='createIssue'||name==='saveTicketEdit'||(name==='updateIssue'&&data.operation==='edit'))&&data.richDocument!==undefined){data.richDocument=normalizeDocument(data.richDocument);data.description=documentText(data.richDocument);}
   if(name==='uploadUrl'||name==='downloadUrl') {
