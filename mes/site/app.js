@@ -935,6 +935,7 @@ function demoEvent(issue, kind, text, extra = {}) {
   }
   renderAll();
 }
+let pendingFeedback=null;
 $("feedback-form").onsubmit = (e) => {
   e.preventDefault();
   if (!requireMember()) return;
@@ -997,38 +998,19 @@ $("feedback-form").onsubmit = (e) => {
         "Preview feedback created. No production data was submitted.",
       );
     } else {
-      const result = await callable("createIssue", {...data, evidence: state.files.map(file => ({name:file.name,type:attachmentType(file),size:file.size}))});
-      createdId = result.id;
-      const uploaded = [];
+      const signature=JSON.stringify(data),sameDraft=pendingFeedback&&Date.now()-pendingFeedback.savedAt<86400000&&pendingFeedback.uid===state.user.uid&&pendingFeedback.signature===signature&&pendingFeedback.files.length===state.files.length&&pendingFeedback.files.every((file,index)=>file===state.files[index]);
+      if(!sameDraft){const result=await callable("createIssue",{...data,evidence:state.files.map(file=>({name:file.name,type:attachmentType(file),size:file.size}))});pendingFeedback={...result,savedAt:Date.now(),uid:state.user.uid,signature,files:[...state.files],uploaded:new Map()};}
+      const draft=pendingFeedback;createdId=draft.id;
       try {
-        for (const [index, file] of state.files.entries()) {
-          showStatus(
-            "create-status",
-            `Feedback saved. Uploading attachment ${index + 1} of ${state.files.length}…`,
-          );
-          await uploadAttachment(`issues/${createdId}/${result.uploadSlots[index]}`, file, attachmentType(file));
-          uploaded.push({ slot: result.uploadSlots[index], name: file.name });
+        for(const [index,file] of draft.files.entries()){
+          showStatus("create-status",t('Uploading evidence before submitting ticket…')+` ${index+1}/${state.files.length}`);
+          if(!draft.uploaded.has(index)){await uploadAttachment(`issues/${createdId}/${draft.uploadSlots[index]}`,file,attachmentType(file));draft.uploaded.set(index,{slot:draft.uploadSlots[index],name:file.name});}
         }
-        if (uploaded.length)
-          await callable("attachFiles", {
-            issueId: createdId,
-            files: uploaded,
-          });
-      } catch (e) {
-        if (uploaded.length)
-          try {
-            await callable("attachFiles", {
-              issueId: createdId,
-              files: uploaded,
-            });
-          } catch {
-            /* Kept on server; owner can inspect upload slots. */
-          }
-        showStatus(
-          "create-status",
-          `Feedback ${createdId} was saved, but one or more attachments failed. Do not resubmit the issue. Contact the owner with this ID.`,
-        );
-        toast("Feedback saved; attachment upload needs attention.");
+        const confirmed=await callable("attachFiles",{issueId:createdId,files:[...draft.uploaded.values()]});
+        if(confirmed.published===false)throw new Error('Add at least one photo or video.');
+        pendingFeedback=null;
+      } catch(error){
+        showStatus("create-status",t('Upload incomplete. Your ticket has not been submitted. Keep this page open and press Submit again to resume.'));
         return;
       }
     }
@@ -1165,7 +1147,7 @@ $("edit-issue").onclick = async () => {
 $('edit-form').onsubmit=event=>{event.preventDefault();if(!ownerOnly()||!editingTicket)return;
  run('edit-status',$('edit-form').querySelector('button[type="submit"]'),async()=>{
  const issue=editingTicket,data={id:issue.id,baseUpdatedAt:issue.updatedAt,subject:$('edit-subject').value.trim(),process:$('edit-process').value.trim(),departmentId:$('edit-department').value,issueTypeId:$('edit-type').value,reporterUid:$('edit-reporter').value,status:$('edit-ticket-status').value,priority:$('edit-priority').value,progress:Number($('edit-progress').value),assessment:$('edit-assessment').value,richDocument:editEditor.getDocument(),occurrences:[...$('edit-occurrences').children].map(row=>({kind:row.dataset.kind,...Object.fromEntries([...row.querySelectorAll('input')].map(i=>[i.name,i.dataset.original&&i.value===i.dataset.initial?i.dataset.original:new Date(i.value).toISOString()]))}))};
- data.description=documentText(data.richDocument);const invalid=validateIssue(data);if(invalid)throw Object.assign(new Error(invalid),{code:'invalid-argument'});
+ data.description=documentText(data.richDocument);const invalid=validateIssue(data)||(issue.evidenceRequired?validateEvidence([...editRetained,...editImageFiles]):'');if(invalid)throw Object.assign(new Error(invalid),{code:'invalid-argument'});
  const files=editRetained.map(f=>({path:f.path,slotIndex:f.slotIndex,name:editNames.get(f)||f.name}));
  if(!state.preview){for(const file of editImageFiles){let reserved=editDrafts.get(file);if(!reserved){reserved=(await callable('reserveTicketFiles',{id:issue.id,indices:[editSlots.get(file)]})).files[0];editDrafts.set(file,reserved);}if(!editUploaded.has(file)){await uploadAttachment(reserved.path,file,attachmentType(file));editUploaded.add(file);}files.push({path:reserved.path,slotIndex:reserved.slotIndex,name:editNames.get(file)||file.name});}data.files=files;await callable('saveTicketEdit',data);}
  else{const live=state.issues.find(i=>i.id===issue.id);Object.assign(live,data);live.attachments=[...editRetained,...editImageFiles.map(f=>({name:editNames.get(f)||f.name,type:attachmentType(f),slotIndex:editSlots.get(f),size:f.size,previewUrl:previewFileUrl(f)}))];demoEvent(live,'edit','Administrator updated feedback and attachments (preview).');}
@@ -1543,7 +1525,7 @@ async function handleAuth(user) {
   state.devices = [];
   state.timeline = [];
   state.selected = null;
-  state.files = [];
+  state.files = []; pendingFeedback=null;
   $("activation-result").hidden = true; $("activation-link").value = "";
   $("profile-form").reset(); $("password-form").reset();
   loadAppearancePreferences(null);

@@ -248,13 +248,15 @@
                 <div id="occurrence-rows"></div>
                 <div class="occurrence-actions"><button type="button" id="add-moment" class="button small">＋ Add moment</button><button type="button" id="add-range" class="button small">＋ Add time range</button></div>
               </section>
+              <div id="issue-reference-guide" class="issue-reference-guide"><strong>Include traceability references</strong><p>Add the MO number, serial number, process code, OP number, product or part number, machine/station and any related identifiers that apply.</p><p class="issue-reference-warning">Without relevant reference information, this ticket has no reference value for tracing or comparing the issue. If an identifier is unavailable or not applicable, say so and provide another way to identify the affected item.</p></div>
               <label for="description-input">Feedback <span>*</span></label><textarea
                 id="description-input"
+                aria-describedby="issue-reference-guide"
                 rows="6"
                 required
                 minlength="1"
                 maxlength="5000"
-                placeholder="Describe the issue or suggestion. Attach a screenshot if helpful."
+                placeholder="MO / Serial / Process code / OP number / Product / Station: … Describe the issue and attach a photo or video."
               ></textarea
               ><label for="attachment-input">Photo or video (required)</label
               ><label class="upload-zone" for="attachment-input"

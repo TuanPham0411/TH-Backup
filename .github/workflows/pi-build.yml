@@ -118,6 +118,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 3
     steps:
+      - uses: actions/checkout@v4
       - name: Check HTTPS sites through Cloudflare from outside the Pi
         shell: bash
         run: |
@@ -144,3 +145,6 @@ jobs:
             curl --fail --silent --show-error --max-time 20 "https://mes.th.io.vn/api/mes/tickets/$reference" | python3 -c 'import json,sys; row=json.load(sys.stdin); assert row.get("ticketNumber") and row.get("id"); assert "uploadSlots" not in row'
             curl --fail --silent --show-error --max-time 20 "https://mes.th.io.vn/ticket/$reference" -o /dev/null
           fi
+
+      - name: Verify published ticket evidence metadata
+        run: python3 deploy/check-evidence.py
