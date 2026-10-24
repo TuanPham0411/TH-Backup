@@ -11,21 +11,33 @@ if ! command -v tailscale >/dev/null; then
 fi
 systemctl enable --now tailscaled
 state=$(tailscale status --json | python3 -c 'import json,sys;print(json.load(sys.stdin).get("BackendState","Unknown"))')
-if [[ $state == NeedsLogin || $state == Stopped ]]; then
- # Keep the Pi's working DNS and default routes; enable no SSH/exit-node features.
- tailscale up --accept-dns=false --timeout=20s >"$workdir/login.log" 2>&1 || true
+enrollment=/var/lib/th-app/tailscale-enrollment
+install -d -m 700 "$enrollment"
+payload="$(dirname "$0")/tailscale-enrollment.enc"
+if [[ -f $payload ]]; then
+ digest=$(sha256sum "$payload" | cut -d' ' -f1)
+ if [[ ! -f $enrollment/consumed.sha256 || $(cat "$enrollment/consumed.sha256") != "$digest" ]]; then
+  [[ -f $enrollment/private.pem ]] || { echo 'Enrollment private key is unavailable'; exit 1; }
+  base64 -d "$payload" >"$workdir/payload.bin"
+  openssl pkeyutl -decrypt -inkey "$enrollment/private.pem" -in "$workdir/payload.bin" -out "$workdir/auth-key" -pkeyopt rsa_padding_mode:oaep -pkeyopt rsa_oaep_md:sha256
+  chmod 600 "$workdir/auth-key"
+  if ! tailscale up --auth-key="file:$workdir/auth-key" --accept-dns=false --force-reauth --timeout=40s >"$workdir/enroll.log" 2>&1; then
+   echo 'Encrypted enrollment failed; credential and diagnostic output withheld'
+   exit 1
+  fi
+  printf '%s\n' "$digest" >"$enrollment/consumed.sha256"
+  rm -f "$enrollment/private.pem"
+ fi
+else
+ # Invalidate any unfinished interactive enrollment; no login URL is logged.
+ if [[ $state == NeedsLogin ]]; then tailscale logout >/dev/null 2>&1 || true; fi
+ if [[ ! -f $enrollment/private.pem ]]; then
+  umask 077
+  openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:3072 -out "$enrollment/private.pem" 2>/dev/null
+ fi
+ echo TAILSCALE_ENROLLMENT_PUBLIC_KEY_BEGIN
+ openssl pkey -in "$enrollment/private.pem" -pubout 2>/dev/null
+ echo TAILSCALE_ENROLLMENT_PUBLIC_KEY_END
 fi
-tailscale status --json >"$workdir/status.json"
-python3 - "$workdir/status.json" "$workdir/login.log" <<'PY'
-import json,pathlib,re,sys
-status=json.loads(pathlib.Path(sys.argv[1]).read_text())
-print('TAILSCALE_STATE='+status.get('BackendState','Unknown'))
-for address in status.get('TailscaleIPs') or []:
- if ':' not in address: print('TAILSCALE_IPV4='+address)
-text=status.get('AuthURL') or ''
-log=pathlib.Path(sys.argv[2])
-if log.exists(): text+='\n'+log.read_text()
-match=re.search(r'https://login\.tailscale\.com/a/[A-Za-z0-9_-]+',text)
-if match: print('TAILSCALE_LOGIN_URL='+match.group(0))
-PY
+tailscale status --json | python3 -c 'import json,sys;s=json.load(sys.stdin);print("TAILSCALE_STATE="+s.get("BackendState","Unknown"));[print("TAILSCALE_IPV4="+ip) for ip in s.get("TailscaleIPs",[]) if ":" not in ip]'
 systemctl is-active tailscaled
