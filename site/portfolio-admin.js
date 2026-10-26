@@ -61,10 +61,10 @@ export function portfolioAdminUser(user,onSave){
    if(type!=='checkbox'&&type!=='date')control.maxLength=max;
    control.oninput=()=>{target[key]=type==='checkbox'?control.checked:control.value;onChange?.(target,control);changed();};wrap.append(control);fields.append(wrap);return control;
   }
-  const accepts={image:'image/jpeg,image/png,image/webp,image/gif',video:'video/mp4,video/webm',audio:'audio/mpeg,audio/mp4,audio/ogg,audio/wav',gallery:'image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm'};
+  const accepts={image:'image/jpeg,image/png,image/webp,image/gif,image/heic,image/heif,.heic,.heif',video:'video/mp4,video/webm',audio:'audio/mpeg,audio/mp4,audio/ogg,audio/wav',gallery:'image/jpeg,image/png,image/webp,image/gif,image/heic,image/heif,.heic,.heif,video/mp4,video/webm'};
   async function library(target,key,kind,multiple=false,onChoose){
    const sheet=el('dialog',undefined,'story-dialog portfolio-library'),close=el('button','×','dialog-close');close.type='button';close.setAttribute('aria-label','Close library');close.onclick=()=>sheet.close();
-   sheet.append(close,el('h2',kind==='audio'?'Soundtrack':kind==='video'?'Introduction video':'Image · GIF · video library'),el('p','Images/GIFs: 12 MB · MP4/WebM: 96 MB · audio: 40 MB. Upload, select, then save to apply.','muted'));
+   sheet.append(close,el('h2',kind==='audio'?'Soundtrack':kind==='video'?'Introduction video':'Image · GIF · video library'),el('p','Images/GIFs/HEIC: 12 MB · MP4/WebM: 96 MB · audio: 40 MB. HEIC/HEIF images are converted to JPEG once. Upload, select, then save to apply.','muted'));
    const upload=el('input');upload.type='file';upload.accept=accepts[kind];upload.multiple=multiple;upload.setAttribute('aria-label','Upload media');
    const progress=el('progress');progress.max=100;progress.value=0;progress.hidden=true;const note=el('p','','editor-status');note.setAttribute('role','status');const list=el('div',undefined,'cms-library-grid');sheet.append(upload,progress,note,list);document.body.append(sheet);sheet.showModal();sheet.addEventListener('close',()=>{stopMedia(sheet);sheet.remove();},{once:true});
    const matches=m=>kind==='audio'?m.type.startsWith('audio/'):kind==='video'?m.type.startsWith('video/'):kind==='image'?m.type.startsWith('image/'):/^(image|video)\//.test(m.type);
@@ -82,7 +82,8 @@ export function portfolioAdminUser(user,onSave){
     if(!list.childNodes.length)list.append(el('p','No files yet. Upload a file above.','muted'));
    }
    function uploadFile(file){return new Promise((resolve,reject)=>{
-    const request=new XMLHttpRequest();request.open('POST','/api/portfolio/content/upload');request.withCredentials=true;request.setRequestHeader('Content-Type',file.type);request.setRequestHeader('X-File-Name',encodeURIComponent(file.name));request.timeout=180000;
+    const request=new XMLHttpRequest();request.open('POST','/api/portfolio/content/upload');request.withCredentials=true;request.setRequestHeader('Content-Type',file.type||(/\.hei[cf]$/i.test(file.name)?'image/heic':'application/octet-stream'));request.setRequestHeader('X-File-Name',encodeURIComponent(file.name));request.timeout=180000;
+    request.upload.onload=()=>{if(/\.hei[cf]$/i.test(file.name))note.textContent='Converting HEIC/HEIF for browser display…';};
     request.upload.onprogress=e=>{if(e.lengthComputable){progress.value=e.loaded/e.total*100;note.textContent=`${file.name} · ${Math.round(progress.value)}%`;}};
     request.onload=()=>{try{const data=JSON.parse(request.responseText);if(request.status<200||request.status>=300)throw Error(data.error||'Upload failed');resolve(data);}catch(error){reject(error);}};
     request.onerror=()=>reject(Error('Connection lost during upload. Please try again.'));request.ontimeout=()=>reject(Error('Upload timed out. Try a shorter video or smaller file.'));request.send(file);

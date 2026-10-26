@@ -1,3 +1,5 @@
+import {isHeic} from './heic-format.js';
+import {normalizeHeicFile} from './heic-upload.js';
 import {Router} from 'express';
 import {randomUUID} from 'node:crypto';
 import {mkdir,rm,open} from 'node:fs/promises';
@@ -9,7 +11,7 @@ import {hash,token} from './security.js';
 import {filePath,storageQuota,deleteEverywhere} from './storage.js';
 import {defaultPortfolio,publicPortfolio,referencedMedia,validatePortfolio,normalizePortfolio,groups} from '../site/portfolio-model.js';
 const error=(status,message)=>Object.assign(new Error(message),{status,expose:true});
-const types=new Set(['image/jpeg','image/png','image/webp','image/gif','video/mp4','video/webm','audio/mpeg','audio/mp4','audio/ogg','audio/wav']);
+const types=new Set(['image/heic','image/heif','image/heic-sequence','image/heif-sequence','image/jpeg','image/png','image/webp','image/gif','video/mp4','video/webm','audio/mpeg','audio/mp4','audio/ogg','audio/wav']);
 export function portfolioContentRouter(pool,root){
  const router=Router();
  async function admin(req){const {rows:[user]}=await pool.query('select u.id from portfolio.users u join portfolio.sessions s on s.uid=u.id where s.hash=$1 and s.expires>now() and u.admin and u.verified',[hash(req.cookies.th_portfolio||'')]);return user;}
@@ -46,16 +48,21 @@ export function portfolioContentRouter(pool,root){
  });
  router.post('/upload',async(req,res)=>{
  const user=await admin(req);if(!user)throw error(403,'Administrator required');
- const type=req.headers['content-type']?.split(';')[0],size=Number(req.headers['content-length']);
- if(!types.has(type)||!Number.isSafeInteger(size)||size<=0||size>(type.startsWith('video/')?96:type.startsWith('audio/')?40:12)*1024*1024)throw error(400,'Use JPG, PNG, WebP, GIF (12 MB), MP4/WebM (96 MB) or audio (40 MB)');
+ let type=req.headers['content-type']?.split(';')[0];const size=Number(req.headers['content-length']);
  let name;try{name=decodeURIComponent(req.headers['x-file-name']||'Upload').slice(0,180);}catch{throw error(400,'Invalid filename');}
+ if((!type||type==='application/octet-stream')&&/\.hei[cf]$/i.test(name))type='image/heic';
+ if(!types.has(type)||!Number.isSafeInteger(size)||size<=0||size>(type.startsWith('video/')?96:type.startsWith('audio/')?40:12)*1024*1024)throw error(400,'Use JPG, PNG, WebP, GIF, HEIC/HEIF (12 MB), MP4/WebM (96 MB) or audio (40 MB)');
  const id=randomUUID(),db=await pool.connect();
  try{await db.query('begin');await db.query('select pg_advisory_xact_lock(74529101)');const {rows:[used]}=await db.query('select coalesce(sum(size),0)::bigint size from portfolio.media');if(Number(used.size)+size>Math.min(storageQuota(),2*1024**3))throw error(413,'Portfolio media storage limit reached');await db.query('insert into portfolio.media(id,type,size,name,created_by) values($1,$2,$3,$4,$5)',[id,type,size,name,user.id]);await db.query('commit');}catch(e){await db.query('rollback');throw e;}finally{db.release();}
  let path,total=0;
  try{path=await filePath(root,`portfolio/${id}`,true);await mkdir(dirname(path),{recursive:true});await pipeline(req,new Transform({transform(chunk,enc,cb){total+=chunk.length;cb(total>size?error(413,'Upload too large'):null,chunk);}}),createWriteStream(path,{flags:'wx',mode:0o600}));if(total!==size)throw error(400,'Incomplete upload');
  const file=await open(path,'r');let b;try{b=Buffer.alloc(16);await file.read(b,0,16,0);}finally{await file.close();}
- const valid=type==='image/gif'?['GIF87a','GIF89a'].includes(b.toString('ascii',0,6)):type==='video/mp4'?b.toString('ascii',4,8)==='ftyp':type==='video/webm'?b.subarray(0,4).equals(Buffer.from([26,69,223,163])):type==='image/png'?b.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10])):type==='image/jpeg'?b[0]===255&&b[1]===216&&b[2]===255:type==='image/webp'?b.toString('ascii',0,4)==='RIFF'&&b.toString('ascii',8,12)==='WEBP':type==='audio/ogg'?b.toString('ascii',0,4)==='OggS':type==='audio/wav'?b.toString('ascii',0,4)==='RIFF'&&b.toString('ascii',8,12)==='WAVE':type==='audio/mp4'?b.toString('ascii',4,8)==='ftyp':b.toString('ascii',0,3)==='ID3'||b[0]===255&&(b[1]&224)===224;
- if(!valid)throw error(400,'File contents do not match the selected format');await pool.query('update portfolio.media set ready=true where id=$1',[id]);res.status(201).json({id,type,name});
+ const heic=/^image\/hei[cf]/.test(type);const valid=heic?isHeic(b):type==='image/gif'?['GIF87a','GIF89a'].includes(b.toString('ascii',0,6)):type==='video/mp4'?b.toString('ascii',4,8)==='ftyp':type==='video/webm'?b.subarray(0,4).equals(Buffer.from([26,69,223,163])):type==='image/png'?b.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10])):type==='image/jpeg'?b[0]===255&&b[1]===216&&b[2]===255:type==='image/webp'?b.toString('ascii',0,4)==='RIFF'&&b.toString('ascii',8,12)==='WEBP':type==='audio/ogg'?b.toString('ascii',0,4)==='OggS':type==='audio/wav'?b.toString('ascii',0,4)==='RIFF'&&b.toString('ascii',8,12)==='WAVE':type==='audio/mp4'?b.toString('ascii',4,8)==='ftyp':b.toString('ascii',0,3)==='ID3'||b[0]===255&&(b[1]&224)===224;
+ if(!valid)throw error(400,'File contents do not match the selected format');
+ let savedType=type,savedSize=size;
+ if(heic){const converted=await normalizeHeicFile(path);savedType=converted.type;savedSize=converted.size;name=name.replace(/\.hei[cf]$/i,'').slice(0,176)+'.jpg';}
+ const final=await pool.connect();try{await final.query('begin');await final.query('select pg_advisory_xact_lock(74529101)');const {rows:[used]}=await final.query('select coalesce(sum(size),0)::bigint size from portfolio.media');if(Number(used.size)-size+savedSize>Math.min(storageQuota(),2*1024**3))throw error(413,'Portfolio media storage limit reached');await final.query('update portfolio.media set ready=true,type=$2,size=$3,name=$4 where id=$1',[id,savedType,savedSize,name]);await final.query('commit');}catch(e){await final.query('rollback');throw e;}finally{final.release();}
+ res.status(201).json({id,type:savedType,name});
  }catch(e){if(path)await rm(path,{force:true});await pool.query('delete from portfolio.media where id=$1',[id]);throw e;}
  });
 

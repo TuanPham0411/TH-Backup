@@ -730,3 +730,15 @@ test('portfolio descriptions inherit media visibility, title styles persist and 
  const history=await(await request('visits',{},ownerLogin.cookie)).json();assert.ok(history.rows.some(r=>r.role==='viewer'&&!r.account_email));assert.ok(history.rows.some(r=>r.role==='user'&&r.account_email===member.email));assert.ok(history.rows.every(r=>!r.visitor_hash));assert.equal(history.rows.find(r=>r.role==='viewer').referrer,'https://search.example.test');
  assert.equal((await request('visits?from=bad',{},ownerLogin.cookie)).status,400);
 });
+
+test('portfolio HEIC uploads become verified private JPEGs and malformed HEIC is removed',async()=>{
+ const {rows:[owner]}=await pool.query("insert into portfolio.users(email,password,name,verified,admin) values('heic-owner@example.test',extensions.crypt('test-owner-password',extensions.gen_salt('bf',4)),'HEIC Owner',true,true) returning *");
+ const login=await api('login',{email:owner.email,password:'test-owner-password'},'','th.io.vn',{'x-forwarded-for':'192.0.2.241'});
+ const request=(path='',options={},cookie=login.cookie)=>fetch(base+'/api/portfolio/content/'+path,{...options,headers:{'x-forwarded-host':'th.io.vn','x-forwarded-for':'192.0.2.242',...(cookie?{cookie}:{}),...options.headers}});
+ const input=Buffer.from(await readFile('tests/fixtures/two-colors.heic.base64','utf8'),'base64');
+ const upload=await request('upload',{method:'POST',headers:{'Content-Type':'application/octet-stream','X-File-Name':'phone.HEIC'},body:input});assert.equal(upload.status,201,await upload.clone().text());const image=await upload.json();assert.equal(image.type,'image/jpeg');assert.equal(image.name,'phone.jpg');
+ assert.equal((await request('media/'+image.id,{},'')).status,404);const rendered=await request('media/'+image.id);assert.equal(rendered.status,200);assert.match(rendered.headers.get('content-type'),/image\/jpeg/);assert.deepEqual([...new Uint8Array(await rendered.arrayBuffer()).subarray(0,3)],[255,216,255]);
+ const {rows:[saved]}=await pool.query('select ready,type,size from portfolio.media where id=$1',[image.id]);assert.equal(saved.ready,true);assert.equal(saved.type,'image/jpeg');assert.ok(Number(saved.size)>0);
+ const before=Number((await pool.query('select count(*) from portfolio.media')).rows[0].count);
+ const broken=await request('upload',{method:'POST',headers:{'Content-Type':'image/heic','X-File-Name':'bad.heic'},body:Buffer.from('000000186674797068656963000000006d69663168656963','hex')});assert.equal(broken.status,400);assert.equal(Number((await pool.query('select count(*) from portfolio.media')).rows[0].count),before);
+});
