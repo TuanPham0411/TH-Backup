@@ -35,10 +35,17 @@ test('handoffs put Complete or Graduate before Start and use precise English pha
 test('checkpoint labels stay centered on their own dates and avoid overlapping text',()=>{
  const items=[entry('training','2016-01-01','2019-12-31','education'),entry('apprentice','2016-10-01','2019-09-01'),entry('technician','2019-09-01','2022-04-01'),entry('study','2022-01-01','2025-12-31','education'),entry('assistant','2022-04-01','2023-07-01'),entry('senior','2023-06-01','2025-03-01'),entry('support','2025-03-01','2026-07-01'),entry('engineer','2026-07-01','')];
  const route=datedRoute(items,Date.parse('2026-10-27'),{labelHeights:{'2022-04-01':130}});
- for(const point of route.points){const label=point.label;assert.equal(label.left,point.x);assert.ok(label.top+label.height<point.y||label.top>point.y);assert.ok(label.top>=route.originY);assert.ok(label.top+label.height<=route.originY+route.height);}
+ for(const point of route.points){const label=point.label;assert.ok(Math.abs(label.left-point.x)<=72);assert.ok(label.gap<=100);assert.ok(label.top+label.height<point.y||label.top>point.y);assert.ok(label.top>=route.originY);assert.ok(label.top+label.height<=route.originY+route.height);}
  assert.ok(route.points.find(p=>p.date==='2022-04-01').label.height>=130);
  for(let i=0;i<route.points.length;i++)for(let j=i+1;j<route.points.length;j++){const a=route.points[i].label,b=route.points[j].label;assert.ok(Math.abs(a.left-b.left)>=(a.width+b.width)/2||a.top+a.height<=b.top||b.top+b.height<=a.top);}
 });
 test('year labels sit close to the opposite side of the lane from phase traces',()=>{
  const route=datedRoute([entry('long','2010-01-01','2030-01-01')]);for(const tick of route.ticks){const f=(Date.UTC(tick.year,0,1)-route.min)/(route.max-route.min),phase=route.at(f,23),dot=(phase.x-tick.x)*(tick.labelX-tick.x)+(phase.y-tick.y)*(tick.labelY-tick.y);assert.ok(dot<0);assert.ok(Math.abs(Math.hypot(tick.labelX-tick.x,tick.labelY-tick.y)-22)<.001);}
+});
+
+test('screenshot regression: dense June/July milestones keep full captions locally without crossing lanes',()=>{
+ const items=[entry('training','2016-10-01','2019-09-01','education'),entry('apprentice','2016-10-01','2019-09-01'),entry('technician','2019-09-01','2022-04-01'),entry('study','2022-10-20','2025-10-20','education'),entry('assistant','2022-04-01','2023-07-01'),entry('senior','2023-06-01','2025-03-01'),entry('support','2025-03-01','2026-07-01'),entry('engineer','2026-07-01','')];
+ const names={training:'Lilama 2 International College of Technology',apprentice:'Apprentice · TGA dual training',technician:'Technician',study:'Ho Chi Minh City University of Technology',assistant:'Assistant Test Engineer',senior:'Senior Assistant Test Engineer',support:'Operational Technical Support Engineer',engineer:'Operational Technical Engineer'};for(const item of items)item.title=names[item.id];
+ const route=datedRoute(items,Date.parse('2026-10-27'));
+ for(const point of route.points){assert.equal(point.label.compact,false);assert.equal(point.label.hidden,undefined);assert.ok(point.label.gap<=100);const [ax,ay,bx,by]=point.label.leader.match(/-?\d+(?:\.\d+)?(?:e[+-]?\d+)?/g).map(Number),dx=bx-ax,dy=by-ay;for(let i=0;i<=500;i++){const road=route.at(i/500);if(Math.abs(road.distance-point.distance)<=42)continue;const t=Math.max(0,Math.min(1,((road.x-ax)*dx+(road.y-ay)*dy)/(dx*dx+dy*dy||1)));assert.ok(Math.hypot(road.x-ax-dx*t,road.y-ay-dy*t)>=12,'leader must not cut through another lane');}}
 });
