@@ -14,7 +14,7 @@ import {defaultPortfolio,mediaURL,normalizePortfolio} from './portfolio-model.js
 const ns='http://www.w3.org/2000/svg';
 export const el=(tag,text,cls)=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(cls)n.className=cls;return n;};
 const svg=(tag,attrs)=>{const n=document.createElementNS(ns,tag);for(const [k,v]of Object.entries(attrs))n.setAttribute(k,v);return n;};
-export const dateLabel=item=>{const format=value=>item.datePrecision==='year'?value.slice(0,4):new Date(value+'T00:00:00Z').toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric',timeZone:'UTC'});return item.date?format(item.date)+(item.end?' — '+format(item.end):item.kind==='milestone'?'':' — Present'):item.subtitle;};
+export const dateLabel=item=>{const format=value=>item.datePrecision==='year'?value.slice(0,4):new Date(value+'T00:00:00Z').toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric',timeZone:'UTC'});return item.date?format(item.date)+(item.end&&item.end!==item.date?' — '+format(item.end):item.end||item.kind==='milestone'?'':' — Present'):item.subtitle;};
 const itemKey=item=>`item-${item.sourceGroup||item.group||'journey'}-${item.id}`;
 
 export const storyGallery=item=>storyCarousel(item.media||[],item.title,{descriptions:currentView.mediaDescriptions});

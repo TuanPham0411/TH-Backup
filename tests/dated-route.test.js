@@ -31,3 +31,14 @@ test('handoffs put Complete or Graduate before Start and use precise English pha
  const events=[{item:{title:'Engineer',kind:'work'},role:'start'},{item:{title:'Training',kind:'education'},role:'end'},{item:{title:'Technician',kind:'work'},role:'end'}];
  const ordered=orderedEvents(events);assert.deepEqual(ordered.map(eventLabel),['Graduate','Complete','Start']);assert.equal(eventLabel({item:{kind:'work'},role:'end'}),'Complete');
 });
+
+test('checkpoint labels stay centered on their own dates and avoid overlapping text',()=>{
+ const items=[entry('training','2016-01-01','2019-12-31','education'),entry('apprentice','2016-10-01','2019-09-01'),entry('technician','2019-09-01','2022-04-01'),entry('study','2022-01-01','2025-12-31','education'),entry('assistant','2022-04-01','2023-07-01'),entry('senior','2023-06-01','2025-03-01'),entry('support','2025-03-01','2026-07-01'),entry('engineer','2026-07-01','')];
+ const route=datedRoute(items,Date.parse('2026-10-27'),{labelHeights:{'2022-04-01':130}});
+ for(const point of route.points){const label=point.label;assert.equal(label.left,point.x);assert.ok(label.top+label.height<point.y||label.top>point.y);assert.ok(label.top>=route.originY);assert.ok(label.top+label.height<=route.originY+route.height);}
+ assert.ok(route.points.find(p=>p.date==='2022-04-01').label.height>=130);
+ for(let i=0;i<route.points.length;i++)for(let j=i+1;j<route.points.length;j++){const a=route.points[i].label,b=route.points[j].label;assert.ok(Math.abs(a.left-b.left)>=(a.width+b.width)/2||a.top+a.height<=b.top||b.top+b.height<=a.top);}
+});
+test('year labels sit close to the opposite side of the lane from phase traces',()=>{
+ const route=datedRoute([entry('long','2010-01-01','2030-01-01')]);for(const tick of route.ticks){const f=(Date.UTC(tick.year,0,1)-route.min)/(route.max-route.min),phase=route.at(f,23),dot=(phase.x-tick.x)*(tick.labelX-tick.x)+(phase.y-tick.y)*(tick.labelY-tick.y);assert.ok(dot<0);assert.ok(Math.abs(Math.hypot(tick.labelX-tick.x,tick.labelY-tick.y)-22)<.001);}
+});
