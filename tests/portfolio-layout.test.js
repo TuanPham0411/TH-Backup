@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {defaultPortfolio,normalizePortfolio,publicPortfolio,referencedMedia,validatePortfolio} from '../site/portfolio-model.js';
-import {timelineEntries,routePoint,dateSlot,rangePath} from '../site/journey-layout.js';
+import {timelineEntries,routePoint,dateSlot,rangePath,phaseTimelineLayout} from '../site/journey-layout.js';
 test('education is included in the dated journey and legacy year precision is explicit',()=>{
  const value=normalizePortfolio(defaultPortfolio),entries=timelineEntries(value);
  assert.equal(entries.length,value.journey.length+value.education.length);
@@ -27,4 +27,15 @@ test('title styles reject unsafe fonts, invalid sizes and arbitrary CSS colors',
 test('individual toolkit skills can be edited and hidden separately from skill categories',()=>{
  const value=normalizePortfolio(defaultPortfolio);assert.ok(value.toolkit.some(e=>e.title==='Python'));
  const skill=value.toolkit.find(e=>e.title==='Python');skill.title='Python tools';skill.public=false;assert.equal(publicPortfolio(value).toolkit.some(e=>e.id===skill.id),false);
+});
+
+test('independent time lanes share one date scale with explicit start, end and ongoing state',()=>{
+ const now=Date.parse('2026-10-26');const entries=[{id:'a',date:'2020-01-01',end:'2024-01-01'},{id:'b',date:'2022-01-01',end:'2025-01-01',kind:'education'},{id:'c',date:'2025-01-01',end:''},{id:'d',date:'2025-06-01',kind:'milestone'}];
+ const result=phaseTimelineLayout(entries,now);assert.equal(result.rows.length,4);assert.ok(result.ticks.length<=7);assert.ok(result.rows.every(r=>r.left>=0&&r.left+r.width<=100));
+ assert.ok(result.rows[0].left<result.rows[1].left);assert.ok(result.rows[0].left+result.rows[0].width>result.rows[1].left,'overlapping dates are represented on separate rows');
+ assert.equal(result.rows[2].ongoing,true);assert.ok(Math.abs(result.rows[2].left+result.rows[2].width-result.now)<.00001);assert.equal(result.rows[0].ongoing,false);assert.equal(result.rows[3].point,true);
+});
+test('short and coincident chapters remain separate records on the date axis',()=>{
+ const entries=[{id:'one',date:'2026-01-01',end:'2026-01-02'},{id:'two',date:'2026-01-01',end:'2026-01-02'}];const result=phaseTimelineLayout(entries,Date.parse('2026-10-26'));
+ assert.equal(result.rows.length,2);assert.equal(result.rows[0].left,result.rows[1].left);assert.equal(result.rows[0].duration,'1d');assert.ok(result.rows[0].width>0);assert.deepEqual(phaseTimelineLayout([]).rows,[]);
 });
