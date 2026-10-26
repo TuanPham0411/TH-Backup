@@ -35,6 +35,7 @@ before(async()=>{
 });
 after(async()=>{await new Promise(resolve=>server.close(resolve));await runtimePool.end();await pool.end();await rm(files,{recursive:true,force:true});});
 async function api(name,data={},cookie='',host='mes.th.io.vn',extra={}) {
+ if(name==='createIssue'&&data.occurrences===undefined)data={...data,occurrences:[{kind:'point',start:new Date().toISOString()}]};
  if(name==='createIssue'&&data.evidence===undefined)data={...data,evidence:[{name:'evidence.png',type:'image/png',size:100}]};
  const response=await fetch(base+(host==='th.io.vn'?'/api/portfolio':'/api/mes'),{method:'POST',headers:{'x-forwarded-host':host,'Content-Type':'application/json',cookie,...extra},body:JSON.stringify(host==='th.io.vn'?{action:name,data}:{name,data})});
  const text=await response.text();let body;try{body=JSON.parse(text);}catch{body=text;}
@@ -469,7 +470,7 @@ test('creation API requires photo/video evidence before allocating a ticket',asy
  const isolated=createApp(runtimePool,files).listen(0,'127.0.0.1');await new Promise(resolve=>isolated.once('listening',resolve));
  const cookie='th_mes='+(await pool.query("select mes_private.open_account_session('mes-owner') result")).rows[0].result.sessionToken;
  try{for(const evidence of [undefined,null,[],[null],[{name:'notes.pdf',type:'application/pdf',size:10}]]){
- const response=await fetch(`http://127.0.0.1:${isolated.address().port}/api/mes`,{method:'POST',headers:{'x-forwarded-host':'mes.th.io.vn','Content-Type':'application/json',cookie},body:JSON.stringify({name:'createIssue',data:{evidence}})});
+ const response=await fetch(`http://127.0.0.1:${isolated.address().port}/api/mes`,{method:'POST',headers:{'x-forwarded-host':'mes.th.io.vn','Content-Type':'application/json',cookie},body:JSON.stringify({name:'createIssue',data:{evidence,occurrences:[{kind:'point',start:new Date().toISOString()}]}})});
  assert.equal(response.status,400);assert.equal((await response.json()).code,'invalid-evidence');
  }}finally{await new Promise(resolve=>isolated.close(resolve));}
 });
@@ -578,7 +579,7 @@ test('only the requester can complete private pending tickets and publish withou
  pending=(await request('getMyPendingTickets')).body.rows.find(r=>r.id===id);
  const slot=await request('reservePendingFiles',{id,count:1});assert.equal(slot.status,200,JSON.stringify(slot.body));const path=slot.body.files[0].path;
  const grant=await request('uploadUrl',{path});assert.equal(grant.status,200,JSON.stringify(grant.body));assert.equal((await fetch(base+grant.body.url,{method:'PUT',headers:{'x-forwarded-host':'mes.th.io.vn','x-forwarded-for':'192.0.2.87','content-type':'image/png'},body:'uploaded evidence'})).status,200);
- const data={id,baseUpdatedAt:pending.updatedAt,process:'Updated OP 20',departmentId:department,description:'MO 1234 serial ABC updated evidence',richDocument:{version:1,ops:[{insert:'MO 1234 serial ABC updated evidence\n'}]},files:[{path,name:'evidence.png'}],status:'New',priority:'Critical',reporterUid:'mes-owner'};
+ const data={id,occurrences:[{kind:'point',start:new Date().toISOString()}],baseUpdatedAt:pending.updatedAt,process:'Updated OP 20',departmentId:department,description:'MO 1234 serial ABC updated evidence',richDocument:{version:1,ops:[{insert:'MO 1234 serial ABC updated evidence\n'}]},files:[{path,name:'evidence.png'}],status:'New',priority:'Critical',reporterUid:'mes-owner'};
  assert.notEqual((await request('completePendingTicket',data,owner)).status,200);
  assert.notEqual((await request('completePendingTicket',{...data,files:[]})).status,200);
  assert.ok(!(await request('read',{path:'issues'},'')).body.rows.some(r=>r.id===id));
@@ -591,5 +592,66 @@ test('only the requester can complete private pending tickets and publish withou
  const newSlot=await request('reservePendingFiles',{id:legacyId,count:1}),newPath=newSlot.body.files[0].path,newGrant=await request('uploadUrl',{path:newPath});assert.equal(newGrant.status,200,JSON.stringify(newGrant.body));
  assert.equal((await fetch(base+newGrant.body.url,{method:'PUT',headers:{'x-forwarded-host':'mes.th.io.vn','x-forwarded-for':'192.0.2.87','content-type':'image/png'},body:'legacy evidence'})).status,200);
  const oldSaved=await request('completePendingTicket',{...data,id:legacyId,baseUpdatedAt:123,files:[{path:newPath,name:'legacy.png'}]});assert.equal(oldSaved.status,200,JSON.stringify(oldSaved.body));assert.equal((await pool.query('select 1 from mes_private.pending_ticket_legacy where issue_id=$1',[legacyId])).rowCount,0);assert.equal((await request('readTicket',{id:legacyId},'')).status,200);
+
+});
+test('notification inboxes, templates, media and schedules enforce account/admin boundaries',async()=>{
+ const users=(await pool.query("select id,data->>'username' username from mes_private.records where collection='users' and data->>'username' in ('comment.a','comment.b')")).rows;
+ const a=users.find(u=>u.username==='comment.a').id,b=users.find(u=>u.username==='comment.b').id;
+ await pool.query("update mes_private.credentials set role='admin' where uid=$1",[b]);
+ const session=async uid=>'th_mes='+(await pool.query('select mes_private.open_account_session($1) result',[uid])).rows[0].result.sessionToken;
+ const owner=await session('mes-owner'),user=await session(a),admin=await session(b);
+ const request=(name,data={},cookie=admin)=>api(name,data,cookie,'mes.th.io.vn',{'x-forwarded-for':'192.0.2.91'});
+ try{
+  for(const action of ['getNotifications','getNotificationAdmin','markAllNotificationsRead'])assert.notEqual((await request(action,{},'')).status,200);
+  assert.notEqual((await request('getNotificationAdmin',{},user)).status,200);
+  const settings=await request('getNotificationAdmin');assert.equal(settings.status,200,JSON.stringify(settings.body));assert.equal(settings.body.rules.pending.time,'08:00');
+  const reservation=await request('reserveNotificationMedia',{title:'Notification image',type:'image/png',size:8});assert.equal(reservation.status,200,JSON.stringify(reservation.body));const mediaId=reservation.body.id;
+  const post=async(cookie)=>fetch(base+'/api/mes/uploads',{method:'POST',headers:{'x-forwarded-host':'mes.th.io.vn','x-forwarded-for':'192.0.2.91',cookie,'content-type':'application/json'},body:JSON.stringify({kind:'media',path:mediaId,type:'image/png',size:8})});
+  assert.notEqual((await post(user)).status,200);let response=await post(admin);assert.equal(response.status,200);const upload=await response.json();response=await fetch(base+'/api/mes/uploads/'+upload.id,{method:'PATCH',headers:{'x-forwarded-host':'mes.th.io.vn','x-forwarded-for':'192.0.2.91',cookie:admin,'content-type':'application/octet-stream','upload-offset':'0'},body:'png-data'});assert.equal(response.status,200,await response.text());
+  const mediaURL=base+'/api/mes/media/'+mediaId,mediaGet=cookie=>fetch(mediaURL,{headers:{'x-forwarded-host':'mes.th.io.vn','x-forwarded-for':'192.0.2.91',...(cookie?{cookie}:{})}});
+  assert.notEqual((await mediaGet('')).status,200);assert.notEqual((await mediaGet(user)).status,200);
+  const content={title:'Private notice test',description:'Personal notification',faultName:'Network error',faultMode:'Intermittent',icon:'warning',severity:'warning',media:[mediaId]};
+  assert.notEqual((await request('saveNotificationTemplate',{name:'Denied',content},user)).status,200);
+  const saved=await request('saveNotificationTemplate',{name:'Test template',content});assert.equal(saved.status,200,JSON.stringify(saved.body));
+  assert.notEqual((await request('saveNotificationTemplate',{name:'Bad media',content:{...content,media:['not-uploaded']}})).status,200);
+  const sent=await request('sendNotification',{content,audience:'selected',uids:[a],channels:['in_app','browser'],repeat:'none'});assert.equal(sent.status,200,JSON.stringify(sent.body));
+  const inbox=await request('getNotifications',{},user);assert.equal(inbox.status,200,JSON.stringify(inbox.body));const notice=inbox.body.rows.find(n=>n.content.title===content.title);assert.ok(notice);assert.equal(notice.recipient_uid,undefined);assert.ok(inbox.body.media.some(m=>m.id===mediaId));assert.equal((await mediaGet(user)).status,200);
+  assert.ok(!(await request('getNotifications',{},owner)).body.rows.some(n=>n.id===notice.id));
+  await request('markNotificationRead',{id:String(notice.id),uid:a},admin);assert.equal((await pool.query('select read_at from mes_private.notifications where id=$1',[notice.id])).rows[0].read_at,null);
+  await request('markNotificationRead',{id:String(notice.id)},user);assert.ok((await pool.query('select read_at from mes_private.notifications where id=$1',[notice.id])).rows[0].read_at);
+  const broadcast=await request('sendNotification',{content:{...content,title:'Broadcast notice',media:[]},audience:'all',uids:[],channels:['in_app'],repeat:'none'});assert.equal(broadcast.status,200);
+  const bNotice=(await request('getNotifications',{},admin)).body.rows.find(n=>n.content.title==='Broadcast notice');assert.ok(bNotice);await request('markAllNotificationsRead',{},user);assert.equal((await pool.query('select read_at from mes_private.notifications where id=$1',[bNotice.id])).rows[0].read_at,null);
+  const future=await request('sendNotification',{content:{...content,title:'Scheduled notice',media:[]},audience:'selected',uids:[a],channels:['in_app'],repeat:'daily',sendAt:'2030-01-01T01:00:00Z'});assert.equal(future.status,200,JSON.stringify(future.body));
+  assert.equal((await pool.query("select count(*)::int n from mes_private.notifications where event_key like $1",['job:'+future.body.id+':%'])).rows[0].n,0);
+  for(let i=0;i<2;i++)await runtimePool.query('select public.mes_notifications_tick($1)',['2030-01-01T01:00:00Z']);assert.equal((await pool.query("select count(*)::int n from mes_private.notifications where event_key like $1",['job:'+future.body.id+':%'])).rows[0].n,1);
+  await pool.query('select public.mes_notifications_tick($1)',['2030-01-02T01:00:00Z']);assert.equal((await pool.query("select count(*)::int n from mes_private.notifications where event_key like $1",['job:'+future.body.id+':%'])).rows[0].n,2);
+  await request('cancelNotificationJob',{id:future.body.id});await pool.query('select public.mes_notifications_tick($1)',['2030-01-03T01:00:00Z']);assert.equal((await pool.query("select count(*)::int n from mes_private.notifications where event_key like $1",['job:'+future.body.id+':%'])).rows[0].n,2);
+  const rescheduled=await request('updateNotificationJob',{id:future.body.id,content:{...content,title:'Changed schedule',media:[]},audience:'selected',uids:[a],channels:['in_app'],repeat:'none',sendAt:'2032-01-01T01:00:00Z'});assert.equal(rescheduled.status,200,JSON.stringify(rescheduled.body));
+  await pool.query('select public.mes_notifications_tick($1)',['2032-01-01T01:00:00Z']);assert.equal((await pool.query("select count(*)::int n from mes_private.notifications where event_key like $1",['job:'+future.body.id+':%'])).rows[0].n,3);
+  assert.notEqual((await request('sendNotification',{content,audience:'all',uids:[],channels:['in_app'],repeat:'daily',sendAt:'-infinity'})).status,200);
+  assert.notEqual((await request('deleteNotificationTemplate',{id:settings.body.rules.pending.templateId})).status,200);
+ }finally{await pool.query("update mes_private.credentials set role='user' where uid=$1",[b]);}
+});
+test('incident time is mandatory, pending reminders deduplicate daily, and ticket updates notify the requester',async()=>{
+ const uid=(await pool.query("select id from mes_private.records where collection='users' and data->>'username'='comment.a'")).rows[0].id;
+ const session=async id=>'th_mes='+(await pool.query('select mes_private.open_account_session($1) result',[id])).rows[0].result.sessionToken;
+ const owner=await session('mes-owner'),user=await session(uid),department=(await pool.query("select id from mes_private.records where collection='departments' limit 1")).rows[0].id;
+ const request=(name,data={},cookie=owner)=>api(name,data,cookie,'mes.th.io.vn',{'x-forwarded-for':'192.0.2.92'});
+ for(const occurrences of [undefined,[],[{kind:'point',start:'invalid'}],[{kind:'range',start:'2026-10-26T10:00:00Z',end:'2026-10-25T10:00:00Z'}]]){const response=await fetch(base+'/api/mes',{method:'POST',headers:{'x-forwarded-host':'mes.th.io.vn','x-forwarded-for':'192.0.2.92',cookie:user,'content-type':'application/json'},body:JSON.stringify({name:'createIssue',data:{occurrences,evidence:[{name:'image.png',size:8,type:'image/png'}]}})});assert.equal(response.status,400);assert.equal((await response.json()).code,'invalid-incident-time');}
+ const created=await request('createIssue',{reporterUid:uid,departmentId:department,process:'OP notice',description:'MO 123 notification lifecycle'},user);assert.equal(created.status,200,JSON.stringify(created.body));
+ const config=(await request('getNotificationAdmin')).body.rules.pending;const rule={...config,time:'08:00',minDays:0,days:['1'],channels:['in_app','browser']};assert.equal((await request('saveNotificationRule',{id:'pending',config:rule})).status,200);
+ assert.notEqual((await request('saveNotificationRule',{id:'pending',config:{...rule,time:'99:00'}})).status,200);assert.notEqual((await request('saveNotificationRule',{id:'pending',config:{...rule,days:[]}})).status,200);
+ await pool.query('select public.mes_notifications_tick($1)',['2031-01-06T00:59:00Z']);const event='pending:'+uid+':2031-01-06';assert.equal((await pool.query('select count(*)::int n from mes_private.notifications where recipient_uid=$1 and event_key=$2',[uid,event])).rows[0].n,0);
+ await pool.query('select public.mes_notifications_tick($1)',['2031-01-06T01:00:00Z']);await pool.query('select public.mes_notifications_tick($1)',['2031-01-06T05:00:00Z']);assert.equal((await pool.query('select count(*)::int n from mes_private.notifications where recipient_uid=$1 and event_key=$2',[uid,event])).rows[0].n,1);
+ await pool.query('select public.mes_notifications_tick($1)',['2031-01-07T01:00:00Z']);assert.equal((await pool.query('select count(*)::int n from mes_private.notifications where recipient_uid=$1 and event_key=$2',[uid,'pending:'+uid+':2031-01-07'])).rows[0].n,0,'Unselected weekdays must not send reminders');
+ await verifiedPhoto(created.body,user);const before=(await pool.query("select count(*)::int n from mes_private.notifications where recipient_uid=$1 and ticket_id=$2",[uid,created.body.id])).rows[0].n;
+ const update={id:created.body.id,operation:'handling',status:'In progress',priority:'High',progress:30,assessment:'Working on it'};assert.equal((await request('updateIssue',update)).status,200);
+ const after=(await pool.query("select content from mes_private.notifications where recipient_uid=$1 and ticket_id=$2 order by id desc",[uid,created.body.id])).rows;assert.equal(after.length,before+1);assert.ok(after[0].content.description.includes('30'));
+ assert.equal((await request('updateIssue',update)).status,200);assert.equal((await pool.query('select count(*)::int n from mes_private.notifications where recipient_uid=$1 and ticket_id=$2',[uid,created.body.id])).rows[0].n,after.length);
+ assert.notEqual((await request('updateIssue',{...update,progress:101})).status,200);assert.equal((await pool.query('select count(*)::int n from mes_private.notifications where recipient_uid=$1 and ticket_id=$2',[uid,created.body.id])).rows[0].n,after.length);
+ const ticket=(await request('readTicket',{id:created.body.id})).body;
+ const edited=await request('saveTicketEdit',{id:ticket.id,baseUpdatedAt:ticket.updatedAt,subject:'Administrator edited the description',process:ticket.process,departmentId:ticket.departmentId,issueTypeId:ticket.issueTypeId||'',reporterUid:uid,status:ticket.status,priority:ticket.priority,progress:ticket.progress,assessment:ticket.assessment||'',richDocument:{version:1,ops:[{insert:'Administrator edited the description with MO details.\n'}]},occurrences:ticket.occurrences,files:ticket.attachments.map((f,index)=>({path:f.path,name:f.name,slotIndex:f.slotIndex??index}))});assert.equal(edited.status,200,JSON.stringify(edited.body));assert.equal((await pool.query('select count(*)::int n from mes_private.notifications where recipient_uid=$1 and ticket_id=$2',[uid,ticket.id])).rows[0].n,after.length+1,'A full ticket edit must emit one notification, not one per internal update');
+ const alertConfig=(await request('getNotificationAdmin')).body.rules.priority_alert;assert.equal((await request('saveNotificationRule',{id:'priority_alert',config:{...alertConfig,enabled:true,audience:'admins',priorities:['Critical']}})).status,200);
+ assert.equal((await request('updateIssue',{...update,priority:'Critical',progress:40})).status,200);assert.ok((await pool.query("select 1 from mes_private.notifications where recipient_uid='mes-owner' and ticket_id=$1 and event_key like 'alert:%'",[ticket.id])).rowCount>0);assert.equal((await pool.query("select 1 from mes_private.notifications where recipient_uid=$1 and ticket_id=$2 and event_key like 'alert:%'",[uid,ticket.id])).rowCount,0);
 
 });

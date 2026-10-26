@@ -69,6 +69,7 @@ test("managed sessions reject inactive, future, expired and mismatched Windows p
 });
 test("feedback requires catalogs, bounded text and a meaningful description", () => {
   const d = {
+    occurrences:[{kind:"point",start:"2026-10-26T00:00:00Z"}],
     teamLeaderId: "a",
     departmentId: "b",
     process: "Station 1",
@@ -177,9 +178,9 @@ test("incident times allow multiple moments/ranges and reject invalid limits", (
   const point = {kind:'point',start:'2026-10-16T01:00:00Z'};
   const range = {kind:'range',start:'2026-10-16T02:00:00Z',end:'2026-10-16T03:00:00Z'};
   assert.equal(validateOccurrences([point,range,point]),'');
-  assert.equal(validateOccurrences([]),'');
+  assert.notEqual(validateOccurrences([]),'');
   for (const bad of [[{...point,start:'bad'}],[{...range,end:point.start}],[{...range,end:null}],Array(21).fill(point),[{...point,start:'1990-01-01T00:00:00Z'}]]) assert.notEqual(validateOccurrences(bad),'');
-  assert.equal(validateIssue({departmentId:'a',process:'Station',description:'Lỗi'}),'');
+  assert.notEqual(validateIssue({departmentId:'a',process:'Station',description:'Lỗi'}),'');
 });
 
 test('video evidence has bounded file types and separate limits from images',()=>{

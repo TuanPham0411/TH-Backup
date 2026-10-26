@@ -70,8 +70,10 @@ export function validateIssue(value) {
   return validateOccurrences(value.occurrences || []);
 }
 export function validateOccurrences(items) {
+  if (!Array.isArray(items) || items.length===0) return "Add at least one incident time.";
   if (!Array.isArray(items) || items.length > 20) return "Add no more than 20 incident times.";
   for (const item of items) {
+    if (!item || typeof item!=="object" || Array.isArray(item)) return "Choose a valid incident time.";
     if (!["point", "range"].includes(item.kind) || typeof item.start !== "string" || !Number.isFinite(Date.parse(item.start)) || new Date(item.start).getUTCFullYear() < 2000 || new Date(item.start).getUTCFullYear() > 2100) return "Choose a valid incident time.";
     if (item.kind === "range" && (typeof item.end !== "string" || !Number.isFinite(Date.parse(item.end)) || Date.parse(item.end) < Date.parse(item.start) || new Date(item.end).getUTCFullYear() > 2100)) return "The end time must be on or after the start time.";
   }

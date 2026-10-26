@@ -275,3 +275,12 @@ Deployment only installs this capability; it does not change the current Wi-Fi.
 Unsupported hosts/controllers report the feature unavailable. Physical network
 switch/rollback still needs a supervised device test; automated tests mock
 NetworkManager to avoid disrupting the production connection.
+
+
+### MES notification inbox and scheduling
+
+The bell beside the language selector opens the signed-in account's persistent inbox. Read state and attachment access are account-scoped. Administration → Notifications and alerts is available to owners and administrators: compose individual/all-account messages, save templates, edit or stop schedules, configure weekday/time/age/channel rules for pending reminders and select which ticket changes or priorities produce alerts. Notification cards support title, description, fault name/mode, severity, icon and up to five uploaded images/videos. Upload limits and the shared storage quota still apply.
+
+The Node service runs the database scheduler once a minute, independently of browser sessions. Pending reminders default to 08:00 Asia/Ho_Chi_Minh. Unique recipient/event keys and a transaction advisory lock prevent duplicate daily or scheduled delivery across retries/restarts. After downtime, a repeating schedule sends one catch-up delivery and advances to its next future slot. Browser alerts require explicit per-account/device permission and a MES tab remaining open; this is not an offline Web Push service. The inbox still receives messages while the user is offline. No email channel is enabled.
+
+New tickets and completion-queue submissions require at least one explicitly supplied incident moment/range. The creation time is never substituted. Existing ticket content/history is not rewritten by this upgrade.

@@ -19,7 +19,7 @@ try {
  revoke all on all tables in schema mes_private from public,th_api;
  revoke execute on all functions in schema mes_private from public,th_api;
  revoke execute on all functions in schema public from public,th_api;
- grant execute on function public.mes_dispatch(text,jsonb,jsonb),public.mes_google_owner_session(),public.mes_view(text,jsonb) to th_api;
+ grant execute on function public.mes_dispatch(text,jsonb,jsonb),public.mes_google_owner_session(),public.mes_view(text,jsonb),public.mes_notifications_tick(timestamptz) to th_api;
  grant usage on schema public,portfolio,extensions to th_api;
  grant select,insert,update,delete on all tables in schema portfolio to th_api;
  grant select,insert,update,delete on public.files,public.file_grants to th_api;`);

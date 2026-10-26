@@ -130,7 +130,6 @@
   #feedback-form .rich-toolbar.mobile-tools-open {display:flex;max-height:230px;overflow:auto}
   .feedback-classification .form-grid {gap:4px}
   .mobile-feedback-optional {display:block;width:100%;text-align:left;margin-top:12px;font-size:.875rem;background:var(--soft);color:var(--ink)}
-  .mobile-optional-closed .occurrence-section {display:none}
   .feedback-classification .occurrence-section {margin-top:12px}
   .feedback-evidence>label:not(.upload-zone) {display:none}
   .feedback-evidence .upload-zone {display:flex;flex-direction:column;align-items:center;gap:8px;margin:0;padding:18px 12px;border:1px dashed var(--accent);background:var(--soft)}

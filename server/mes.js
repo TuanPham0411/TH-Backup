@@ -1,4 +1,4 @@
-import {validateEvidence,validateIssue} from '../mes/site/model.js';
+import {validateEvidence,validateIssue,validateOccurrences} from '../mes/site/model.js';
 import {driveApi} from './drive-client.js';
 import {serveCloudMedia,prepareCloudOriginal,commitCloudRecord,cloudRecord,removeCloudFile} from './cloud-media.js';
 import {publishFile} from './publish.js';
@@ -85,7 +85,9 @@ export function mesRouter(pool,filesRoot) {
   if(typeof name!=='string'||!data||typeof data!=='object'||Array.isArray(data)||name==='finishDelete')return res.sendStatus(400);
   const actor={...actorFor(req.cookies.th_mes,req.headers['x-mes-tester']),ip:req.ip,agent:String(req.headers['user-agent']||'').slice(0,240)};
   if(!publicActions.has(name)&&!actor.session)return res.status(401).json({code:'unauthenticated',error:'Sign in first'});
+  if(name==='reserveNotificationMedia')data.storageQuota=storageQuota();
   if(name==='createIssue'){
+   const invalidTime=validateOccurrences(data.occurrences);if(invalidTime)return res.status(400).json({code:'invalid-incident-time',error:invalidTime});
    await dispatch('getSession',{},actor);
    const invalid=validateEvidence(data.evidence);
    if(invalid)return res.status(400).json({code:'invalid-evidence',error:invalid});

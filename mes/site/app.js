@@ -1,3 +1,5 @@
+import {initNotifications} from './notifications.js';
+import {initNotificationAdmin} from './notification-admin.js';
 import {initDashboardSignal} from './dashboard-signal.js';
 import {initPendingTickets} from './pending-tickets.js';
 import {initIncidentColors} from './incident-colors.js';
@@ -107,7 +109,7 @@ function toast(message) {
 }
 function errorMessage(e) {
   const c = String(e?.code || "");
-  if (["invalid-credentials", "rate-limited", "password-policy", "P0099", "P0409"].includes(c)) return e.message;
+  if (["invalid-credentials", "rate-limited", "password-policy", "invalid-incident-time", "P0099", "P0409"].includes(c)) return e.message;
   if (c === "owner-required") return "This Google account is not accepted as the MES owner. Use eric.scorp93@gmail.com. Reset sign-in session to switch accounts.";
   if (c === "backend-not-ready") return "Account service update required. Deploy the MES accounts SQL installer and the matching API.";
   if (c.includes("unauthenticated"))
@@ -243,6 +245,7 @@ function renderDirectories() {
   if (state.isOwner) renderSettings();
 }
 function renderForm() {
+  if (!$("occurrence-rows").children.length) addOccurrence("point",false);
   $("reporter-select").value = state.user?.displayName || "";
   $("require-windows").checked = state.requiresWindows;
   $("identity-notice").textContent = state.preview
@@ -1584,7 +1587,7 @@ function readOccurrences() {
     return { kind: row.dataset.kind, start: start ? new Date(start).toISOString() : "", ...(row.dataset.kind === "range" ? { end: end ? new Date(end).toISOString() : "" } : {}) };
   });
 }
-function addOccurrence(kind) {
+function addOccurrence(kind,focus=true) {
   if ($("occurrence-rows").children.length >= 20) { toast("Add no more than 20 incident times."); return; }
   const row = el("div", undefined, "occurrence-row"); row.dataset.kind = kind;
   row.append(el("span", kind === "range" ? "Time range" : "Moment", "occurrence-kind"));
@@ -1599,7 +1602,7 @@ function addOccurrence(kind) {
     label.append(input); row.append(label);
   }
   const remove = el("button", "Remove", "text-button"); remove.type = "button"; remove.onclick = () => row.remove(); row.append(remove);
-  $("occurrence-rows").append(row); row.querySelector("input").focus();
+  $("occurrence-rows").append(row); if(focus)row.querySelector("input").focus();
 }
 function renderOccurrences(items) {
   const section = el("section", undefined, "incident-summary"); section.append(el("h3", "Incident times"));
@@ -1702,6 +1705,8 @@ initAppearancePreferences(()=>({user:state.user,preview:state.preview,isOwner:st
 initDashboardPreferences(()=>({user:state.user,preview:state.preview,isAdmin:state.isAdmin||state.isOwner}));
 initDashboardSignal();
 compactDashboard();
+initNotifications(()=>({user:state.user,preview:state.preview}),navigate,openIssue);
+initNotificationAdmin(()=>({user:state.user,preview:state.preview,isAdmin:state.isAdmin||state.isOwner}));
 initSettingsTabs(()=>({isOwner:state.isOwner,isAdmin:state.isAdmin}));
 initializeLanguage(() => { workspace.render(); feedbackEditor.setLanguage(); editEditor.setLanguage(); renderAll(); renderTimeline(); updateIdentity(); if (state.selected) { const issue = state.issues.find(i => i.id === state.selected); if (issue) renderDetail(issue); } });
 selectOptions($("issue-status"), [

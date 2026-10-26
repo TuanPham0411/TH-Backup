@@ -1,3 +1,4 @@
+import {startNotificationScheduler} from './notifications.js';
 import {wifiRouter} from './wifi.js';
 import {resolve} from 'node:path';
 import {runtimeSites,hostOf} from './sites.js';
@@ -53,6 +54,7 @@ if(process.env.NODE_ENV!=='test') {
  const filesRoot=process.env.FILES_ROOT||'/var/lib/th-app/files';
  const app=createApp(pool,process.env.FILES_ROOT||'/var/lib/th-app/files');
  const server=app.listen(Number(process.env.PORT||3000),process.env.HOST||'127.0.0.1');server.requestTimeout=180000;
+ const stopNotifications=startNotificationScheduler(pool,()=>app.locals.maintenance.blocked||backupActive());
  const cleanup=setInterval(()=>{if(app.locals.maintenance.blocked||backupActive())return;return cleanupUploads(pool,filesRoot).then(()=>pool.query("delete from public.file_grants where expires<now(); delete from portfolio.sessions where expires<now(); delete from portfolio.tokens where expires<now()")).catch(()=>{});},3600000);cleanup.unref();
- process.on('SIGTERM',()=>{clearInterval(cleanup);server.close(()=>pool.end().then(()=>process.exit(0)));});
+ process.on('SIGTERM',()=>{clearInterval(cleanup);stopNotifications();server.close(()=>pool.end().then(()=>process.exit(0)));});
 }
