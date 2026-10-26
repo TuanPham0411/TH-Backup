@@ -7,7 +7,7 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: pi-deployment
+  group: ${{ github.event_name == 'pull_request' && format('pi-pr-{0}', github.event.pull_request.number) || 'pi-deployment' }}
   cancel-in-progress: false
 jobs:
   build:
