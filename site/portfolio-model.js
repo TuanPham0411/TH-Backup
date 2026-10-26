@@ -11,11 +11,11 @@ export function normalizePortfolio(input){
  const value=structuredClone(input);value.copy||={};value.sections||={};value.mediaTypes||={};
  value.hobbies||=[];value.notes||=[];value.titleStyles||={};value.mediaDescriptions||={};
  if(!value.toolkit){const tags=new Map();for(const skill of value.skills||[])for(const title of skill.tags||[]){if(tags.has(title)){if(skill.public)tags.get(title).public=true;continue;}tags.set(title,{id:'tool-'+tags.size,title,subtitle:'',description:'',tags:[],media:[],public:skill.public===true});}value.toolkit=[...tags.values()];}
- for(const item of value.education||[]){if(!item.date){const years=(item.subtitle||'').match(/(?:19|20)\d{2}/g);if(years?.length){item.date=years[0]+'-01-01';item.end=(years[1]||years[0])+'-12-31';item.datePrecision='year';}}} Object.assign(value.profile,{introVideo:value.profile.introVideo||'',introPoster:value.profile.introPoster||'',introPublic:value.profile.introPublic===true,heroImage:value.profile.heroImage||'asset:/images/ot-hero.webp',identityLine:value.profile.identityLine??'PERSONAL HOME · CV · PORTFOLIO'});
+ for(const item of value.education||[]){if(!item.date){const years=(item.subtitle||'').match(/(?:19|20)\d{2}/g);if(years?.length){item.date=years[0]+'-01-01';item.end=(years[1]||years[0])+'-12-31';item.datePrecision='year';}}} Object.assign(value.profile,{introVideo:value.profile.introVideo||'',introPoster:value.profile.introPoster||'',introPublic:value.profile.introPublic===true,heroImage:value.profile.heroImage||'asset:/images/ot-hero.webp',aboutImage:value.profile.aboutImage||value.profile.heroImage||'asset:/images/ot-hero.webp',identityLine:value.profile.identityLine??'PERSONAL HOME · CV · PORTFOLIO'});
  for(const key of groups)value[key]||=[];return value;
 }
 export function referencedMedia(input){
- const value=normalizePortfolio(input),refs=new Set();for(const key of ['portrait','heroImage','music','introVideo','introPoster'])if(value.profile[key])refs.add(value.profile[key]);for(const group of groups)for(const item of value[group])for(const id of item.media||[])refs.add(id);
+ const value=normalizePortfolio(input),refs=new Set();for(const key of ['portrait','heroImage','aboutImage','music','introVideo','introPoster'])if(value.profile[key])refs.add(value.profile[key]);for(const group of groups)for(const item of value[group])for(const id of item.media||[])refs.add(id);
  // Descriptive media inherits the visibility of its parent image. A visited set
  // bounds cycles without exposing descriptions attached only to private photos.
  for(const id of refs)for(const child of value.mediaDescriptions[id]?.media||[])refs.add(child);
@@ -26,7 +26,7 @@ export function validatePortfolio(input){
  const value=normalizePortfolio(input),text=(v,max)=>typeof v==='string'&&v.length<=max;
  if(!Number.isInteger(value.version)||!value.profile)throw Error('Invalid content version');
  const p=value.profile;
- for(const [key,max]of Object.entries({name:100,headline:160,identityLine:160,summary:1000,about:8000,email:254,phone:40,portrait:100,heroImage:100,music:100,musicTitle:160,introVideo:100,introPoster:100}))if(!text(p[key],max))throw Error(`Invalid ${key}`);
+ for(const [key,max]of Object.entries({name:100,headline:160,identityLine:160,summary:1000,about:8000,email:254,phone:40,portrait:100,heroImage:100,aboutImage:100,music:100,musicTitle:160,introVideo:100,introPoster:100}))if(!text(p[key],max))throw Error(`Invalid ${key}`);
  if((p.email&&!/^\S+@\S+\.\S+$/.test(p.email))||!/^[+\d ()-]*$/.test(p.phone)||typeof p.musicPublic!=='boolean'||typeof p.introPublic!=='boolean')throw Error('Invalid profile');
  if(!value.copy||Array.isArray(value.copy)||typeof value.copy!=='object'||Object.keys(value.copy).length>500||Object.entries(value.copy).some(([key,v])=>! /^[a-zA-Z0-9_-]{1,100}$/.test(key)||!text(v,8000)))throw Error('Invalid page text');
  if(!value.sections||typeof value.sections!=='object'||Array.isArray(value.sections)||Object.entries(value.sections).some(([key,v])=>![...groups,'intro'].includes(key)||typeof v!=='boolean'))throw Error('Invalid section visibility');

@@ -28,7 +28,7 @@ export function portfolioContentRouter(pool,root){
  const metadata=new Map(rows.map(m=>[m.id,m.type]));
  if(value.profile.music&&!metadata.get(value.profile.music)?.startsWith('audio/'))throw error(400,'Choose an audio track');
  if(value.profile.portrait&&!value.profile.portrait.startsWith('asset:')&&!metadata.get(value.profile.portrait)?.startsWith('image/'))throw error(400,'Choose a portrait image');
- for(const key of ['portrait','heroImage','introPoster'])if(value.profile[key]&&!value.profile[key].startsWith('asset:')&&!metadata.get(value.profile[key])?.startsWith('image/'))throw error(400,'Choose an image for '+key);
+ for(const key of ['portrait','heroImage','aboutImage','introPoster'])if(value.profile[key]&&!value.profile[key].startsWith('asset:')&&!metadata.get(value.profile[key])?.startsWith('image/'))throw error(400,'Choose an image for '+key);
  if(value.profile.introVideo&&!metadata.get(value.profile.introVideo)?.startsWith('video/'))throw error(400,'Choose an MP4 or WebM introduction video');
  for(const key of groups)for(const item of value[key])for(const id of item.media)if(!id.startsWith('asset:')&&!/^(image|video)\//.test(metadata.get(id)||''))throw error(400,'Galleries accept images, GIF and video');
  for(const [id,desc]of Object.entries(value.mediaDescriptions)){

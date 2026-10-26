@@ -29,7 +29,7 @@ function renderProjects(){
  $('project-list').replaceChildren();$('project-empty').hidden=!!list.length;
  $('project-count').textContent=`${list.length} of ${projects.length} projects`;
  for(const p of list){
-  const card=element('article',undefined,'project-card');card.setAttribute('aria-labelledby',`project-title-${p.id}`);if(p.public===false)card.append(element('span','🔒 Riêng tư','private-badge'));
+  const card=element('article',undefined,'project-card');card.setAttribute('aria-labelledby',`project-title-${p.id}`);if(p.public===false)card.append(element('span','🔒 Private','private-badge'));
   const body=element('div',undefined,'project-body'),heading=element('div',undefined,'project-heading');
   const art=element('div',undefined,`project-art ${p.category.toLowerCase()}`);art.setAttribute('aria-hidden','true');art.append(element('span',p.icon));
   const intro=element('div',undefined,'project-intro'),meta=element('div',undefined,'project-meta');

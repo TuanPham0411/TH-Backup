@@ -28,3 +28,9 @@ test('individual toolkit skills can be edited and hidden separately from skill c
  const value=normalizePortfolio(defaultPortfolio);assert.ok(value.toolkit.some(e=>e.title==='Python'));
  const skill=value.toolkit.find(e=>e.title==='Python');skill.title='Python tools';skill.public=false;assert.equal(publicPortfolio(value).toolkit.some(e=>e.id===skill.id),false);
 });
+
+test('separate About background is a validated public image reference',()=>{
+ const value=normalizePortfolio(defaultPortfolio);value.profile.aboutImage='about-image';value.mediaTypes['about-image']='image/webp';
+ validatePortfolio(value);assert.ok(referencedMedia(value).has('about-image'));assert.ok(referencedMedia(publicPortfolio(value)).has('about-image'));
+ assert.throws(()=>validatePortfolio({...value,profile:{...value.profile,aboutImage:'x'.repeat(101)}}));
+});
