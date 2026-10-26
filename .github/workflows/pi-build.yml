@@ -150,3 +150,13 @@ jobs:
         run: |
           set -euo pipefail
           curl --fail --silent --show-error --retry 3 --retry-delay 3 --max-time 20 -H 'Content-Type: application/json' --data '{"name":"read","data":{"path":"issues"}}' https://mes.th.io.vn/api/mes | python3 deploy/check-evidence.py
+      - name: Verify portfolio social preview and public stories
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --retry 3 --retry-delay 3 --max-time 20 https://th.io.vn/ -o "$RUNNER_TEMP/portfolio.html"
+          python3 -c 'from pathlib import Path; import os; page=Path(os.environ["RUNNER_TEMP"]+"/portfolio.html").read_text(); assert "property=\"og:image\"" in page and "https://th.io.vn/images/portfolio-social.jpg" in page and "summary_large_image" in page'
+          curl --fail --silent --show-error --retry 3 --retry-delay 3 --max-time 20 https://th.io.vn/images/portfolio-social.jpg -o "$RUNNER_TEMP/portfolio-social.jpg"
+          python3 -c 'from pathlib import Path; import os; image=Path(os.environ["RUNNER_TEMP"]+"/portfolio-social.jpg").read_bytes(); assert image.startswith(bytes([255,216,255])) and len(image)>100000'
+          curl --fail --silent --show-error --retry 3 --retry-delay 3 --max-time 20 https://th.io.vn/api/portfolio/content/ | python3 -c 'import json,sys; data=json.load(sys.stdin); assert isinstance(data["journey"],list); assert all(e.get("public") is True for key in ["journey","skills","family","activities","projects","education"] for e in data[key])'
+          status=$(curl --silent --show-error --max-time 20 -o /dev/null -w '%{http_code}' https://th.io.vn/api/portfolio/content/admin)
+          test "$status" = 403
