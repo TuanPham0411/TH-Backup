@@ -1,3 +1,4 @@
+import {createEditorControl} from './editor-control.js';
 import {el,getPortfolioView} from './journey.js';
 import {groups,mediaURL,normalizePortfolio,validatePortfolio,publicPortfolio} from './portfolio-model.js';
 import {pageCopy,copyForElement} from './page-copy.js';
@@ -53,7 +54,7 @@ export function portfolioAdminUser(user,onSave){
    if(!list)return;for(const item of draft[section.value]){const option=el('option',`${item.public?'● Công khai':'○ Riêng tư'} · ${item.title}`);option.value=item.id;entry.append(option);}if(id)entry.value=id;remove.disabled=!entry.value;
   }
   function field(target,key,label,{type='text',area=false,wide=false,max=8000,value,onChange}={}){
-   const wrap=el('label',label,wide?'wide':''),control=el(area?'textarea':'input');control.type=type;
+   const wrap=el('label',label,wide?'wide':''),control=createEditorControl(document,{area,type});
    if(type==='checkbox'){wrap.classList.add('editor-checkbox');control.checked=target[key]===true;}else control.value=value??target[key]??'';
    if(type!=='checkbox'&&type!=='date')control.maxLength=max;
    control.oninput=()=>{target[key]=type==='checkbox'?control.checked:control.value;onChange?.(target,control);changed();};wrap.append(control);fields.append(wrap);return control;
