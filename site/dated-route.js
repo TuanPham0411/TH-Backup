@@ -11,7 +11,15 @@ export function datedRoute(items,now=Date.now()){
  const fraction=date=>(Date.parse(date)-min)/span;
  const path=(from=0,to=1,offset=0)=>{const count=Math.max(2,Math.ceil((to-from)*700));return Array.from({length:count+1},(_,i)=>{const p=at(from+(to-from)*i/count,offset);return`${i?'L':'M'} ${p.x.toFixed(2)} ${p.y.toFixed(2)}`;}).join(' ');};
  const lanes=[];const intervals=items.filter(i=>i.kind!=='milestone').map(item=>{const start=fraction(item.date),end=fraction(endDate(item));let lane=lanes.findIndex(e=>e<=start);if(lane<0)lane=lanes.length;lanes[lane]=end;const offset=23+lane*9;return{item,start,end,lane,path:path(start,end,offset),a:at(start,offset),b:at(end,offset)};});
- const captions=[];for(const point of points){Object.assign(point,at(fraction(point.date)));point.fraction=fraction(point.date);let left=Math.max(125,Math.min(875,point.x)),top=point.y+49;while(captions.some(p=>Math.abs(p.left-left)<225&&Math.abs(p.top-top)<78))top+=80;point.label={left,top};captions.push(point.label);}
+ const captions=[];for(const point of points){Object.assign(point,at(fraction(point.date)));point.fraction=fraction(point.date);
+ // Labels live between straight lanes. Their leaders, not the date pins, move.
+ const row=Math.min(rows-1,Math.round((point.y-70)/pitch)),left=Math.max(125,Math.min(875,point.x));
+ const labelHeight=40+point.events.reduce((sum,event)=>sum+Math.ceil((event.item.title.length+14)/30)*18,0);
+ let top=70+row*pitch+58;
+ while(captions.some(p=>Math.abs(p.left-left)<225&&top<p.top+p.height+12&&top+labelHeight+12>p.top))top=Math.max(...captions.filter(p=>Math.abs(p.left-left)<225&&top<p.top+p.height+12&&top+labelHeight+12>p.top).map(p=>p.top+p.height+12));
+ point.label={left,top,height:labelHeight};captions.push(point.label);
+ }
+
  const ticks=[];for(let year=new Date(min).getUTCFullYear()+1;year<=new Date(max).getUTCFullYear();year++){const f=(Date.UTC(year,0,1)-min)/span;ticks.push({year,...at(f)});}
- return{min,max,length,height:Math.max(height,...captions.map(p=>p.top+110)),points,intervals,ticks,path:path(),at};
+ return{min,max,length,height:Math.max(height,...captions.map(p=>p.top+p.height+24)),points,intervals,ticks,path:path(),at};
 }
