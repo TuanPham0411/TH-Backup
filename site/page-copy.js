@@ -1,6 +1,6 @@
 // Keep editable copy as plain text. Text nodes preserve links, spans and layout.
 export const pageCopy=[];
-const roots=['.site-header .logo','.site-header nav','.home-hub','.focus-strip','.hero .button-row','.hero-bottom','#about .portrait-caption','#about>div:last-child','#personal-intro .section-heading','#expertise .section-heading','#experience .section-heading','.journey-intro','#projects .section-heading','.project-toolbar [data-filter]','#personal-activities .section-heading','#personal-hobbies .section-heading','#personal-family .section-heading','#personal-notes .section-heading','#contact','.site-footer','.image-rights'];
+const roots=['.site-header .logo','.site-header nav','.home-hub','.focus-strip','.hero .button-row','.hero-bottom','#about .portrait-caption','#about>div:last-child','#personal-intro .section-heading','#expertise .section-heading','#experience .section-heading','.journey-intro','.journey-key','#projects .section-heading','.project-toolbar [data-filter]','#personal-activities .section-heading','#personal-hobbies .section-heading','#personal-family .section-heading','#personal-notes .section-heading','#contact','.site-footer','.image-rights'];
 for(const option of document.querySelectorAll('#contact-topic option'))option.value=option.textContent;
 let index=0;const seen=new Set();
 for(const selector of roots)for(const root of document.querySelectorAll(selector)){

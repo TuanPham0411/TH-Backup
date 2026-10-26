@@ -707,3 +707,26 @@ test('personal home supports GIF/video chapters, private introduction posters an
  draft.profile.introVideo=gif;const wrong=await request('',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(draft)},cookie);assert.equal(wrong.status,400,'introduction needs actual video metadata');
  const badCopy={...draft,copy:{unsafe:{html:'bad'}}};const invalid=await request('',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(badCopy)},cookie);assert.equal(invalid.status,400);
 });
+
+test('portfolio descriptions inherit media visibility, title styles persist and visit history is administrator-only',async()=>{
+ const {rows:[owner]}=await pool.query("insert into portfolio.users(email,password,name,verified,admin) values('layout-owner@example.test',extensions.crypt('test-owner-password',extensions.gen_salt('bf',4)),'Layout Owner',true,true) returning *");
+ const {rows:[member]}=await pool.query("insert into portfolio.users(email,password,name,verified) values('visitor-member@example.test',extensions.crypt('test-user-password',extensions.gen_salt('bf',4)),'Visitor Member',true) returning *");
+ const ownerLogin=await api('login',{email:owner.email,password:'test-owner-password'},'','th.io.vn',{'x-forwarded-for':'192.0.2.231'}),memberLogin=await api('login',{email:member.email,password:'test-user-password'},'','th.io.vn',{'x-forwarded-for':'192.0.2.232'});
+ const request=(path='',options={},cookie='')=>fetch(base+'/api/portfolio/content/'+path,{...options,headers:{'x-forwarded-host':'th.io.vn','x-forwarded-for':'192.0.2.233',...(cookie?{cookie}:{}),...options.headers}});
+ const upload=async(type,body)=>{const r=await request('upload',{method:'POST',headers:{'Content-Type':type},body},ownerLogin.cookie);assert.equal(r.status,201);return(await r.json()).id;};
+ const image=await upload('image/gif',Buffer.from('GIF89a-private-image')),child=await upload('video/webm',Buffer.from('1a45dfa3000000000000000000000000','hex'));
+ const draft=await(await request('admin',{},ownerLogin.cookie)).json();draft.hobbies.push({id:'described-image',title:'Private caption parent',subtitle:'',description:'',tags:[],media:[image],public:false});draft.mediaDescriptions[image]={title:'A caption',description:'With private video',media:[child]};draft.titleStyles={'profile-name':{font:'Georgia',size:42,color:'#bbaacc'}};
+ const save=async()=>{const r=await request('',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(draft)},ownerLogin.cookie);assert.equal(r.status,200,await r.clone().text());draft.version=(await r.json()).version;};await save();
+ let visible=await(await request('')).json();assert.equal(visible.mediaDescriptions[image],undefined);assert.equal((await request('media/'+child)).status,404);assert.equal((await request('media/'+child,{},ownerLogin.cookie)).status,200);
+ draft.hobbies.at(-1).public=true;draft.sections.hobbies=true;await save();visible=await(await request('')).json();assert.equal(visible.mediaDescriptions[image].title,'A caption');assert.equal((await request('media/'+child)).status,200);assert.equal(visible.titleStyles['profile-name'].font,'Georgia');
+ draft.titleStyles['profile-name'].font='url(unsafe)';const bad=await request('',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(draft)},ownerLogin.cookie);assert.equal(bad.status,400);
+ assert.equal((await request('visits')).status,403);assert.equal((await request('visits',{},memberLogin.cookie)).status,403);
+ const payload={path:'/#experience',uid:owner.id,referrer:'https://search.example.test/path?secret=must-not-save'};
+ const visit=await request('visits',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});assert.equal(visit.status,204);const viewerCookie=visit.headers.get('set-cookie').split(';')[0];assert.match(visit.headers.get('set-cookie'),/HttpOnly/);assert.match(visit.headers.get('set-cookie'),/Secure/);
+ const before=(await pool.query('select count(*)::int n from portfolio.visits')).rows[0].n;
+ await request('visits',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)},viewerCookie);assert.equal((await pool.query('select count(*)::int n from portfolio.visits')).rows[0].n,before,'reload within 30 seconds deduplicates anonymous view');
+ assert.equal((await request('visits',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({path:'/?password=secret'})},viewerCookie)).status,400);
+ await request('visits',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({path:'/#about'})},memberLogin.cookie);
+ const history=await(await request('visits',{},ownerLogin.cookie)).json();assert.ok(history.rows.some(r=>r.role==='viewer'&&!r.account_email));assert.ok(history.rows.some(r=>r.role==='user'&&r.account_email===member.email));assert.ok(history.rows.every(r=>!r.visitor_hash));assert.equal(history.rows.find(r=>r.role==='viewer').referrer,'https://search.example.test');
+ assert.equal((await request('visits?from=bad',{},ownerLogin.cookie)).status,400);
+});
