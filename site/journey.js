@@ -1,17 +1,15 @@
 import {portraitVideo} from './portrait-video.js';
 import {setPhotoDescriptions,describePhoto} from './photo-description.js';
 import {setTitleStyles,styledTitle,applyPageTitles} from './title-style.js';
-import {timelineEntries,phaseTimelineLayout} from './journey-layout.js';
+import {timelineEntries,routePoint,routeAt,dateSlot,rangePath} from './journey-layout.js';
 import {setMediaTypes,mediaElement,mediaType,stopMedia} from './portfolio-media.js';
 import {applyCopy} from './page-copy.js';
 import './journey.css';
-import './phase-timeline.css';
 import {defaultPortfolio,mediaURL,normalizePortfolio} from './portfolio-model.js';
 const ns='http://www.w3.org/2000/svg';
 export const el=(tag,text,cls)=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(cls)n.className=cls;return n;};
 const svg=(tag,attrs)=>{const n=document.createElementNS(ns,tag);for(const [k,v]of Object.entries(attrs))n.setAttribute(k,v);return n;};
-export const journeyDate=(value,precision)=>precision==='year'?value.slice(0,4):new Date(value+'T00:00:00Z').toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric',timeZone:'UTC'});
-export const dateLabel=item=>item.date?journeyDate(item.date,item.datePrecision)+(item.end?' — '+journeyDate(item.end,item.datePrecision):item.kind==='milestone'?'':' — Present'):item.subtitle;
+export const dateLabel=item=>{const format=value=>item.datePrecision==='year'?value.slice(0,4):new Date(value+'T00:00:00Z').toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric',timeZone:'UTC'});return item.date?format(item.date)+(item.end?' — '+format(item.end):item.kind==='milestone'?'':' — Present'):item.subtitle;};
 const itemKey=item=>`item-${item.sourceGroup||item.group||'journey'}-${item.id}`;
 
 export const storyGallery=(item)=>{const wrap=el('div',undefined,'story-gallery');for(const id of item.media||[])wrap.append(mediaElement(id,item.title));return wrap;};
@@ -29,33 +27,39 @@ export function drawJourney(items){
  const host=document.getElementById('experience-list');host.replaceChildren();host.className='journey-track';
  const ordered=items.toSorted((a,b)=>a.date.localeCompare(b.date)||a.title.localeCompare(b.title));
  host.hidden=!ordered.length;if(!ordered.length){host.append(el('p','New chapters are on their way.','muted'));return;}
- const layout=phaseTimelineLayout(ordered);host.classList.add('phase-timeline');host.style.removeProperty('--journey-height');
- const backdrop=svg('svg',{viewBox:`0 0 1000 ${Math.max(500,ordered.length*126)}`,preserveAspectRatio:'none','aria-hidden':'true',class:'journey-signal'});
- for(let i=0;i<5;i++){const y=40+i*Math.max(500,ordered.length*126)/5;backdrop.append(svg('path',{d:`M -20 ${y} H 170 l 35 -18 h 100 l 40 35 h 100 l 35 -35 h 100 l 30 18 H 1020`,class:'signal-branch',style:`animation-delay:${-i*2}s`}));}host.append(backdrop);
- const axis=el('div',undefined,'phase-axis'),axisLabel=el('span','CHAPTER / PERIOD','phase-axis-label'),scale=el('div',undefined,'phase-axis-scale');
- for(const tick of layout.ticks){const label=el('span',tick.label);label.style.left=tick.position+'%';scale.append(label);}axis.append(axisLabel,scale);host.append(axis);
- layout.rows.forEach(({item,left,width,point:single,ongoing,duration},i)=>{
- const point=el('article',undefined,`journey-stop phase-row${item.kind==='education'?' education-stop':''}`);if(item.public===false){point.classList.add('private-entry');point.setAttribute('data-visibility','Riêng tư');}
- const button=el('button',undefined,'phase-open');button.type='button';button.setAttribute('aria-label',`Read ${item.title}, ${dateLabel(item)}`);
- const icon=el('span',item.kind==='education'?'🎓':String(i+1).padStart(2,'0'),'phase-icon'),copy=el('div',undefined,'phase-copy');
- copy.append(styledTitle(el('h3',item.title),itemKey(item)),el('p',item.subtitle,'phase-company'),el('p',dateLabel(item),'journey-date'));if(item.public===false)copy.append(el('span','🔒 Riêng tư','phase-private'));button.append(icon,copy);button.onclick=()=>openStory(item,i);
- const plot=el('div',undefined,'phase-plot');plot.setAttribute('aria-label',dateLabel(item));
- for(const tick of layout.ticks){const line=el('i',undefined,'phase-gridline');line.style.left=tick.position+'%';line.setAttribute('aria-hidden','true');const label=el('span',tick.label,'phase-tick-label');label.style.left=tick.position+'%';label.setAttribute('aria-hidden','true');plot.append(line,label);}
- const rail=el('div',undefined,'phase-rail');rail.setAttribute('aria-hidden','true');plot.append(rail);
- const bar=el('button',undefined,`phase-bar${ongoing?' phase-ongoing':''}${single?' phase-milestone':''}`);bar.type='button';bar.style.left=left+'%';bar.style.width=width+'%';bar.setAttribute('aria-label',`${item.title}: ${dateLabel(item)}. ${duration}. Open details`);bar.onclick=()=>openStory(item,i);
- const startCap=el('span',undefined,'phase-start');startCap.setAttribute('aria-hidden','true');bar.append(startCap);
- if(!single){const endCap=el('span',ongoing?'›':'','phase-end');endCap.setAttribute('aria-hidden','true');bar.append(endCap);if(width>12)bar.append(el('span',duration,'phase-duration'));}
- plot.append(bar);
- const endpoints=el('div',undefined,'phase-endpoints');endpoints.append(el('span',(single?'◆ ':'● ')+journeyDate(item.date,item.datePrecision)),el('span',duration,'phase-duration-summary'),el('span',single?'':ongoing?'→ Present':'○ '+journeyDate(item.end,item.datePrecision)));plot.append(endpoints);
+ const rows=Math.ceil((ordered.length+1)/3),height=rows*260;host.style.setProperty('--journey-height',height+'px');
+ const backdrop=svg('svg',{viewBox:`0 0 1000 ${height}`,preserveAspectRatio:'none','aria-hidden':'true',class:'journey-signal'});
+ for(let i=0;i<5;i++){const y=40+i*height/5;backdrop.append(svg('path',{d:`M -20 ${y} H 170 l 35 -18 h 100 l 40 35 h 100 l 35 -35 h 100 l 30 18 H 1020`,class:'signal-branch',style:`animation-delay:${-i*2}s`}));}host.append(backdrop);
+ const art=svg('svg',{viewBox:`0 0 1000 ${height}`,preserveAspectRatio:'none','aria-hidden':'true',class:'journey-road'});let path='';
+ for(let i=0;i<=ordered.length;i++){const p=routePoint(i);if(!i){path=`M ${p.x} ${p.y}`;continue;}const previous=routePoint(i-1);path+=p.y===previous.y?` H ${p.x}`:` C ${p.x+(p.x>500?140:-140)} ${previous.y} ${p.x+(p.x>500?140:-140)} ${p.y} ${p.x} ${p.y}`;}
+ art.append(svg('path',{d:path,class:'road-shadow'}),svg('path',{d:path,class:'road-base'}),svg('path',{d:path,class:'road-lane'}),svg('path',{d:path,class:'road-flow'}));host.append(art);
+ const laneEnds=[];for(let i=0;i<ordered.length;i++){
+ const item=ordered[i];if(item.kind==='milestone')continue;
+ const start=Date.parse(item.date),end=item.end?Date.parse(item.end):Date.now();
+ let lane=laneEnds.findIndex(value=>value<=start);if(lane<0)lane=laneEnds.length;laneEnds[lane]=end;
+ const finish=Math.max(i+.04,dateSlot(ordered,end)),offset=8+lane*5;
+ const color=item.kind==='education'?'#b8a1ff':`hsl(${165+i/Math.max(1,ordered.length-1)*75} 65% 65%)`;
+ const band=svg('path',{d:rangePath(i,finish,lane),class:`journey-duration ${item.kind==='education'?'education-duration':'work-duration'}${item.end?'':' ongoing-duration'}`,style:`stroke:${color}`});
+ const title=svg('title',{});title.textContent=`${item.title}: ${dateLabel(item)}`;band.append(title);art.append(band);
+ for(const [slot,isEnd]of [[i,false],[finish,true]]){
+ const p=routeAt(slot),cap=svg('circle',{cx:p.x,cy:p.y+offset,r:isEnd?4:3,class:`journey-range-cap${isEnd?' range-end':' range-start'}`,style:`stroke:${color};fill:${isEnd?'#0b1925':color}`});
+ const label=svg('title',{});label.textContent=`${item.title} · ${isEnd?(item.end?'End: '+item.end:'Ongoing · Present'):'Start: '+item.date}`;cap.append(label);art.append(cap);
+ }
+ }
+
+ const end=routePoint(ordered.length);art.append(svg('circle',{cx:end.x,cy:end.y,r:5,class:'journey-now'}));
+ const first=Date.parse(ordered[0].date),last=Date.parse(ordered.at(-1).date),span=Math.max(1,last-first);
+ ordered.forEach((item,i)=>{
+ const {x,y}=routePoint(i),row=Math.floor(i/3),left=x/10;
+ const point=el('div',undefined,`journey-stop${row%2?' reverse':''}${item.kind==='education'?' education-stop':''}`);if(item.public===false){point.classList.add('private-entry');point.setAttribute('data-visibility','Riêng tư');}point.style.left=`${left}%`;point.style.top=`${y-21}px`;point.style.setProperty('--chapter-hue',item.kind==='education'?'270':String(165+(Date.parse(item.date)-first)/span*75));
+ const button=el('button',undefined,'journey-pin');button.type='button';button.setAttribute('aria-label',`Read ${item.title}, ${dateLabel(item)}`);button.append(el('span',item.kind==='education'?'🎓':String(i+1).padStart(2,'0')));button.onclick=()=>openStory(item,i);
+ const caption=el('div',undefined,'journey-caption');caption.append(el('span',dateLabel(item),'journey-date'),styledTitle(el('h3',item.title),itemKey(item)),el('p',item.subtitle));
  const peek=el('div',undefined,'journey-peek');peek.setAttribute('aria-label',item.title+' preview');peek.append(styledTitle(el('h3',item.title),itemKey(item)),el('p',dateLabel(item),'story-date'),el('p',item.description.slice(0,320),'peek-description'));
  if(item.media?.length){const reel=el('div',undefined,'journey-peek-media');for(const id of item.media)reel.append(mediaElement(id,item.title,{preview:true}));peek.append(reel);if(item.media.length>1){const controls=el('div',undefined,'peek-controls');const previous=el('button','←','text-button'),next=el('button','→','text-button');previous.type=next.type='button';previous.setAttribute('aria-label','Previous media');next.setAttribute('aria-label','Next media');previous.onclick=()=>{stopMedia(reel);reel.scrollBy({left:-reel.clientWidth,behavior:'smooth'});};next.onclick=()=>{stopMedia(reel);reel.scrollBy({left:reel.clientWidth,behavior:'smooth'});};controls.append(previous,el('span',`${item.media.length} photos / GIF / videos`),next);peek.append(controls);}}
  const read=el('button','Open chapter ↗','text-button');read.type='button';read.onclick=()=>openStory(item);peek.append(read);
- const positionPeek=()=>{const anchor=button.getBoundingClientRect(),box=point.getBoundingClientRect(),height=Math.min(peek.offsetHeight,innerHeight-24),width=340;peek.style.left=`${Math.max(8,Math.min(innerWidth-width-8,anchor.left+anchor.width/2-width/2))-box.left+width/2}px`;if(anchor.top>height+20){peek.style.top='auto';peek.style.bottom=`${box.bottom-anchor.top+12}px`;}else{peek.style.bottom='auto';peek.style.top=`${anchor.bottom-box.top+12}px`;}};let closeTimer;
- const showPeek=()=>{clearTimeout(closeTimer);positionPeek();point.classList.add('peek-open');const first=peek.querySelector('.journey-peek-media')?.firstElementChild,video=first?.tagName==='VIDEO'?first:null;if(video&&!matchMedia('(prefers-reduced-motion: reduce)').matches)video.play().catch(()=>{});};
- const hidePeek=()=>{point.classList.remove('peek-open');stopMedia(peek);};
- point.addEventListener('focusin',showPeek);point.addEventListener('pointerenter',showPeek);point.addEventListener('pointerleave',()=>{closeTimer=setTimeout(()=>{if(!point.contains(document.activeElement))hidePeek();},140);});
- point.addEventListener('focusout',()=>{setTimeout(()=>{if(!point.contains(document.activeElement))hidePeek();},0);});point.addEventListener('keydown',event=>{if(event.key==='Escape'){clearTimeout(closeTimer);hidePeek();}});
- point.append(button,plot,peek);host.append(point);
+ const positionPeek=()=>{const anchor=button.getBoundingClientRect(),box=point.getBoundingClientRect(),height=Math.min(peek.offsetHeight,innerHeight-24),width=340;peek.style.left=`${Math.max(8,Math.min(innerWidth-width-8,anchor.left+anchor.width/2-width/2))-box.left+width/2}px`;if(anchor.top>height+20){peek.style.top='auto';peek.style.bottom=`${box.bottom-anchor.top+12}px`;}else{peek.style.bottom='auto';peek.style.top=`${anchor.bottom-box.top+12}px`;}};point.addEventListener('focusin',positionPeek);point.addEventListener('pointerenter',()=>{positionPeek();const first=peek.querySelector('.journey-peek-media')?.firstElementChild,video=first?.tagName==='VIDEO'?first:null;if(video&&!matchMedia('(prefers-reduced-motion: reduce)').matches)video.play().catch(()=>{});});point.addEventListener('pointerleave',()=>stopMedia(peek));
+ point.addEventListener('focusout',()=>{if(!point.contains(document.activeElement))stopMedia(peek);});
+ point.append(button,caption,peek);host.append(point);
  });
  observer?.disconnect();if('IntersectionObserver'in window){observer=new IntersectionObserver(([e])=>host.classList.toggle('journey-playing',e.isIntersecting));observer.observe(host);}else host.classList.add('journey-playing');
 }
