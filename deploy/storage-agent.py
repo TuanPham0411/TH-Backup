@@ -58,7 +58,7 @@ def roots(c, mounted):
 
 def relative(value):
     path=Path(value)
-    if path.is_absolute() or '..' in path.parts or not path.parts or path.parts[0] not in ('issues','media','.uploads','.cache'):
+    if path.is_absolute() or '..' in path.parts or not path.parts or path.parts[0] not in ('issues','media','portfolio','.uploads','.cache'):
         raise ValueError('Invalid storage path')
     return path
 
@@ -120,6 +120,8 @@ def snapshot(destination, c, mounted, hardlinks=False):
     remote=cloud_index()
     # Verify all referenced completed files before declaring a complete backup.
     expected=run(['runuser','-u','postgres','--','psql','-d','th_app','-At','-c',"select path from public.files union all select 'media/'||id from public.mes_media where ready"] ).splitlines()
+    if run(['runuser','-u','postgres','--','psql','-d','th_app','-At','-c',"select coalesce(to_regclass('portfolio.media')::text,'')"]).strip()=='portfolio.media':
+        expected+=run(['runuser','-u','postgres','--','psql','-d','th_app','-At','-c',"select 'portfolio/'||id from portfolio.media where ready"]).splitlines()
     for name in expected:
         rel=relative(name)
         if name not in remote and not any((root/rel).is_file() for root in active):raise ValueError('A referenced media file is missing; backup was not started')

@@ -655,3 +655,33 @@ test('incident time is mandatory, pending reminders deduplicate daily, and ticke
  assert.equal((await request('updateIssue',{...update,priority:'Critical',progress:40})).status,200);assert.ok((await pool.query("select 1 from mes_private.notifications where recipient_uid='mes-owner' and ticket_id=$1 and event_key like 'alert:%'",[ticket.id])).rowCount>0);assert.equal((await pool.query("select 1 from mes_private.notifications where recipient_uid=$1 and ticket_id=$2 and event_key like 'alert:%'",[uid,ticket.id])).rowCount,0);
 
 });
+
+test('portfolio content uses verified admin sessions, optimistic versions and private media publication',async()=>{
+ const {rows:[owner]}=await pool.query("insert into portfolio.users(email,password,name,verified,admin) values('content-owner@example.test',extensions.crypt('test-owner-password',extensions.gen_salt('bf',4)),'Owner',true,true) returning *");
+ const login=await api('login',{email:owner.email,password:'test-owner-password'},'','th.io.vn',{'x-forwarded-for':'192.0.2.209'});assert.equal(login.status,200);const cookie=login.cookie;
+ const headers={'x-forwarded-host':'th.io.vn','x-forwarded-for':'192.0.2.210'};
+ const request=(path='',options={},auth='')=>fetch(base+'/api/portfolio/content/'+path,{...options,headers:{...headers,...(auth?{cookie:auth}:{}),...options.headers}});
+ assert.equal((await request('admin')).status,403);assert.equal((await request('',{method:'PUT',headers:{'Content-Type':'application/json'},body:'{}'})).status,403);
+ const initial=await (await request('')).json();assert.ok(initial.journey.length>=6);assert.equal(initial.family.length,0);
+ const draft=await (await request('admin',{},cookie)).json();
+ const bytes=Buffer.from('89504e470d0a1a0a0000000000000000','hex');
+ const bad=await request('upload',{method:'POST',headers:{'Content-Type':'image/png','X-File-Name':'fake.png'},body:Buffer.from('not an image')},cookie);assert.equal(bad.status,400);
+ const upload=await request('upload',{method:'POST',headers:{'Content-Type':'image/png','X-File-Name':'family.png'},body:bytes},cookie);assert.equal(upload.status,201);const photo=(await upload.json()).id;
+ assert.equal((await request('media/'+photo)).status,404);assert.equal((await request('media/'+photo,{},cookie)).status,200);
+ draft.family.push({id:'family-chapter',title:'Private family chapter',subtitle:'Family',description:'This is private until explicitly published.',tags:[],media:[photo],public:false});
+ const save=()=>request('',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(draft)},cookie);
+ const saved=await save();assert.equal(saved.status,200,await saved.clone().text());draft.version=(await saved.json()).version;
+ assert.equal((await (await request('')).json()).family.length,0);assert.equal((await request('media/'+photo)).status,404);
+ draft.family[0].public=true;const published=await save();assert.equal(published.status,200);const next=(await published.json()).version;
+ assert.equal((await save()).status,409,'stale editor must not overwrite');draft.version=next;
+ assert.equal((await (await request('')).json()).family[0].title,'Private family chapter');assert.equal((await request('media/'+photo)).status,200);
+ assert.equal((await request('media/'+photo,{method:'DELETE'},cookie)).status,409,'cannot delete referenced media');
+ const originalDate=draft.journey[0].date;draft.journey[0].date='2026-02-31';assert.equal((await save()).status,400);draft.journey[0].date=originalDate;
+ draft.family[0].public=false;const hidden=await save();assert.equal(hidden.status,200);draft.version=(await hidden.json()).version;assert.equal((await request('media/'+photo)).status,404,'unpublishing must revoke anonymous bytes');
+ const audio=await request('upload',{method:'POST',headers:{'Content-Type':'audio/mpeg','X-File-Name':'sound.mp3'},body:Buffer.from('ID3-test-audio-header')},cookie);assert.equal(audio.status,201);draft.profile.music=(await audio.json()).id;draft.profile.musicPublic=false;
+ const soundtrack=await save();assert.equal(soundtrack.status,200);draft.version=(await soundtrack.json()).version;assert.equal((await request('media/'+draft.profile.music)).status,404);draft.profile.musicPublic=true;
+ const liveMusic=await save();assert.equal(liveMusic.status,200);draft.version=(await liveMusic.json()).version;assert.equal((await request('media/'+draft.profile.music)).status,200);
+ draft.family=[];const removed=await save();assert.equal(removed.status,200);draft.version=(await removed.json()).version;
+ assert.equal((await request('media/'+photo,{method:'DELETE'},cookie)).status,200);assert.equal((await request('media/'+photo,{},cookie)).status,404);
+ const revoked=await api('logout',{},cookie,'th.io.vn',{'x-forwarded-for':'192.0.2.211'});assert.equal(revoked.status,200);assert.equal((await request('admin',{},cookie)).status,403);
+});

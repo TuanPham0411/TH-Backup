@@ -36,7 +36,8 @@ export function createApp(pool,filesRoot,{sites=runtimeSites(),mesOnly=process.e
  app.use('/api/mes',previewRouter(pool,filesRoot));
  app.use('/api/mes/wifi',wifiRouter(pool));
  app.use('/api/mes/admin',adminRouter(pool,filesRoot,gate));app.use('/api/mes',translationRouter(pool));
- if(!mesOnly)app.use('/api/portfolio',portfolioRouter(pool));app.use('/api/mes/uploads',uploadRouter(pool,filesRoot,gate));app.use('/api/mes',workspaceRouter(pool,filesRoot));app.use('/api/mes',mesRouter(pool,filesRoot));
+ if(!mesOnly)app.use('/api/portfolio',portfolioRouter(pool,filesRoot));app.use('/api/mes/uploads',uploadRouter(pool,filesRoot,gate));app.use('/api/mes',workspaceRouter(pool,filesRoot));app.use('/api/mes',mesRouter(pool,filesRoot));
+ if(!mesOnly&&process.env.PORTFOLIO_WEB_ROOT){const portfolioWeb=resolve(process.env.PORTFOLIO_WEB_ROOT),mesWeb=resolve(process.env.MES_WEB_ROOT||'mes/dist');app.use((req,res,next)=>express.static(req.hostname===hostOf(sites.portfolio)?portfolioWeb:mesWeb)(req,res,next));app.get(['/', '/ticket/:reference','/page/:id'],(req,res)=>res.sendFile(resolve(req.hostname===hostOf(sites.portfolio)?portfolioWeb:mesWeb,'index.html')));}
  if(mesOnly&&webRoot){app.use(express.static(resolve(webRoot)));app.get(['/','/ticket/:reference','/page/:id'],(req,res)=>res.sendFile(resolve(webRoot,'index.html')));}
  app.use((err,req,res,next)=>{
   const code=err.code;
