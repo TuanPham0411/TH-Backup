@@ -685,3 +685,25 @@ test('portfolio content uses verified admin sessions, optimistic versions and pr
  assert.equal((await request('media/'+photo,{method:'DELETE'},cookie)).status,200);assert.equal((await request('media/'+photo,{},cookie)).status,404);
  const revoked=await api('logout',{},cookie,'th.io.vn',{'x-forwarded-for':'192.0.2.211'});assert.equal(revoked.status,200);assert.equal((await request('admin',{},cookie)).status,403);
 });
+
+test('personal home supports GIF/video chapters, private introduction posters and editable site copy',async()=>{
+ const {rows:[user]}=await pool.query("insert into portfolio.users(email,password,name,verified,admin) values('home-owner@example.test',extensions.crypt('test-owner-password',extensions.gen_salt('bf',4)),'Home Owner',true,true) returning *");
+ const login=await api('login',{email:user.email,password:'test-owner-password'},'','th.io.vn',{'x-forwarded-for':'192.0.2.214'});const cookie=login.cookie;
+ const request=(path='',options={},auth='')=>fetch(base+'/api/portfolio/content/'+path,{...options,headers:{'x-forwarded-host':'th.io.vn','x-forwarded-for':'192.0.2.215',...(auth?{cookie:auth}:{}),...options.headers}});
+ const upload=async(type,body)=>{const r=await request('upload',{method:'POST',headers:{'Content-Type':type,'X-File-Name':'sample'},body},cookie);assert.equal(r.status,201,await r.clone().text());return(await r.json()).id;};
+ const gif=await upload('image/gif',Buffer.from('GIF89a-test-header'));
+ const video=await upload('video/mp4',Buffer.from('000000186674797069736f6d00000000','hex'));
+ const webm=await upload('video/webm',Buffer.from('1a45dfa3000000000000000000000000','hex'));
+ const fake=await request('upload',{method:'POST',headers:{'Content-Type':'video/mp4'},body:Buffer.from('a fake MP4 video')},cookie);assert.equal(fake.status,400);
+ const draft=await(await request('admin',{},cookie)).json();assert.ok(Array.isArray(draft.hobbies));
+ draft.copy={'copy-test':'Edited plain text <script> is literal'};draft.hobbies.push({id:'my-hobby',title:'My hobby',subtitle:'Personal',description:'Editable personal content.',tags:['Personal'],media:[gif,webm],public:false});draft.journey[0].media=[video,gif];draft.profile.introVideo=video;draft.profile.introPoster=gif;draft.profile.introPublic=false;
+ const save=async()=>{const r=await request('',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(draft)},cookie);assert.equal(r.status,200,await r.clone().text());draft.version=(await r.json()).version;};await save();
+ const ownerView=await(await request('',{},cookie)).json();assert.equal(ownerView.adminView,true);assert.equal(ownerView.hobbies[0].title,'My hobby');assert.equal(ownerView.profile.introPoster,gif);const guestPreview=await(await request('?view=public',{},cookie)).json();assert.equal(guestPreview.hobbies.length,0);assert.equal(guestPreview.profile.introVideo,'');
+ let visible=await(await request('')).json();assert.equal(visible.hobbies.length,0);assert.equal(visible.profile.introVideo,'');assert.equal(visible.profile.introPoster,'');assert.equal(visible.mediaTypes[webm],undefined);assert.equal((await request('media/'+webm)).status,404);
+ assert.equal(visible.mediaTypes[video],'video/mp4');assert.equal(visible.journey[0].media[0],video);assert.equal(visible.copy['copy-test'],draft.copy['copy-test']);
+ const range=await request('media/'+video,{headers:{range:'bytes=0-7'}});assert.equal(range.status,206);assert.equal((await range.arrayBuffer()).byteLength,8);
+ draft.hobbies[0].public=true;draft.profile.introPublic=true;await save();visible=await(await request('')).json();assert.equal(visible.mediaTypes[webm],'video/webm');assert.equal(visible.profile.introPoster,gif);assert.equal((await request('media/'+webm)).status,200);
+ draft.sections.hobbies=false;await save();visible=await(await request('')).json();assert.equal(visible.hobbies.length,0);assert.equal((await request('media/'+webm)).status,404,'hidden group must revoke private bytes');
+ draft.profile.introVideo=gif;const wrong=await request('',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(draft)},cookie);assert.equal(wrong.status,400,'introduction needs actual video metadata');
+ const badCopy={...draft,copy:{unsafe:{html:'bad'}}};const invalid=await request('',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(badCopy)},cookie);assert.equal(invalid.status,400);
+});
