@@ -21,7 +21,7 @@ export function drawJourney(items){
  ordered.forEach((item,i)=>{
  const row=Math.floor(i/columns),group=ordered.slice(row*columns,row*columns+columns),lo=Date.parse(group[0].date),hi=Date.parse(group.at(-1).date);
  // Date-proportional position blended with minimum spacing keeps near-identical dates legible.
- const local=i%columns,fraction=group.length===1?.5:.45*local/(group.length-1)+.55*(Date.parse(item.date)-lo)/Math.max(1,hi-lo),x=12+fraction*76,left=row%2?100-x:x;
+ const local=i%columns,fraction=group.length===1?.5:.8*local/(group.length-1)+.2*(Date.parse(item.date)-lo)/Math.max(1,hi-lo),x=12+fraction*76,left=row%2?100-x:x;
  const point=el('div',undefined,`journey-stop${row%2?' reverse':''}`);point.style.left=`${left}%`;point.style.top=`${row*242}px`;point.style.setProperty('--chapter-hue',String(165+(Date.parse(item.date)-first)/span*95));
  const button=el('button',undefined,'journey-pin');button.type='button';button.setAttribute('aria-label',`Read ${item.title}, ${dateLabel(item)}`);button.append(el('span',String(i+1).padStart(2,'0')));button.onclick=()=>openStory(item,i);
  const caption=el('div',undefined,'journey-caption');caption.append(el('span',dateLabel(item),'journey-date'),el('h3',item.title),el('p',item.subtitle));
