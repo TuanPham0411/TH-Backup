@@ -1,3 +1,4 @@
+import {initDashboardSignal} from './dashboard-signal.js';
 import {initPendingTickets} from './pending-tickets.js';
 import {initIncidentColors} from './incident-colors.js';
 import './access-history.css';
@@ -1699,6 +1700,7 @@ initContentTabs({state,navigate,toast});
 initMobileFeedback();
 initAppearancePreferences(()=>({user:state.user,preview:state.preview,isOwner:state.isOwner}));
 initDashboardPreferences(()=>({user:state.user,preview:state.preview,isAdmin:state.isAdmin||state.isOwner}));
+initDashboardSignal();
 compactDashboard();
 initSettingsTabs(()=>({isOwner:state.isOwner,isAdmin:state.isAdmin}));
 initializeLanguage(() => { workspace.render(); feedbackEditor.setLanguage(); editEditor.setLanguage(); renderAll(); renderTimeline(); updateIdentity(); if (state.selected) { const issue = state.issues.find(i => i.id === state.selected); if (issue) renderDetail(issue); } });
