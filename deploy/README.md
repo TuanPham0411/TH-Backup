@@ -335,3 +335,10 @@ Each date caption is centered on its own checkpoint and placed above or below it
 
 ### Local caption placement
 Caption placement now solves nearby conflicts together, prioritizes short leaders, and limits the label edge to 36–100 units from its checkpoint. Small horizontal offsets (up to 72 units) can use adjacent empty space. Both the text rectangle and the leader are checked against the main road; a leader cannot cross a different lane. Real phase traces are obstacles for text, rather than treating the maximum trace offset as occupied everywhere. Full captions are retained for the June/July screenshot regression; unusually dense datasets can use compact date captions with full checkpoint details.
+
+### Owner-arranged timeline captions
+Verified portfolio admins get an **Arrange labels** toolbar directly above the timeline. Captions support pointer/touch drag with pointer capture, arrow-key adjustments (Shift for larger steps), Delete to reset one caption, Save layout, Cancel and Reset to automatic. Positions are offsets from their date pin in a 1000-unit world coordinate system; dates, the road, time scale and phase traces do not move. Pure ongoing checkpoints use a stable `present` key across calendar days. Saved positions are shown to public viewers; positions for private-only dates are removed from public output.
+
+`PATCH /api/portfolio/content/layout` requires the existing verified admin session, validates bounded positions and saves only `timelineLayout` under the content advisory lock and optimistic version check. It preserves all unrelated content, and a cached content editor merges the new layout/version without dropping its own unsaved fields. No schema migration is required. The standalone MES exporter includes the shared layout validation module used by the bundled server.
+
+Activity, hobby and family blocks also have decorative horizontal signal branches behind the content. Their mask begins near the block center and fades to 10% opacity at the right edge; animation pauses offscreen, in hidden tabs and for reduced-motion preferences. SVG overlays do not handle pointer events or change block dimensions.

@@ -31,6 +31,7 @@ function affordances(){
  }
 }
 document.addEventListener('portfolio:content',affordances);
+document.addEventListener('portfolio:layout-saved',event=>{if(draft&&currentUser?.isAdmin){draft.timelineLayout=structuredClone(event.detail.positions);draft.version=event.detail.version;}});
 export function portfolioAdminUser(user,onSave){
  if(identity===user?.uid&&mount.childNodes.length&&currentUser?.isAdmin===user?.isAdmin&&currentUser?.emailVerified===user?.emailVerified){currentUser=user;affordances();return;}
  currentUser=user;applyView=onSave;previewGuest=false;identity=user?.uid||null;generation++;draft=null;dirty=false;document.querySelectorAll('.portfolio-library').forEach(d=>d.remove());mount.replaceChildren();navigation.replaceChildren();dialog.close();openSection=null;

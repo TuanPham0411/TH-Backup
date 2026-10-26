@@ -1,13 +1,15 @@
+import {applyTimelinePositions} from './manual-timeline-layout.js';
+import {timelineDrag} from './timeline-drag.js';
 import {previewLifetime} from './preview-lifetime.js';
 import {phaseKey,orderedEvents,eventText,eventLines} from './timeline-events.js';
 import {datedRoute} from './dated-route.js';
 import {storyCarousel} from './story-carousel.js';
 import {stopMedia} from './portfolio-media.js';
 const ns='http://www.w3.org/2000/svg',el=(tag,text,cls)=>{const n=document.createElement(tag);if(text)n.textContent=text;if(cls)n.className=cls;return n;},svg=(tag,attrs)=>{const n=document.createElementNS(ns,tag);for(const[k,v]of Object.entries(attrs))n.setAttribute(k,v);return n;};
-let observer,resizeObserver;
-export function renderDatedRoute(items,{openStory,dateLabel,styledTitle,descriptions={}}){
- const host=document.getElementById('experience-list');document.querySelectorAll('.route-floating-preview').forEach(n=>{stopMedia(n);n.remove();});host.replaceChildren();host.className='journey-track dated-journey';host.hidden=!items.length;if(!items.length)return;
- const timelineNow=Date.now();let layout=datedRoute(items,timelineNow);const labelNodes=[];const canvas=el('div',undefined,'route-canvas');canvas.style.aspectRatio=`1000 / ${layout.height}`;host.append(canvas);let pointerPhase=null,focusPhase=null;
+let observer,resizeObserver,dragController;
+export function renderDatedRoute(items,{openStory,dateLabel,styledTitle,descriptions={},layoutPreferences={},canEdit=false,onSaveLayout}){
+ dragController?.dispose();const host=document.getElementById('experience-list');document.querySelectorAll('.route-floating-preview').forEach(n=>{stopMedia(n);n.remove();});host.replaceChildren();host.className='journey-track dated-journey';host.hidden=!items.length;if(!items.length)return;
+ const timelineNow=Date.now();let preferences=structuredClone(layoutPreferences),measuredHeights={};let layout=applyTimelinePositions(datedRoute(items,timelineNow),preferences);const labelNodes=[];const canvas=el('div',undefined,'route-canvas');canvas.style.aspectRatio=`1000 / ${layout.height}`;host.append(canvas);let pointerPhase=null,focusPhase=null;
  const mark=(node,items)=>{node.classList.add('phase-member');node.dataset.phases=JSON.stringify(items.map(phaseKey));};
  const focusPhaseNodes=()=>{const key=pointerPhase||focusPhase;canvas.classList.toggle('phase-focus',!!key);for(const node of canvas.querySelectorAll('.phase-member')){const active=!!key&&JSON.parse(node.dataset.phases).includes(key);node.classList.toggle('phase-active',active);node.classList.toggle('phase-muted',!!key&&!active);}};
  const art=svg('svg',{viewBox:`0 ${layout.originY} 1000 ${layout.height}`,'aria-hidden':'true',class:'journey-road'}),background=svg('svg',{viewBox:`0 ${layout.originY} 1000 ${layout.height}`,'aria-hidden':'true',class:'journey-signal'});
@@ -31,7 +33,7 @@ export function renderDatedRoute(items,{openStory,dateLabel,styledTitle,descript
  const leader=svg('path',{d:point.label.leader,class:'route-leader'});mark(leader,unique);art.append(leader);
  const peek=el('div',undefined,'journey-peek route-floating-preview');peek.hidden=true;document.body.append(peek);peek.append(el('h3',dateLabel({...item,end:'',kind:'milestone'})),el('p',point.date,'story-date'),eventLines(events,document));if(item.media.length)peek.append(storyCarousel(item.media,title,{rotate:true,descriptions}));const read=el('button','View details ↗','text-button');read.type='button';read.onclick=()=>{hide();openStory(item);};peek.append(read);
  const hide=()=>{lifetime.cancel();peek.hidden=true;stop.classList.remove('peek-open');stopMedia(peek);};const lifetime=previewLifetime(stop,peek,hide);
- const show=()=>{if(matchMedia('(max-width: 760px)').matches)return;lifetime.cancel();peek.hidden=false;stop.classList.add('peek-open');const anchor=pin.getBoundingClientRect(),width=Math.min(340,innerWidth-24),height=Math.min(peek.offsetHeight,innerHeight-24);peek.style.left=`${Math.max(12,Math.min(innerWidth-width-12,anchor.left-width/2))}px`;peek.style.top=`${Math.max(12,Math.min(innerHeight-height-12,anchor.top>height+24?anchor.top-height-18:anchor.bottom+18))}px`;};
+ const show=()=>{if(host.classList.contains('editing-timeline-layout')||matchMedia('(max-width: 760px)').matches)return;lifetime.cancel();peek.hidden=false;stop.classList.add('peek-open');const anchor=pin.getBoundingClientRect(),width=Math.min(340,innerWidth-24),height=Math.min(peek.offsetHeight,innerHeight-24);peek.style.left=`${Math.max(12,Math.min(innerWidth-width-12,anchor.left-width/2))}px`;peek.style.top=`${Math.max(12,Math.min(innerHeight-height-12,anchor.top>height+24?anchor.top-height-18:anchor.bottom+18))}px`;};
  peek.addEventListener('keydown',e=>{if(e.key==='Escape')hide();});stop.addEventListener('pointerenter',show);stop.addEventListener('focusin',show);stop.addEventListener('keydown',e=>{if(e.key==='Escape')hide();});
 
 
@@ -39,7 +41,11 @@ export function renderDatedRoute(items,{openStory,dateLabel,styledTitle,descript
  });
  // Measure real wrapped text at the current viewport scale before final placement.
  resizeObserver?.disconnect();let lastWidth=0;
- const fitLabels=()=>{if(!canvas.isConnected||!canvas.clientWidth||canvas.clientWidth===lastWidth)return;lastWidth=canvas.clientWidth;const scale=lastWidth/1000,labelHeights={};labelNodes.forEach(({caption},index)=>{labelHeights[layout.points[index].date]={height:Math.ceil(caption.getBoundingClientRect().height/scale)+4,width:layout.points[index].label.width};});layout=datedRoute(items,timelineNow,{labelHeights});canvas.style.aspectRatio=`1000 / ${layout.height}`;for(const art of canvas.querySelectorAll('svg'))art.setAttribute('viewBox',`0 ${layout.originY} 1000 ${layout.height}`);labelNodes.forEach(({stop,caption,leader},index)=>{const point=layout.points[index];caption.hidden=!!point.label.hidden;caption.dataset.compact=String(!!point.label.compact);stop.style.setProperty('--checkpoint-y',(point.y-layout.originY)/layout.height*100+'%');caption.style.left=point.label.left/10+'%';caption.style.width=point.label.width/10+'%';caption.style.top=(point.label.top-layout.originY)/layout.height*100+'%';caption.dataset.side=point.label.side;leader.setAttribute('d',point.label.leader);});};
+ const paint=()=>{canvas.style.aspectRatio=`1000 / ${layout.height}`;for(const art of canvas.querySelectorAll('svg'))art.setAttribute('viewBox',`0 ${layout.originY} 1000 ${layout.height}`);labelNodes.forEach(({stop,caption,leader},index)=>{const point=layout.points[index];caption.hidden=!!point.label.hidden;caption.dataset.compact=String(!!point.label.compact);caption.dataset.manual=String(!!point.label.manual);stop.style.setProperty('--checkpoint-y',(point.y-layout.originY)/layout.height*100+'%');caption.style.left=point.label.left/10+'%';caption.style.width=point.label.width/10+'%';caption.style.top=(point.label.top-layout.originY)/layout.height*100+'%';caption.dataset.side=point.label.side;leader.setAttribute('d',point.label.leader);});};
+ const updatePositions=next=>{preferences=structuredClone(next);layout=applyTimelinePositions(datedRoute(items,timelineNow,{labelHeights:measuredHeights}),preferences);paint();};
+ const fitLabels=()=>{if(!canvas.isConnected||!canvas.clientWidth||canvas.clientWidth===lastWidth)return;lastWidth=canvas.clientWidth;const scale=lastWidth/1000;measuredHeights={};labelNodes.forEach(({caption},index)=>{measuredHeights[layout.points[index].date]={height:Math.ceil(caption.getBoundingClientRect().height/scale)+4,width:layout.points[index].label.width};});updatePositions(preferences);};
+ if(canEdit)dragController=timelineDrag({host,canvas,getLayout:()=>layout,labelNodes,positions:preferences,onChange:updatePositions,onSave:onSaveLayout});
+
  requestAnimationFrame(fitLabels);if('ResizeObserver'in window){resizeObserver=new ResizeObserver(fitLabels);resizeObserver.observe(canvas);}
 
  observer?.disconnect();if('IntersectionObserver'in window){observer=new IntersectionObserver(([e])=>host.classList.toggle('journey-playing',e.isIntersecting));observer.observe(host);}else host.classList.add('journey-playing');

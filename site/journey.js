@@ -1,3 +1,4 @@
+import {initPersonalMotion} from './personal-motion.js';
 import {eventLines} from './timeline-events.js';
 import {initAboutMatrix} from './about-matrix.js';
 import {portraitVideo} from './portrait-video.js';
@@ -17,7 +18,7 @@ const svg=(tag,attrs)=>{const n=document.createElementNS(ns,tag);for(const [k,v]
 export const dateLabel=item=>{const format=value=>item.datePrecision==='year'?value.slice(0,4):new Date(value+'T00:00:00Z').toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric',timeZone:'UTC'});return item.date?format(item.date)+(item.end&&item.end!==item.date?' — '+format(item.end):item.end||item.kind==='milestone'?'':' — Present'):item.subtitle;};
 const itemKey=item=>`item-${item.sourceGroup||item.group||'journey'}-${item.id}`;
 
-export const storyGallery=item=>storyCarousel(item.media||[],item.title,{descriptions:currentView.mediaDescriptions});
+export const storyGallery=item=>storyCarousel(item.media||[],item.title,{descriptions:currentView.mediaDescriptions,layoutPreferences:currentView.timelineLayout,canEdit:currentView.adminView===true,onSaveLayout:saveTimelineLayout});
 const dialog=el('dialog',undefined,'story-dialog');dialog.setAttribute('aria-label','Journey details');document.body.append(dialog);
 dialog.addEventListener('close',()=>stopMedia(dialog));
 export function openStory(item,index=0){
@@ -27,8 +28,12 @@ export function openStory(item,index=0){
 }
 
 dialog.onclick=e=>{if(e.target===dialog&&!(e.clientX>=dialog.getBoundingClientRect().left&&e.clientX<=dialog.getBoundingClientRect().right&&e.clientY>=dialog.getBoundingClientRect().top&&e.clientY<=dialog.getBoundingClientRect().bottom))dialog.close();};
-export function drawJourney(items){renderDatedRoute(items,{openStory,dateLabel,styledTitle,descriptions:currentView.mediaDescriptions});}
+export function drawJourney(items){renderDatedRoute(items,{openStory,dateLabel,styledTitle,descriptions:currentView.mediaDescriptions,layoutPreferences:currentView.timelineLayout,canEdit:currentView.adminView===true,onSaveLayout:saveTimelineLayout});}
 
+async function saveTimelineLayout(positions){
+ const before=currentView;if(!before.adminView)throw Error('Administrator required');const response=await fetch('/api/portfolio/content/layout',{method:'PATCH',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({version:before.version,positions})});const saved=await response.json();if(!response.ok)throw Error(saved.error||'Unable to save layout');if(!currentView.adminView)throw Error('Session changed. Sign in again.');
+ document.dispatchEvent(new CustomEvent('portfolio:layout-saved',{detail:saved}));renderPortfolio({...currentView,timelineLayout:saved.positions,version:saved.version});const status=document.querySelector('.timeline-layout-tools [role=status]');if(status)status.textContent='Layout saved';
+}
 let audio,trackId,currentView=normalizePortfolio(defaultPortfolio);
 export const getPortfolioView=()=>currentView;
 export function renderPortfolio(input){
@@ -56,7 +61,7 @@ export function renderPortfolio(input){
  const year=el('span',String(new Date().getFullYear()));year.id='year';document.querySelector('.site-footer>.mono').replaceChildren(document.createTextNode('© '),year,document.createTextNode(' '+p.name.toUpperCase()));
  const intro=document.getElementById('personal-intro'),player=document.getElementById('intro-player');intro.hidden=true;stopMedia(player);player.replaceChildren();
  const hero=document.querySelector('.hero-image');hero.style.backgroundImage=p.heroImage?`url("${mediaURL(p.heroImage)}")`:'none';
- const music=document.getElementById('portfolio-music');music.hidden=false;music.disabled=!p.music;if(trackId!==p.music){audio?.pause();audio=undefined;trackId=p.music;music.textContent='♫ Play soundtrack';music.setAttribute('aria-pressed','false');}if(!p.music)music.textContent='♫ Soundtrack';music.title=p.music?p.musicTitle:'No soundtrack uploaded yet';music.onclick=async()=>{if(!audio){audio=new Audio(mediaURL(p.music));audio.preload='none';audio.loop=true;audio.volume=.25;audio.onerror=()=>{music.textContent='♫ Track unavailable';music.setAttribute('aria-pressed','false');};}if(audio.paused){try{await audio.play();music.textContent='Ⅱ Pause music';music.setAttribute('aria-pressed','true');}catch{music.textContent='♫ Tap to try again';}}else{audio.pause();music.textContent='♫ Play soundtrack';music.setAttribute('aria-pressed','false');}};applyCopy(value.copy);applyPageTitles();document.getElementById('about').style.setProperty('--about-photo',`url("${mediaURL(p.aboutImage)}")`);initAboutMatrix();document.dispatchEvent(new CustomEvent('portfolio:content',{detail:value}));
+ const music=document.getElementById('portfolio-music');music.hidden=false;music.disabled=!p.music;if(trackId!==p.music){audio?.pause();audio=undefined;trackId=p.music;music.textContent='♫ Play soundtrack';music.setAttribute('aria-pressed','false');}if(!p.music)music.textContent='♫ Soundtrack';music.title=p.music?p.musicTitle:'No soundtrack uploaded yet';music.onclick=async()=>{if(!audio){audio=new Audio(mediaURL(p.music));audio.preload='none';audio.loop=true;audio.volume=.25;audio.onerror=()=>{music.textContent='♫ Track unavailable';music.setAttribute('aria-pressed','false');};}if(audio.paused){try{await audio.play();music.textContent='Ⅱ Pause music';music.setAttribute('aria-pressed','true');}catch{music.textContent='♫ Tap to try again';}}else{audio.pause();music.textContent='♫ Play soundtrack';music.setAttribute('aria-pressed','false');}};applyCopy(value.copy);applyPageTitles();document.getElementById('about').style.setProperty('--about-photo',`url("${mediaURL(p.aboutImage)}")`);initAboutMatrix();initPersonalMotion();document.dispatchEvent(new CustomEvent('portfolio:content',{detail:value}));
 }
 export function initPortfolio(onContent){renderPortfolio(defaultPortfolio);fetch('/api/portfolio/content/').then(r=>{if(!r.ok)throw Error();return r.json();}).then(v=>{renderPortfolio(v);onContent(v);}).catch(()=>{});}
 

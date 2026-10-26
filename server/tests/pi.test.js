@@ -742,3 +742,13 @@ test('portfolio HEIC uploads become verified private JPEGs and malformed HEIC is
  const before=Number((await pool.query('select count(*) from portfolio.media')).rows[0].count);
  const broken=await request('upload',{method:'POST',headers:{'Content-Type':'image/heic','X-File-Name':'bad.heic'},body:Buffer.from('000000186674797068656963000000006d69663168656963','hex')});assert.equal(broken.status,400);assert.equal(Number((await pool.query('select count(*) from portfolio.media')).rows[0].count),before);
 });
+
+test('only the owner can save timeline layout; positions persist without overwriting content',async()=>{
+ const {rows:[owner]}=await pool.query("insert into portfolio.users(email,password,name,verified,admin) values('layout-drag-owner@example.test',extensions.crypt('test-owner-password',extensions.gen_salt('bf',4)),'Layout Owner',true,true) returning *");
+ const login=await api('login',{email:owner.email,password:'test-owner-password'},'','th.io.vn',{'x-forwarded-for':'192.0.2.251'});
+ const request=(path='',options={},cookie=login.cookie)=>fetch(base+'/api/portfolio/content/'+path,{...options,headers:{'x-forwarded-host':'th.io.vn','x-forwarded-for':'192.0.2.252',...(cookie?{cookie}:{}),...options.headers}});
+ const current=await(await request('admin')).json(),positions={'2016-10-01':{dx:40,dy:80},'2001-02-03':{dx:0,dy:50}};
+ const patch=(version,positions,cookie=login.cookie)=>request('layout',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({version,positions})},cookie);
+ assert.equal((await patch(current.version,positions,'')).status,403);const saved=await patch(current.version,positions);assert.equal(saved.status,200,await saved.clone().text());const result=await saved.json();assert.equal(result.version,current.version+1);
+ const next=await(await request('admin')).json();assert.deepEqual(next.timelineLayout,positions);assert.deepEqual(next.profile,current.profile);assert.deepEqual(next.journey,current.journey);assert.equal((await patch(current.version,{})).status,409);assert.equal((await patch(result.version,{present:{dx:10000,dy:0}})).status,400);const visible=await(await request('',{},'')).json();assert.equal(visible.timelineLayout['2001-02-03'],undefined);assert.deepEqual(visible.timelineLayout['2016-10-01'],positions['2016-10-01']);
+});

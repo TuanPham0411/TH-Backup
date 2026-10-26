@@ -1,3 +1,4 @@
+import {validateTimelineLayout} from '../site/manual-timeline-layout.js';
 import {isHeic} from './heic-format.js';
 import {normalizeHeicFile} from './heic-upload.js';
 import {Router} from 'express';
@@ -44,6 +45,15 @@ export function portfolioContentRouter(pool,root){
  const result=await db.query("insert into portfolio.content(id,version,data,updated_by) select 'main',1,$2,$3 where $1=0 on conflict(id) do nothing returning version",[value.version,data,user.id]);
  const saved=result.rowCount?result:await db.query("update portfolio.content set data=$2,version=version+1,updated_by=$3,updated_at=now() where id='main' and version=$1 returning version",[value.version,data,user.id]);
  if(!saved.rowCount)throw error(409,'Content changed in another tab. Reload before editing.');await db.query('commit');res.json({version:saved.rows[0].version});
+ }catch(e){await db.query('rollback');throw e;}finally{db.release();}
+ });
+ router.patch('/layout',async(req,res)=>{
+ const user=await admin(req);if(!user)throw error(403,'Administrator required');
+ let positions;try{positions=validateTimelineLayout(req.body?.positions);}catch(e){throw error(400,e.message);}
+ if(!Number.isInteger(req.body?.version))throw error(400,'Invalid content version');const db=await pool.connect();
+ try{await db.query('begin');await db.query('select pg_advisory_xact_lock(74529101)');const current=await load(db);if(current.version!==req.body.version)throw error(409,'Content changed in another tab. Reload before saving the layout.');
+ const saved=await db.query("update portfolio.content set data=jsonb_set(data,'{timelineLayout}',$2::jsonb),version=version+1,updated_by=$3,updated_at=now() where id='main' and version=$1 returning version",[current.version,JSON.stringify(positions),user.id]);
+ let version=saved.rows[0]?.version;if(!version){const data={...current,timelineLayout:positions};delete data.version;await db.query("insert into portfolio.content(id,version,data,updated_by) values('main',1,$1,$2)",[data,user.id]);version=1;}await db.query('commit');res.json({version,positions});
  }catch(e){await db.query('rollback');throw e;}finally{db.release();}
  });
  router.post('/upload',async(req,res)=>{
