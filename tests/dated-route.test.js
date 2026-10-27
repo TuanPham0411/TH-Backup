@@ -59,3 +59,7 @@ test('new earlier and future checkpoints and automatic reset always retain their
 test('a failed global label placement recovers individual full descriptions instead of hiding all',()=>{
  const points=[{date:'2026-01-01',x:150,y:70,distance:0,events:[{role:'start',item:{title:'First phase'}}]},{date:'2026-01-02',x:150,y:80,distance:0,events:[{role:'start',item:{title:'Next phase'}}]}],road=Array.from({length:60},(_,i)=>({x:150,y:i*4,distance:1000}));assert.equal(placeRouteLabels(points,road),false);recoverRouteLabels(points,road);assert.ok(points.every(point=>point.label.recovered&&!point.label.hidden&&!point.label.compact&&point.label.height>0&&point.events[0].item.title));
 });
+
+test('touch diagram skips caption placement and saved-label space without changing the time domain',()=>{
+ const items=[entry('job','2020-01-01','2026-01-01'),entry('study','2022-01-01','2025-01-01','education')],full=datedRoute(items),touch=datedRoute(items,Date.now(),{labels:false});assert.equal(touch.path,full.path);assert.deepEqual(touch.points.map(p=>[p.date,p.x,p.y]),full.points.map(p=>[p.date,p.x,p.y]));assert.ok(touch.points.every(p=>p.label.hidden&&p.label.leader===''));assert.ok(touch.height<full.height);
+});

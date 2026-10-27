@@ -110,3 +110,7 @@ Administrators can set **Administration → Default display settings** for anony
 ### Mobile feedback
 
 Phones use a touch layout with readable ticket cards and three feedback sections: description, context and optional evidence. Text formatting and incident time expand on demand. Users can take a photo, record video through the device camera, or select existing files; the original 5-file and 200 MB/video limits apply. The send bar stays at the bottom, moves out of the way while the software keyboard is open, and shows upload status above it. Inputs use at least 16 px to avoid automatic iOS focus zoom; safe areas and dynamic viewport heights are respected. Desktop layout remains unchanged, with a darker Issue list hover.
+
+### Touch portfolio
+
+Phones use a compact diagram-only journey with swipe browsing and tap-to-open checkpoints. Hover previews, external checkpoint captions and automatic media-rail motion are disabled for narrow screens or coarse touch input; desktop interactions remain available. Portraits start without a bundled sample source and become visible only after the authoritative content image has loaded, including after replacement or removal.

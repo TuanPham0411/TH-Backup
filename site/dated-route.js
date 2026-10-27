@@ -1,6 +1,6 @@
 import {placeRouteLabels,recoverRouteLabels} from './route-labels.js';
 // Time is mapped to cumulative distance, including the bends, never to item index.
-export function datedRoute(items,now=Date.now(),{labelHeights={}}={}){
+export function datedRoute(items,now=Date.now(),{labelHeights={},labels=true}={}){
  const present=new Date(now+7*3600000).toISOString().slice(0,10),endDate=item=>item.end||(item.date>present?item.date:present);
  const grouped=new Map(),add=(date,item,role)=>{const key=date;let point=grouped.get(key);if(!point){point={date,events:[]};grouped.set(key,point);}point.events.push({item,role});};
  for(const item of items){add(item.date,item,'start');if(item.kind!=='milestone')add(endDate(item),item,item.end?'end':'ongoing');}
@@ -15,6 +15,7 @@ export function datedRoute(items,now=Date.now(),{labelHeights={}}={}){
  // Keep captions in a bounded neighborhood of their actual date pins.
  // Solve nearby placements together instead of pushing conflicts across lanes.
  for(const point of points){Object.assign(point,at(fraction(point.date)));point.fraction=fraction(point.date);}
+ if(!labels){for(const point of points)point.label={left:point.x,top:point.y,width:0,height:0,leader:'',hidden:true};const ticks=[];for(let year=new Date(min).getUTCFullYear()+1;year<=new Date(max).getUTCFullYear();year++){const f=(Date.UTC(year,0,1)-min)/span,p=at(f),label=at(f,-22);ticks.push({year,...p,labelX:label.x,labelY:label.y,anchor:label.x<p.x-8?'end':label.x>p.x+8?'start':'middle'});}return{min,max,length,rows,originY:0,height:Math.max(height,70+(rows-1)*pitch+80),points,intervals,ticks,path:path(),at};}
  const tracks=[];samples.forEach((p,index)=>{const next=samples[Math.min(index+1,samples.length-1)],prev=samples[Math.max(0,index-1)],dx=next.x-prev.x,dy=next.y-prev.y,n=Math.hypot(dx,dy)||1;for(const phase of intervals)if(p.length/length>=phase.start&&p.length/length<=phase.end){const offset=23+phase.lane*9;tracks.push({x:p.x+dy/n*offset,y:p.y-dx/n*offset});}});
  if(!placeRouteLabels(points,samples,{labelHeights,tracks}))recoverRouteLabels(points,samples,{labelHeights});
  const captions=points.map(point=>point.label);

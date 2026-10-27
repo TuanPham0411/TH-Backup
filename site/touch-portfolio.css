@@ -1,0 +1,72 @@
+/* No stale portrait is visible while the current server image loads. */
+.portrait-frame[data-portrait-state=loading] .portrait-video-stage{background:linear-gradient(120deg,#0b1720,#172b31,#0b1720)!important}
+.portrait-frame[data-portrait-state=loading] .portrait-video-stage::after{content:'Loading portrait…';position:absolute;inset:0;display:grid;place-items:center;color:#a2b7c3;font-size:12px;pointer-events:none}
+/* Touch input gets a diagram, deliberate taps and manual photo browsing. */
+.touch-portfolio .route-floating-preview,.touch-portfolio .photo-description-popup{display:none!important}
+.touch-timeline .route-canvas{min-width:720px}
+.touch-timeline-hint{font-size:11px;color:var(--muted);margin:0 0 12px;position:sticky;left:0;width:fit-content}
+.touch-timeline .route-checkpoint.journey-stop{top:calc(var(--checkpoint-y) + var(--touch-pin-offset,0px))!important}
+.touch-timeline .route-checkpoint .journey-pin{width:30px;height:30px;font-size:10px}
+.touch-timeline .journey-pin::after{content:'';position:absolute;inset:-7px;border-radius:50%}
+.touch-timeline .journey-pin:hover{transform:none}
+.touch-timeline .touch-pin-stem{stroke:#91cdb9;stroke-width:1;vector-effect:non-scaling-stroke}
+.touch-timeline .route-year{font-size:14px}
+.touch-portfolio #experience .journey-intro,.touch-portfolio #experience .journey-key,.touch-portfolio .timeline-layout-tools,.touch-portfolio .route-caption,.touch-portfolio .route-leader{display:none!important}
+.touch-portfolio .media-rail-info{display:none!important}
+.touch-portfolio .media-rail-photo::before,.touch-portfolio .media-rail-photo::after{opacity:.45}
+.touch-portfolio .film-sheen::after,.touch-portfolio .hero-image,.touch-portfolio .about-matrix>span,.touch-portfolio #about>div:last-child::before{animation:none!important}
+.touch-portfolio .personal-motion{display:none}
+.touch-portfolio .home-hub a::after{display:none}
+.touch-portfolio .photo-description-popup{visibility:hidden!important}
+@media(max-width:760px){
+ #main-site .site-header{padding:10px 14px;gap:10px}
+ #main-site .site-header .logo{font-size:22px}
+ #main-site .header-actions{gap:6px!important}
+ #main-site #account-open{font-size:11px;min-height:40px;padding:8px 10px}
+ #main-site #menu-toggle{min-width:40px;min-height:40px}
+ #main-site #portfolio-music:disabled{display:none}
+ #main-site #portfolio-music{width:36px;height:40px;min-width:36px;padding:6px;font-size:0}
+ #main-site #portfolio-music::before{content:'♫';font-size:18px}
+ #main-site .hero{min-height:0}
+ #main-site .hero-content{padding-block:28px 22px}
+ #main-site .hero h1{font-size:clamp(34px,8.4vw,44px);letter-spacing:-1.4px}
+ #main-site .hero-summary{font-size:14px;line-height:1.65;margin-bottom:18px}
+ #main-site .hero-bottom{margin-top:22px}
+ #main-site .hero .button-row{gap:9px}
+ #main-site .hero .button{padding:10px 13px;font-size:12px}
+ #main-site .home-hub{gap:8px}
+ #main-site .home-hub a{padding:11px 12px}
+ #main-site .home-hub a small,#main-site .focus-strip{display:none}
+ #main-site .home-hub strong{font-size:13px;margin:6px 0 0}
+ #main-site #about .portrait-frame{max-width:220px}
+ #main-site #about .portrait-caption{padding:10px 8px}
+ #main-site #about>div:last-child{padding:16px 13px}
+ #main-site #about>div:last-child h2{font-size:clamp(26px,6.8vw,34px)}
+ #main-site #about>div:last-child>p:not(.eyebrow){font-size:13px;line-height:1.7}
+ #main-site #about .about-details{gap:12px 18px;margin-block:14px}
+ #main-site .section-heading h2{font-size:28px;letter-spacing:-.8px}
+ #main-site .section-heading>p{font-size:12px}
+ #main-site .expertise-card{display:grid;grid-template-columns:29px minmax(0,1fr);gap:4px 10px;padding:16px}
+ #main-site .expertise-card .skill-number{grid-row:1/5;margin:0;font-size:23px}
+ #main-site .expertise-card>:not(.skill-number){grid-column:2}
+ #main-site .expertise-card h3{font-size:19px;margin:5px 0 7px}
+ #main-site .expertise-card p{font-size:13px;line-height:1.6;margin-bottom:5px}
+ #main-site .toolkit-badge{font-size:11px;padding:6px 9px}
+ #main-site #experience .section-heading{margin-bottom:12px}
+ #main-site #experience .section-heading>a{font-size:11px}
+ #main-site #experience .dated-journey{padding-block:5px!important}
+ #main-site .media-rail-photo{width:178px;height:150px}
+ #main-site .media-rail-viewport{min-height:158px}
+ #main-site .media-rail-toolbar{font-size:11px}
+ #main-site .media-rail-toolbar .text-button{display:none}
+ #main-site .contact-layout{gap:20px}
+ #main-site #contact input,#main-site #contact textarea{font-size:16px}
+ #main-site .site-footer{gap:12px}
+ #main-site .admin-mode-bar{font-size:10px;padding:7px 12px}
+ #main-site .admin-mode-bar .text-button{display:none}
+ #main-site .admin-mode-bar .button{font-size:10px;padding:6px 9px}
+ .portfolio-admin-dialog .editor-fields input,.portfolio-admin-dialog .editor-fields textarea{font-size:16px}
+ .photo-story-dialog{padding:28px 15px 18px}
+ .photo-story-dialog .slide-carousel .carousel-stage img,.photo-story-dialog .slide-carousel .carousel-stage video{height:48dvh}
+ .story-heading h2{font-size:25px}
+}

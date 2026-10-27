@@ -1,3 +1,5 @@
+import {isTouchInterface} from './input-mode.js';
+import {renderMobileJourney} from './mobile-journey.js';
 import {applyTimelinePositions,labelLeader} from './manual-timeline-layout.js';
 import {timelineDrag} from './timeline-drag.js';
 import {previewLifetime} from './preview-lifetime.js';
@@ -6,9 +8,9 @@ import {datedRoute} from './dated-route.js';
 import {storyCarousel} from './story-carousel.js';
 import {stopMedia} from './portfolio-media.js';
 const ns='http://www.w3.org/2000/svg',el=(tag,text,cls)=>{const n=document.createElement(tag);if(text)n.textContent=text;if(cls)n.className=cls;return n;},svg=(tag,attrs)=>{const n=document.createElementNS(ns,tag);for(const[k,v]of Object.entries(attrs))n.setAttribute(k,v);return n;};
-let observer,resizeObserver,dragController;
+let observer,resizeObserver,dragController,mobileController;
 export function renderDatedRoute(items,{openStory,dateLabel,styledTitle,descriptions={},layoutPreferences={},canEdit=false,onSaveLayout}){
- dragController?.dispose();const host=document.getElementById('experience-list');document.querySelectorAll('.route-floating-preview').forEach(n=>{stopMedia(n);n.remove();});host.replaceChildren();host.className='journey-track dated-journey';host.hidden=!items.length;if(!items.length)return;
+ dragController?.dispose();mobileController?.dispose();observer?.disconnect();resizeObserver?.disconnect();const host=document.getElementById('experience-list');document.querySelectorAll('.route-floating-preview').forEach(n=>{stopMedia(n);n.remove();});host.replaceChildren();host.className='journey-track dated-journey';host.hidden=!items.length;if(!items.length)return;if(isTouchInterface()){mobileController=renderMobileJourney(host,items,{openStory,dateLabel});return;}
  const timelineNow=Date.now();let preferences=structuredClone(layoutPreferences),measuredHeights={};let layout=applyTimelinePositions(datedRoute(items,timelineNow),preferences);const labelNodes=[];const canvas=el('div',undefined,'route-canvas');canvas.style.aspectRatio=`1000 / ${layout.height}`;host.append(canvas);let pointerPhase=null,focusPhase=null;
  const mark=(node,items)=>{node.classList.add('phase-member');node.dataset.phases=JSON.stringify(items.map(phaseKey));};
  const focusPhaseNodes=()=>{const key=pointerPhase||focusPhase;canvas.classList.toggle('phase-focus',!!key);for(const node of canvas.querySelectorAll('.phase-member')){const active=!!key&&JSON.parse(node.dataset.phases).includes(key);node.classList.toggle('phase-active',active);node.classList.toggle('phase-muted',!!key&&!active);}};
