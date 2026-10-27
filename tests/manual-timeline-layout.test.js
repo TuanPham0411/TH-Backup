@@ -24,3 +24,7 @@ test('manual caption width and height are validated, applied and reset without t
 test('manual callout connectors have a diagonal segment and a horizontal segment meeting the frame edge',()=>{
  for(const left of [80,220]){const point={x:150,y:150,label:{left,top:20,width:120,height:60}},connector=labelConnector(point);assert.equal(connector.elbow.y,connector.end.y);assert.equal(connector.end.y,50);assert.ok(connector.end.x===left-60||connector.end.x===left+60);assert.equal((connector.path.match(/ L /g)||[]).length,2);assert.ok(Math.abs(Math.hypot(connector.start.x-point.x,connector.start.y-point.y)-20)<.001);}
 });
+
+ test('caption connectors support saved left and right edges independently of caption position',()=>{
+ for(const left of [80,220])for(const side of ['left','right']){const positions={'2020-01-01':{dx:10,dy:50,connectorSide:side}};validateTimelineLayout(positions);const layout=applyTimelinePositions(datedRoute([{id:'job',date:'2020-01-01',end:'2024-01-01',title:'Engineer',kind:'work'}]),positions);assert.equal(layout.points[0].label.connectorSide,side);const point={x:150,y:150,label:{left,top:20,width:120,height:60,connectorSide:side}},connector=labelConnector(point);assert.equal(connector.end.x,left+(side==='left'?-60:60));assert.equal(connector.elbow.y,connector.end.y);assert.equal((connector.path.match(/ L /g)||[]).length,2);}assert.throws(()=>validateTimelineLayout({present:{dx:0,dy:0,connectorSide:'top'}}));
+ });

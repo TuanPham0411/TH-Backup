@@ -3,17 +3,17 @@ export function validateTimelineLayout(value){
  if(!value||typeof value!=='object'||Array.isArray(value)||Object.keys(value).length>400)throw Error('Invalid timeline layout');
  for(const [key,position]of Object.entries(value)){
  if(key!=='present'&&(!/^\d{4}-\d{2}-\d{2}$/.test(key)||!Number.isFinite(Date.parse(key))||new Date(key).toISOString().slice(0,10)!==key))throw Error('Invalid timeline checkpoint');
- if(!position||typeof position!=='object'||Array.isArray(position)||Object.keys(position).some(key=>!['dx','dy','width','height'].includes(key))||!Number.isFinite(position.dx)||!Number.isFinite(position.dy)||Math.abs(position.dx)>900||Math.abs(position.dy)>1000||position.width!==undefined&&(!Number.isFinite(position.width)||position.width<120||position.width>420)||position.height!==undefined&&(!Number.isFinite(position.height)||position.height<20||position.height>480))throw Error('Invalid timeline label position');
+ if(!position||typeof position!=='object'||Array.isArray(position)||Object.keys(position).some(key=>!['dx','dy','width','height','connectorSide'].includes(key))||!Number.isFinite(position.dx)||!Number.isFinite(position.dy)||Math.abs(position.dx)>900||Math.abs(position.dy)>1000||position.width!==undefined&&(!Number.isFinite(position.width)||position.width<120||position.width>420)||position.height!==undefined&&(!Number.isFinite(position.height)||position.height<20||position.height>480)||position.connectorSide!==undefined&&!['left','right'].includes(position.connectorSide))throw Error('Invalid timeline label position');
  }
  return value;
 }
 export function applyTimelinePositions(layout,positions={}){
- for(const point of layout.points){const saved=positions[checkpointLayoutKey(point)];if(!saved)continue;const label=point.label;if(saved.width!==undefined)label.width=saved.width;if(saved.height!==undefined)label.height=saved.height;label.sized=saved.height!==undefined;label.left=Math.max(label.width/2+8,Math.min(992-label.width/2,point.x+saved.dx));label.top=point.y+saved.dy;label.side=label.top+label.height/2<point.y?'above':'below';label.hidden=false;label.compact=false;label.manual=true;label.leader=labelLeader(point);}
+ for(const point of layout.points){const saved=positions[checkpointLayoutKey(point)];if(!saved)continue;const label=point.label;if(saved.width!==undefined)label.width=saved.width;if(saved.height!==undefined)label.height=saved.height;label.sized=saved.height!==undefined;label.connectorSide=saved.connectorSide;label.left=Math.max(label.width/2+8,Math.min(992-label.width/2,point.x+saved.dx));label.top=point.y+saved.dy;label.side=label.top+label.height/2<point.y?'above':'below';label.hidden=false;label.compact=false;label.manual=true;label.leader=labelLeader(point);}
  const labels=layout.points.filter(p=>!p.label.hidden).map(p=>p.label),bottom=layout.originY+layout.height;
  layout.originY=Math.min(layout.originY,...labels.map(label=>label.top-12));layout.height=Math.max(bottom,...labels.map(label=>label.top+label.height+24))-layout.originY;return layout;
 }
 export function labelConnector(point,label=point.label){
- const direction=label.left>=point.x?1:-1,end={x:label.left-direction*label.width/2,y:label.top+label.height/2};
+ const direction=label.connectorSide==='left'?1:label.connectorSide==='right'?-1:label.left>=point.x?1:-1,end={x:label.left-direction*label.width/2,y:label.top+label.height/2};
  const elbow={x:end.x-direction*28,y:end.y},dx=elbow.x-point.x,dy=elbow.y-point.y,distance=Math.hypot(dx,dy)||1;
  const start={x:point.x+dx/distance*20,y:point.y+dy/distance*20};
  return{start,elbow,end,path:`M ${start.x} ${start.y} L ${elbow.x} ${elbow.y} L ${end.x} ${end.y}`};
