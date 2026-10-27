@@ -3,7 +3,7 @@ export function validateTimelineLayout(value){
  if(!value||typeof value!=='object'||Array.isArray(value)||Object.keys(value).length>400)throw Error('Invalid timeline layout');
  for(const [key,position]of Object.entries(value)){
  if(key!=='present'&&(!/^\d{4}-\d{2}-\d{2}$/.test(key)||!Number.isFinite(Date.parse(key))||new Date(key).toISOString().slice(0,10)!==key))throw Error('Invalid timeline checkpoint');
- if(!position||typeof position!=='object'||Array.isArray(position)||Object.keys(position).some(key=>!['dx','dy','width','height'].includes(key))||!Number.isFinite(position.dx)||!Number.isFinite(position.dy)||Math.abs(position.dx)>900||Math.abs(position.dy)>1000||position.width!==undefined&&(!Number.isFinite(position.width)||position.width<120||position.width>420)||position.height!==undefined&&(!Number.isFinite(position.height)||position.height<48||position.height>480))throw Error('Invalid timeline label position');
+ if(!position||typeof position!=='object'||Array.isArray(position)||Object.keys(position).some(key=>!['dx','dy','width','height'].includes(key))||!Number.isFinite(position.dx)||!Number.isFinite(position.dy)||Math.abs(position.dx)>900||Math.abs(position.dy)>1000||position.width!==undefined&&(!Number.isFinite(position.width)||position.width<120||position.width>420)||position.height!==undefined&&(!Number.isFinite(position.height)||position.height<20||position.height>480))throw Error('Invalid timeline label position');
  }
  return value;
 }
