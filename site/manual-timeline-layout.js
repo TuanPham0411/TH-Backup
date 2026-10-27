@@ -12,4 +12,10 @@ export function applyTimelinePositions(layout,positions={}){
  const labels=layout.points.filter(p=>!p.label.hidden).map(p=>p.label),bottom=layout.originY+layout.height;
  layout.originY=Math.min(layout.originY,...labels.map(label=>label.top-12));layout.height=Math.max(bottom,...labels.map(label=>label.top+label.height+24))-layout.originY;return layout;
 }
-export function labelLeader(point){const label=point.label,left=label.left-label.width/2,right=label.left+label.width/2;const x=Math.max(left,Math.min(right,point.x)),y=point.y<label.top?label.top-3:point.y>label.top+label.height?label.top+label.height+3:point.y,dx=x-point.x,dy=y-point.y,distance=Math.hypot(dx,dy)||1;return`M ${point.x+dx/distance*20} ${point.y+dy/distance*20} L ${x} ${y}`;}
+export function labelConnector(point,label=point.label){
+ const direction=label.left>=point.x?1:-1,end={x:label.left-direction*label.width/2,y:label.top+label.height/2};
+ const elbow={x:end.x-direction*28,y:end.y},dx=elbow.x-point.x,dy=elbow.y-point.y,distance=Math.hypot(dx,dy)||1;
+ const start={x:point.x+dx/distance*20,y:point.y+dy/distance*20};
+ return{start,elbow,end,path:`M ${start.x} ${start.y} L ${elbow.x} ${elbow.y} L ${end.x} ${end.y}`};
+}
+export const labelLeader=point=>labelConnector(point).path;

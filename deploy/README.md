@@ -354,3 +354,10 @@ The public portfolio uses smaller section gaps, a shorter hero, tighter headings
 The next compact pass reduces road row pitch from 210 to 180 units and narrows bends from 54 to 48 units. Date-to-arc-distance mapping and checkpoint-relative saved caption preferences remain unchanged.
 
 Complete endpoints have a small star on the checkpoint border; Graduate endpoints have a laurel wreath. Shared endpoints can show both at separate border positions. The existing central number/icon remains intact and the decorative SVGs ignore pointer events.
+
+### Cinematic timeline callouts and badge visibility
+Timeline captions now have dark film-style frames and shared two-segment leaders: a diagonal from the checkpoint ring to an elbow, followed by a horizontal attachment to the frame's side. Automatic placement checks both segments against the road; manual movement/resizing uses the same connector geometry. Placement uses measured text height on wide screens instead of retaining oversized estimates. The row pitch is reduced to 130 units with 38-unit bends.
+
+Reflow only changes viewBoxes of the three top-level scene SVGs. Nested achievement badge SVGs keep their 24×24 viewBox; previously the broad SVG selector inadvertently replaced these and made badges almost invisible. Complete stars and Graduate laurels are now larger and positioned directly over the checkpoint ring, with separate positions when both apply.
+
+About uses a centered 360px portrait plus bounded 900px copy column instead of an expanding empty portrait column. Heading, body copy, profile caption, focus details and contact link align centrally; mobile stacks the same composition. Binary/photo background layers are slightly brighter while retaining a dark reading surface.

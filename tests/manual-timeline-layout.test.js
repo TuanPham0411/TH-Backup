@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {validateTimelineLayout,applyTimelinePositions,checkpointLayoutKey} from '../site/manual-timeline-layout.js';
+import {validateTimelineLayout,applyTimelinePositions,checkpointLayoutKey,labelConnector} from '../site/manual-timeline-layout.js';
 import {datedRoute} from '../site/dated-route.js';
 import {normalizePortfolio,defaultPortfolio,publicPortfolio} from '../site/portfolio-model.js';
 test('manual label positions leave the chronological road, pins and phases unchanged',()=>{
@@ -19,4 +19,8 @@ test('public output removes positions belonging only to private milestone dates'
 
 test('manual caption width and height are validated, applied and reset without touching event data',()=>{
  const positions={'2020-01-01':{dx:10,dy:50,width:280,height:120}};validateTimelineLayout(positions);const items=[{id:'job',date:'2020-01-01',end:'2024-01-01',title:'Engineer',kind:'work'}];const layout=applyTimelinePositions(datedRoute(items),positions);assert.equal(layout.points[0].label.width,280);assert.equal(layout.points[0].label.height,120);assert.equal(layout.points[0].label.sized,true);const reset=applyTimelinePositions(datedRoute(items),{});assert.ok(reset.points.every(p=>!p.label.hidden&&p.events.length));for(const position of [{dx:0,dy:0,width:10},{dx:0,dy:0,height:2000}])assert.throws(()=>validateTimelineLayout({present:position}));
+});
+
+test('manual callout connectors have a diagonal segment and a horizontal segment meeting the frame edge',()=>{
+ for(const left of [80,220]){const point={x:150,y:150,label:{left,top:20,width:120,height:60}},connector=labelConnector(point);assert.equal(connector.elbow.y,connector.end.y);assert.equal(connector.end.y,50);assert.ok(connector.end.x===left-60||connector.end.x===left+60);assert.equal((connector.path.match(/ L /g)||[]).length,2);assert.ok(Math.abs(Math.hypot(connector.start.x-point.x,connector.start.y-point.y)-20)<.001);}
 });
