@@ -28,3 +28,17 @@ export function placeRouteLabels(points,road,{labelHeights={},maxGap=100,tracks=
  if(!solve())return false;
  points.forEach((point,index)=>point.label=assigned.get(index));return true;
 }
+
+// Recover labels one at a time if a dense cluster cannot satisfy the global
+// solver. A single conflict must never hide every checkpoint description.
+export function recoverRouteLabels(points,road,{labelHeights={}}={}){
+ const placed=[];
+ for(const point of points){const width=190,measured=labelHeights[point.date],height=Math.max(typeof measured==='object'?measured.height:measured||0,28+point.events.reduce((n,event)=>n+Math.ceil((event.item.title.length+12)/30)*17+4,0));let best;
+ for(const shift of [0,-36,36,-72,72])for(const gap of [36,52,68,84,100])for(const side of ['above','below']){
+ const left=Math.max(width/2+8,Math.min(992-width/2,point.x+shift)),top=side==='above'?point.y-gap-height:point.y+gap,a={x:point.x,y:point.y+(side==='above'?-20:20)},b={x:left,y:side==='above'?top+height+3:top-3},box={left,top,width,height,side,gap,compact:false,recovered:true,leader:`M ${a.x} ${a.y} L ${b.x} ${b.y}`};
+ const collision=placed.reduce((sum,other)=>sum+(overlaps(box,other)?1:0),0),cross=road.some(p=>Math.abs(p.distance-point.distance)>42&&segmentDistance(p,a,b)<13),textRoad=road.some(p=>Math.abs(p.x-left)<width/2+8&&p.y>top-8&&p.y<top+height+8);
+ const cost=collision*100000+Number(cross)*20000+Number(textRoad)*10000+gap+Math.abs(shift)*.6;if(!best||cost<best.cost)best={...box,cost};
+ }
+ point.label=best;placed.push(best);
+ }
+}

@@ -37,16 +37,16 @@ export function renderDatedRoute(items,{openStory,dateLabel,styledTitle,descript
  peek.addEventListener('keydown',e=>{if(e.key==='Escape')hide();});stop.addEventListener('pointerenter',show);stop.addEventListener('focusin',show);stop.addEventListener('keydown',e=>{if(e.key==='Escape')hide();});
 
 
- stop.append(pin);canvas.append(stop,caption);labelNodes.push({stop,caption,leader});
+ stop.append(pin);canvas.append(stop,caption);labelNodes.push({stop,pin,caption,leader});
  });
  // Measure real wrapped text at the current viewport scale before final placement.
  resizeObserver?.disconnect();let lastWidth=0;
- const paint=()=>{canvas.style.aspectRatio=`1000 / ${layout.height}`;for(const art of canvas.querySelectorAll('svg'))art.setAttribute('viewBox',`0 ${layout.originY} 1000 ${layout.height}`);labelNodes.forEach(({stop,caption,leader},index)=>{const point=layout.points[index];caption.hidden=!!point.label.hidden;caption.dataset.compact=String(!!point.label.compact);caption.dataset.manual=String(!!point.label.manual);stop.style.setProperty('--checkpoint-y',(point.y-layout.originY)/layout.height*100+'%');caption.style.left=point.label.left/10+'%';caption.style.width=point.label.width/10+'%';caption.style.top=(point.label.top-layout.originY)/layout.height*100+'%';caption.dataset.side=point.label.side;leader.setAttribute('d',point.label.leader);});};
+ const paint=()=>{canvas.style.aspectRatio=`1000 / ${layout.height}`;for(const art of canvas.querySelectorAll('svg'))art.setAttribute('viewBox',`0 ${layout.originY} 1000 ${layout.height}`);labelNodes.forEach(({stop,caption,leader},index)=>{const point=layout.points[index];caption.hidden=!!point.label.hidden;caption.dataset.compact=String(!!point.label.compact);caption.dataset.manual=String(!!point.label.manual);caption.dataset.sized=String(!!point.label.sized);caption.style.height=point.label.sized?point.label.height*(canvas.clientWidth||1000)/1000+'px':'';stop.style.setProperty('--checkpoint-y',(point.y-layout.originY)/layout.height*100+'%');caption.style.left=point.label.left/10+'%';caption.style.width=point.label.width/10+'%';caption.style.top=(point.label.top-layout.originY)/layout.height*100+'%';caption.dataset.side=point.label.side;leader.setAttribute('d',point.label.leader);});};
  const updatePositions=next=>{preferences=structuredClone(next);layout=applyTimelinePositions(datedRoute(items,timelineNow,{labelHeights:measuredHeights}),preferences);paint();};
  const fitLabels=()=>{if(!canvas.isConnected||!canvas.clientWidth||canvas.clientWidth===lastWidth)return;lastWidth=canvas.clientWidth;const scale=lastWidth/1000;measuredHeights={};labelNodes.forEach(({caption},index)=>{measuredHeights[layout.points[index].date]={height:Math.ceil(caption.getBoundingClientRect().height/scale)+4,width:layout.points[index].label.width};});updatePositions(preferences);};
  if(canEdit)dragController=timelineDrag({host,canvas,getLayout:()=>layout,labelNodes,positions:preferences,onChange:updatePositions,onSave:onSaveLayout});
 
- requestAnimationFrame(fitLabels);if('ResizeObserver'in window){resizeObserver=new ResizeObserver(fitLabels);resizeObserver.observe(canvas);}
+ paint();requestAnimationFrame(fitLabels);if('ResizeObserver'in window){resizeObserver=new ResizeObserver(fitLabels);resizeObserver.observe(canvas);}
 
  observer?.disconnect();if('IntersectionObserver'in window){observer=new IntersectionObserver(([e])=>host.classList.toggle('journey-playing',e.isIntersecting));observer.observe(host);}else host.classList.add('journey-playing');
 }

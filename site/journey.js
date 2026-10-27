@@ -1,3 +1,4 @@
+import {mediaRail,disposeMediaRails} from './media-rail.js';
 import {initPersonalMotion} from './personal-motion.js';
 import {eventLines} from './timeline-events.js';
 import {initAboutMatrix} from './about-matrix.js';
@@ -23,8 +24,8 @@ const dialog=el('dialog',undefined,'story-dialog');dialog.setAttribute('aria-lab
 dialog.addEventListener('close',()=>stopMedia(dialog));
 export function openStory(item,index=0){
  stopMedia(dialog);dialog.replaceChildren();const close=el('button','×','dialog-close');close.type='button';close.setAttribute('aria-label','Close story');close.onclick=()=>dialog.close();
- const heading=el('header',undefined,'story-heading');heading.append(el('span',item.kind==='education'?'EDUCATION / LEARNING':'MY JOURNEY / CHAPTER','story-kicker'),styledTitle(el('h2',item.title),itemKey(item)),el('p',dateLabel(item),'story-date'),item.checkpointEvents?eventLines(item.checkpointEvents,document):el('p',item.subtitle,'story-subtitle'));
- dialog.append(close,heading,el('p',item.description,'story-copy'));if(item.public===false)heading.prepend(el('span','🔒 Private · visible only to you','private-badge'));const tags=el('div',undefined,'tags');for(const t of item.tags||[])tags.append(el('span',t));dialog.append(tags,storyGallery(item));dialog.showModal();
+ const heading=el('header',undefined,'story-heading');heading.append(el('span',item.photoStory?'PHOTO / STORY':item.kind==='education'?'EDUCATION / LEARNING':'MY JOURNEY / CHAPTER','story-kicker'),styledTitle(el('h2',item.title),itemKey(item)),el('p',dateLabel(item),'story-date'),item.checkpointEvents?eventLines(item.checkpointEvents,document):el('p',item.subtitle,'story-subtitle'));
+ dialog.classList.toggle('photo-story-dialog',item.photoStory===true);dialog.append(close,heading,el('p',item.description,'story-copy'));if(item.public===false)heading.prepend(el('span','🔒 Private · visible only to you','private-badge'));const tags=el('div',undefined,'tags');for(const t of item.tags||[])tags.append(el('span',t));dialog.append(tags,storyGallery(item));dialog.showModal();
 }
 
 dialog.onclick=e=>{if(e.target===dialog&&!(e.clientX>=dialog.getBoundingClientRect().left&&e.clientX<=dialog.getBoundingClientRect().right&&e.clientY>=dialog.getBoundingClientRect().top&&e.clientY<=dialog.getBoundingClientRect().bottom))dialog.close();};
@@ -49,9 +50,11 @@ export function renderPortfolio(input){
  const entries=timelineEntries(value);drawJourney(entries);document.getElementById('experience').hidden=!entries.length;
  const education=document.querySelector('.education-grid');education.replaceChildren();education.hidden=true;
 
+ disposeMediaRails();
  for(const group of ['activities','hobbies','family','notes']){
  const section=document.getElementById(`personal-${group}`);section.hidden=!value[group].length;const grid=section.querySelector('.personal-grid');grid.replaceChildren();
- for(const item of value[group]){
+ if(group!=='notes'&&value[group].some(item=>item.media.length))grid.append(mediaRail(value[group].filter(item=>item.media.length),{group,descriptions:value.mediaDescriptions,openStory}));
+ for(const item of value[group].filter(item=>group==='notes'||!item.media.length)){
  const card=el('article',undefined,'personal-card personal-story'),copy=el('div',undefined,'personal-story-copy');
  const update=id=>{const info=value.mediaDescriptions[id]||{};copy.replaceChildren();if(item.public===false)copy.append(el('span','🔒 Private','private-badge'));copy.append(el('span',item.subtitle,'eyebrow'),styledTitle(el('h3',info.title||item.title),info.title?`photo-${id.replace(/[^a-zA-Z0-9_-]/g,'-')}`:`item-${group}-${item.id}`),el('p',info.description||item.description,'personal-photo-copy'));const more=el('button','View details ↗','text-button');more.type='button';more.onclick=()=>openStory({...item,group});copy.append(more);copy.classList.remove('photo-copy-out');copy.classList.add('photo-copy-enter');};
  if(item.media.length)card.append(storyCarousel(item.media,item.title,{rotate:true,descriptions:value.mediaDescriptions,onChange:update,onTransition:phase=>{if(phase==='out'){copy.classList.remove('photo-copy-enter');copy.classList.add('photo-copy-out');}}}));else{card.append(el('span',group==='family'?'♡':'↗','personal-art'));update('');}card.append(copy);grid.append(card);

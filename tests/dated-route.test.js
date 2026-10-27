@@ -1,3 +1,4 @@
+import {placeRouteLabels,recoverRouteLabels} from '../site/route-labels.js';
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {orderedEvents,eventLabel} from '../site/timeline-events.js';
@@ -48,4 +49,12 @@ test('screenshot regression: dense June/July milestones keep full captions local
  const names={training:'Lilama 2 International College of Technology',apprentice:'Apprentice · TGA dual training',technician:'Technician',study:'Ho Chi Minh City University of Technology',assistant:'Assistant Test Engineer',senior:'Senior Assistant Test Engineer',support:'Operational Technical Support Engineer',engineer:'Operational Technical Engineer'};for(const item of items)item.title=names[item.id];
  const route=datedRoute(items,Date.parse('2026-10-27'));
  for(const point of route.points){assert.equal(point.label.compact,false);assert.equal(point.label.hidden,undefined);assert.ok(point.label.gap<=100);const [ax,ay,bx,by]=point.label.leader.match(/-?\d+(?:\.\d+)?(?:e[+-]?\d+)?/g).map(Number),dx=bx-ax,dy=by-ay;for(let i=0;i<=500;i++){const road=route.at(i/500);if(Math.abs(road.distance-point.distance)<=42)continue;const t=Math.max(0,Math.min(1,((road.x-ax)*dx+(road.y-ay)*dy)/(dx*dx+dy*dy||1)));assert.ok(Math.hypot(road.x-ax-dx*t,road.y-ay-dy*t)>=12,'leader must not cut through another lane');}}
+});
+
+test('new earlier and future checkpoints and automatic reset always retain their event captions',()=>{
+ const items=[entry('early','1990-01-01','1991-01-01'),entry('job','2020-01-01','2026-01-01'),entry('future','2090-01-01','2100-01-01')];for(const now of ['2026-10-27','2026-10-28']){const route=datedRoute(items,Date.parse(now));assert.equal(route.points.length,6);assert.ok(route.points.every(point=>!point.label.hidden&&!point.label.compact&&point.label.height>0&&point.events.length));}
+});
+
+test('a failed global label placement recovers individual full descriptions instead of hiding all',()=>{
+ const points=[{date:'2026-01-01',x:150,y:70,distance:0,events:[{role:'start',item:{title:'First phase'}}]},{date:'2026-01-02',x:150,y:80,distance:0,events:[{role:'start',item:{title:'Next phase'}}]}],road=Array.from({length:60},(_,i)=>({x:150,y:i*4,distance:1000}));assert.equal(placeRouteLabels(points,road),false);recoverRouteLabels(points,road);assert.ok(points.every(point=>point.label.recovered&&!point.label.hidden&&!point.label.compact&&point.label.height>0&&point.events[0].item.title));
 });

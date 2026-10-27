@@ -16,3 +16,7 @@ test('layout validation rejects unsafe keys, invalid coordinates and excessive p
 test('public output removes positions belonging only to private milestone dates',()=>{
  const value=normalizePortfolio(defaultPortfolio);value.journey.push({id:'private-date',date:'2001-02-03',end:'2002-03-04',title:'Private',subtitle:'',description:'',tags:[],media:[],public:false});value.timelineLayout={'2001-02-03':{dx:10,dy:20},'2016-10-01':{dx:0,dy:60}};const visible=publicPortfolio(value);assert.equal(visible.timelineLayout['2001-02-03'],undefined);assert.deepEqual(visible.timelineLayout['2016-10-01'],{dx:0,dy:60});
 });
+
+test('manual caption width and height are validated, applied and reset without touching event data',()=>{
+ const positions={'2020-01-01':{dx:10,dy:50,width:280,height:120}};validateTimelineLayout(positions);const items=[{id:'job',date:'2020-01-01',end:'2024-01-01',title:'Engineer',kind:'work'}];const layout=applyTimelinePositions(datedRoute(items),positions);assert.equal(layout.points[0].label.width,280);assert.equal(layout.points[0].label.height,120);assert.equal(layout.points[0].label.sized,true);const reset=applyTimelinePositions(datedRoute(items),{});assert.ok(reset.points.every(p=>!p.label.hidden&&p.events.length));for(const position of [{dx:0,dy:0,width:10},{dx:0,dy:0,height:2000}])assert.throws(()=>validateTimelineLayout({present:position}));
+});
