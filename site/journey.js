@@ -12,6 +12,7 @@ import {setMediaTypes,mediaElement,mediaType,stopMedia} from './portfolio-media.
 import {applyCopy} from './page-copy.js';
 import './journey.css';
 import './dated-journey.css';
+import './compact-cinema.css';
 import {defaultPortfolio,mediaURL,normalizePortfolio} from './portfolio-model.js';
 const ns='http://www.w3.org/2000/svg';
 export const el=(tag,text,cls)=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(cls)n.className=cls;return n;};

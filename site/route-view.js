@@ -1,7 +1,7 @@
 import {applyTimelinePositions} from './manual-timeline-layout.js';
 import {timelineDrag} from './timeline-drag.js';
 import {previewLifetime} from './preview-lifetime.js';
-import {phaseKey,orderedEvents,eventText,eventLines} from './timeline-events.js';
+import {phaseKey,orderedEvents,eventText,eventLines,addMilestoneBadges} from './timeline-events.js';
 import {datedRoute} from './dated-route.js';
 import {storyCarousel} from './story-carousel.js';
 import {stopMedia} from './portfolio-media.js';
@@ -28,7 +28,7 @@ export function renderDatedRoute(items,{openStory,dateLabel,styledTitle,descript
 
  const item={...unique[0],title:point.date,checkpointEvents:events,date:point.date,end:point.date,kind:'milestone',subtitle:labels.join('\n'),description:unique.map(i=>`${i.title}\n${dateLabel(i)}\n${i.description}`).join('\n\n'),media:[...new Set(unique.flatMap(i=>i.media||[]))],tags:[...new Set(unique.flatMap(i=>i.tags||[]))],public:unique.every(i=>i.public!==false)};
  const stop=el('div',undefined,`journey-stop route-checkpoint${allEducation?' education-stop':''}`);stop.style.setProperty('--checkpoint-x',point.x/10+'%');stop.style.setProperty('--checkpoint-y',(point.y-layout.originY)/layout.height*100+'%');stop.style.setProperty('--chapter-hue',allEducation?'270':'165');stop.dataset.date=point.date;stop.dataset.events=String(point.events.length);mark(stop,unique);if(!item.public)stop.classList.add('private-entry');stop.classList.add(point.events.length>1?'checkpoint-shared':point.events[0].role==='end'?'checkpoint-end':'checkpoint-start');
- const pin=el('button',allEducation?'🎓':String(index+1).padStart(2,'0'),'journey-pin');pin.type='button';pin.setAttribute('aria-label',point.date+': '+labels.join('; '));pin.onclick=()=>{hide();openStory(item);};
+ const pin=el('button',allEducation?'🎓':String(index+1).padStart(2,'0'),'journey-pin');addMilestoneBadges(pin,events,document);pin.type='button';pin.setAttribute('aria-label',point.date+': '+labels.join('; '));pin.onclick=()=>{hide();openStory(item);};
  const caption=el('button',undefined,'journey-caption route-caption');caption.type='button';caption.setAttribute('aria-label',point.date+': '+labels.join('; '));caption.hidden=!!point.label.hidden;caption.dataset.compact=String(!!point.label.compact);caption.style.left=point.label.left/10+'%';caption.style.width=point.label.width/10+'%';caption.dataset.side=point.label.side;caption.style.top=(point.label.top-layout.originY)/layout.height*100+'%';caption.append(el('span',point.events.every(e=>e.role==='ongoing')?'Present · '+point.date:dateLabel({...item,datePrecision:point.events.every(e=>e.item.datePrecision==='year')?'year':'day'}),'journey-date'),eventLines(events,document));mark(caption,unique);for(const line of caption.querySelectorAll('.checkpoint-event'))mark(line,events.filter(e=>phaseKey(e.item)===line.dataset.phase).map(e=>e.item));caption.onclick=()=>{hide();openStory(item);};
  const leader=svg('path',{d:point.label.leader,class:'route-leader'});mark(leader,unique);art.append(leader);
  const peek=el('div',undefined,'journey-peek route-floating-preview');peek.hidden=true;document.body.append(peek);peek.append(el('h3',dateLabel({...item,end:'',kind:'milestone'})),el('p',point.date,'story-date'),eventLines(events,document));if(item.media.length)peek.append(storyCarousel(item.media,title,{rotate:true,descriptions}));const read=el('button','View details ↗','text-button');read.type='button';read.onclick=()=>{hide();openStory(item);};peek.append(read);
