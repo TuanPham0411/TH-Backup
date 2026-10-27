@@ -114,3 +114,5 @@ Phones use a touch layout with readable ticket cards and three feedback sections
 ### Touch portfolio
 
 Phones use a compact diagram-only journey with swipe browsing and tap-to-open checkpoints. Hover previews, external checkpoint captions and automatic media-rail motion are disabled for narrow screens or coarse touch input; desktop interactions remain available. Portraits start without a bundled sample source and become visible only after the authoritative content image has loaded, including after replacement or removal.
+
+Timeline callouts support three inset connector points (25%, 50%, 75%) on each of the four edges. Arrange labels exposes twelve clickable anchors plus Point and Length controls; Length accepts 0–300 timeline units and saves per checkpoint. Existing left/right midpoint layouts remain compatible. The early portfolio bootstrap starts fresh content loading and preloads the current portrait before the main UI; portrait bytes can be stored privately but are revalidated and authorized on every subsequent request.
