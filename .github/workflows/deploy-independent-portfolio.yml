@@ -16,10 +16,10 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: TuanPham0411/TH-Portfolio
-          ref: dcb2010ab605926ac6d6e843612c901e242b1c47
+          ref: f3b22044dab23cb532363ef4b4fd56ce5189c1c9
           persist-credentials: false
       - name: Verify requested source
-        run: test "$(git rev-parse HEAD)" = dcb2010ab605926ac6d6e843612c901e242b1c47
+        run: test "$(git rev-parse HEAD)" = f3b22044dab23cb532363ef4b4fd56ce5189c1c9
       - uses: actions/setup-node@v4
         with: {node-version: '22', cache: npm}
       - run: npm ci
@@ -55,7 +55,7 @@ jobs:
       - name: Install Portfolio only, preserving live content
         env:
           RELEASE_DIR: ${{ runner.temp }}/th-release-${{ github.run_id }}-${{ github.run_attempt }}
-          RELEASE_ID: portfolio-dcb2010ab605926ac6d6e843612c901e242b1c47-${{ github.run_id }}-${{ github.run_attempt }}
+          RELEASE_ID: portfolio-f3b22044dab23cb532363ef4b4fd56ce5189c1c9-${{ github.run_id }}-${{ github.run_attempt }}
         run: |
           set -euo pipefail
           cd "$RELEASE_DIR"
@@ -71,7 +71,7 @@ jobs:
               request=urllib.request.Request('http://127.0.0.1'+path,headers={'Host':host})
               with urllib.request.urlopen(request,timeout=15) as response:return json.load(response)
           build=get('/build-info.json','th.io.vn')
-          assert build['revision']=='dcb2010ab605926ac6d6e843612c901e242b1c47'
+          assert build['revision']=='f3b22044dab23cb532363ef4b4fd56ce5189c1c9'
           assert build['frontendSha256']=='c2fe66bfde4c24b707d2f9733529c72db5852fc0a4245a4cfae1fafea9b2fc86'
           assert get('/api/health','th.io.vn')['service']=='th-portfolio'
           assert get('/api/health','mes.th.io.vn')['ok']
@@ -93,10 +93,10 @@ jobs:
           import json,time,urllib.request
           for attempt in range(12):
               try:
-                  request=urllib.request.Request('https://th.io.vn/build-info.json?revision=dcb2010ab605926ac6d6e843612c901e242b1c47',headers={'Cache-Control':'no-cache'})
+                  request=urllib.request.Request('https://th.io.vn/build-info.json?revision=f3b22044dab23cb532363ef4b4fd56ce5189c1c9',headers={'Cache-Control':'no-cache'})
                   with urllib.request.urlopen(request,timeout=15) as response:data=json.load(response)
                   assert data['repository']=='TuanPham0411/TH-Portfolio'
-                  assert data['revision']=='dcb2010ab605926ac6d6e843612c901e242b1c47'
+                  assert data['revision']=='f3b22044dab23cb532363ef4b4fd56ce5189c1c9'
                   print('Public Portfolio is serving the requested latest build.')
                   break
               except Exception:
