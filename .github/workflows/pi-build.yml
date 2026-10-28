@@ -71,7 +71,7 @@ jobs:
             work/release.sha256
           retention-days: 7
   deploy:
-    if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/feat/mes-quick-access')
+    if: false # Deployments paused: projects split; replacement TH-Server is not provisioned
     needs: build
     runs-on: [self-hosted, Linux, ARM64]
     timeout-minutes: 10
