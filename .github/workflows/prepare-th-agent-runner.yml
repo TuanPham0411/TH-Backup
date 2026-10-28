@@ -34,7 +34,7 @@ jobs:
             python3 - <<'PY'
           import json
           from pathlib import Path
-          data=json.loads(Path('.runner').read_text())
+          data=json.loads(Path('.runner').read_text(encoding='utf-8-sig'))
           assert data.get('gitHubUrl','').rstrip('/').lower()=='https://github.com/tuanpham0411/th-agent', 'Existing directory belongs to another repository'
           assert data.get('agentName')=='th-agent', 'Existing directory belongs to another runner'
           print('Existing th-agent registration preserved.')
