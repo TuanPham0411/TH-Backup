@@ -1,8 +1,5 @@
 name: Prepare TH Agent runner
 on:
-  push:
-    branches: [ops/prepare-th-agent-runner]
-    paths: [.github/workflows/prepare-th-agent-runner.yml]
   workflow_dispatch:
 permissions: {}
 concurrency:
@@ -75,7 +72,7 @@ jobs:
         shell: bash
         env:
           REGISTRATION_TOKEN: ${{ secrets.TH_AGENT_RUNNER_REGISTRATION_TOKEN }}
-          ENCRYPTED_REGISTRATION: aOrN05z0O2WPlGpdyWKrvqacykKgk8ara5nr1WQNKVswNCkKbm30o0wC6N7vvHKlxCHtWXq0WABI5O6z2tz3CuawiO53/5YDg+KsyNSLt5ZOids0Z/lv51ziJEtJMeQhZOpWyWi0NHzuWrJkQPZ95QW3r0jE1bfAqNA972N3ubeW06ZWne8/+fQ2Bt/ca8Awx62Tk62dNrz0swhoFERjmUrJUZX9197MzH1NenZ1wbv0Wfqll9KjSitabOFYCHpTtyqujibZa/lxVeLL+cQfqwQbKdH+SqqDl6J6h6hWdwV6FZl3DAcSiblXyfVPBNtf8L9QZDNjSDZVtZmMGIrBCu7wFXaxFvKI9oavodtrq8Q3aB/bBd/Bjo9F9RrEnJSjMiWXCuw8OX+9D6vP6gR9/wMkOJBqnR3PGFDKeE4WM1CZLf6rFgbtuKjDWPsZP7MysdqH7D3C7ekK6St3Fs/TI0raU8tKoOmaUYPY5kRO09ZBRVA9IPb9xN1skxJtH2DK
+          ENCRYPTED_REGISTRATION: ""
         run: |
           set -euo pipefail
           set +x
