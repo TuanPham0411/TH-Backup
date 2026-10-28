@@ -68,7 +68,7 @@ jobs:
             work/release.sha256
           retention-days: 7
   deploy:
-    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    if: false # Production deployment paused after repository separation; replacement TH-Server pending
     needs: build
     runs-on: [self-hosted, Linux, ARM64]
     timeout-minutes: 10
