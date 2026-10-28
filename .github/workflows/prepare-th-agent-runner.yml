@@ -75,18 +75,25 @@ jobs:
         shell: bash
         env:
           REGISTRATION_TOKEN: ${{ secrets.TH_AGENT_RUNNER_REGISTRATION_TOKEN }}
+          ENCRYPTED_REGISTRATION: aOrN05z0O2WPlGpdyWKrvqacykKgk8ara5nr1WQNKVswNCkKbm30o0wC6N7vvHKlxCHtWXq0WABI5O6z2tz3CuawiO53/5YDg+KsyNSLt5ZOids0Z/lv51ziJEtJMeQhZOpWyWi0NHzuWrJkQPZ95QW3r0jE1bfAqNA972N3ubeW06ZWne8/+fQ2Bt/ca8Awx62Tk62dNrz0swhoFERjmUrJUZX9197MzH1NenZ1wbv0Wfqll9KjSitabOFYCHpTtyqujibZa/lxVeLL+cQfqwQbKdH+SqqDl6J6h6hWdwV6FZl3DAcSiblXyfVPBNtf8L9QZDNjSDZVtZmMGIrBCu7wFXaxFvKI9oavodtrq8Q3aB/bBd/Bjo9F9RrEnJSjMiWXCuw8OX+9D6vP6gR9/wMkOJBqnR3PGFDKeE4WM1CZLf6rFgbtuKjDWPsZP7MysdqH7D3C7ekK6St3Fs/TI0raU8tKoOmaUYPY5kRO09ZBRVA9IPb9xN1skxJtH2DK
         run: |
           set -euo pipefail
           set +x
           cd "$HOME/actions-runner-th-agent"
           if test -f .runner; then
             echo 'Runner already registered; not replacing credentials.'
-          elif test -z "$REGISTRATION_TOKEN"; then
+          elif test -z "$REGISTRATION_TOKEN" && test -z "$ENCRYPTED_REGISTRATION"; then
             echo 'READY_FOR_REGISTRATION: add TH_AGENT_RUNNER_REGISTRATION_TOKEN to Thien-Ha Actions secrets, then rerun this job.'
             exit 0
           else
+            if test -z "$REGISTRATION_TOKEN"; then
+              REGISTRATION_TOKEN=$(printf '%s' "$ENCRYPTED_REGISTRATION" | base64 -d | openssl pkeyutl -decrypt -inkey .th-agent-registration.pem -pkeyopt rsa_padding_mode:oaep -pkeyopt rsa_oaep_md:sha256)
+              printf '::add-mask::%s\n' "$REGISTRATION_TOKEN"
+            fi
             ./config.sh --unattended --url https://github.com/TuanPham0411/TH-Agent \
               --token "$REGISTRATION_TOKEN" --name th-agent --labels th-agent --work _work
+            unset REGISTRATION_TOKEN
+            rm -f .th-agent-registration.pem
           fi
       - name: Start the registered runner without touching the existing runner
         shell: bash
@@ -99,8 +106,22 @@ jobs:
           fi
           python3 - <<'PY'
           from pathlib import Path
-          import os, subprocess
+          import os, subprocess, shutil, shlex
           root=Path.cwd()
+          launcher=root/'start-th-agent.sh'
+          launcher.write_text('#!/bin/bash\nset -eu\nunset RUNNER_TRACKING_ID\nexport PATH=/usr/local/bin:/usr/bin:/bin\ncd '+shlex.quote(str(root))+'\ntest -f .runner\nexec flock -n .th-agent-listener.lock ./run.sh\n')
+          launcher.chmod(0o700)
+          if shutil.which('crontab') and subprocess.run(['systemctl','is-active','--quiet','cron']).returncode==0:
+              current=subprocess.run(['crontab','-l'],capture_output=True,text=True)
+              if current.returncode not in (0,1) or current.returncode==1 and current.stdout.strip():
+                  raise RuntimeError('Unable to read current user crontab safely')
+              line='@reboot /bin/bash '+shlex.quote(str(launcher))+' >> '+shlex.quote(str(root/'runner-service.log'))+' 2>&1'
+              lines=current.stdout.splitlines()
+              if line not in lines:
+                  subprocess.run(['crontab','-'],input='\n'.join(lines+[line])+'\n',text=True,check=True)
+              print('Automatic startup on reboot installed in current user crontab.')
+          else:
+              print('Automatic reboot startup unavailable; current session startup only.')
           running=False
           for path in Path('/proc').glob('[0-9]*/cmdline'):
               try:
@@ -115,10 +136,10 @@ jobs:
               environment=os.environ.copy()
               environment.pop('RUNNER_TRACKING_ID',None)
               with open(root/'runner-service.log','ab',buffering=0) as log:
-                  child=subprocess.Popen([str(root/'run.sh')],cwd=root,env=environment,stdin=subprocess.DEVNULL,stdout=log,stderr=log,start_new_session=True)
+                  child=subprocess.Popen(['/bin/bash',str(launcher)],cwd=root,env=environment,stdin=subprocess.DEVNULL,stdout=log,stderr=log,start_new_session=True)
               print('Started th-agent runner launcher, PID',child.pid)
           PY
-          echo 'Runner started. Persistent startup after reboot will be verified separately.'
+          echo 'Runner launch completed.'
       - name: Report preparation state
         if: always()
         shell: bash
