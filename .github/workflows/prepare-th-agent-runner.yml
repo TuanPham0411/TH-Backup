@@ -59,6 +59,18 @@ jobs:
           test -x run.sh
           ./bin/Runner.Listener --version
           printf 'Runner directory ready: %s\n' "$target"
+      - name: Prepare one-time encrypted registration channel
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$HOME/actions-runner-th-agent"
+          if test ! -f .runner; then
+            umask 077
+            if test ! -f .th-agent-registration.pem; then
+              openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:3072 -out .th-agent-registration.pem 2>/dev/null
+            fi
+            openssl pkey -in .th-agent-registration.pem -pubout
+          fi
       - name: Register with TH-Agent when a registration token is supplied
         shell: bash
         env:
