@@ -1,0 +1,120 @@
+name: Prepare TH Agent runner
+on:
+  push:
+    branches: [ops/prepare-th-agent-runner]
+    paths: [.github/workflows/prepare-th-agent-runner.yml]
+  workflow_dispatch:
+permissions: {}
+concurrency:
+  group: prepare-th-agent-runner
+  cancel-in-progress: false
+jobs:
+  prepare:
+    if: github.repository == 'TuanPham0411/Thien-Ha' && github.ref == 'refs/heads/ops/prepare-th-agent-runner' && github.event_name != 'pull_request'
+    runs-on: [self-hosted, Linux, ARM64]
+    timeout-minutes: 12
+    steps:
+      - name: Verify existing server runner
+        env:
+          SELECTED_RUNNER: ${{ runner.name }}
+        run: |
+          set -eu
+          test "$SELECTED_RUNNER" = th-server
+          test "$(uname -m)" = aarch64
+          test "$(hostname -s)" = th-server
+          test "$(id -u)" != 0
+      - name: Prepare separate ARM64 runner directory
+        shell: bash
+        run: |
+          set -euo pipefail
+          target="$HOME/actions-runner-th-agent"
+          test ! -L "$target"
+          mkdir -p "$target"
+          test -O "$target"
+          chmod 700 "$target"
+          cd "$target"
+          if test -f .runner; then
+            python3 - <<'PY'
+          import json
+          from pathlib import Path
+          data=json.loads(Path('.runner').read_text())
+          assert data.get('gitHubUrl','').rstrip('/').lower()=='https://github.com/tuanpham0411/th-agent', 'Existing directory belongs to another repository'
+          assert data.get('agentName')=='th-agent', 'Existing directory belongs to another runner'
+          print('Existing th-agent registration preserved.')
+          PY
+          elif test ! -f .th-agent-package; then
+            test -z "$(find . -mindepth 1 -maxdepth 1 -print -quit)"
+            available=$(df -Pk . | awk 'NR==2 {print $4}')
+            test "$available" -ge 1048576
+            archive=$(mktemp "$RUNNER_TEMP/th-agent-runner.XXXXXXXX.tar.gz")
+            trap 'rm -f -- "$archive"' EXIT
+            curl --fail --location --retry 3 --connect-timeout 15 --max-time 300 \
+              https://github.com/actions/runner/releases/download/v2.338.2/actions-runner-linux-arm64-2.338.2.tar.gz \
+              --output "$archive"
+            printf '%s  %s\n' 670adb2f268fe21dcbb58b3db0e0aa9d5b3bddfe2c651481336e561ff86de945 "$archive" | sha256sum -c -
+            tar -xzf "$archive" -C "$target" --no-same-owner
+            printf '%s\n' 2.338.2 > .th-agent-package
+          fi
+          test -x config.sh
+          test -x run.sh
+          ./bin/Runner.Listener --version
+          printf 'Runner directory ready: %s\n' "$target"
+      - name: Register with TH-Agent when a registration token is supplied
+        shell: bash
+        env:
+          REGISTRATION_TOKEN: ${{ secrets.TH_AGENT_RUNNER_REGISTRATION_TOKEN }}
+        run: |
+          set -euo pipefail
+          set +x
+          cd "$HOME/actions-runner-th-agent"
+          if test -f .runner; then
+            echo 'Runner already registered; not replacing credentials.'
+          elif test -z "$REGISTRATION_TOKEN"; then
+            echo 'READY_FOR_REGISTRATION: add TH_AGENT_RUNNER_REGISTRATION_TOKEN to Thien-Ha Actions secrets, then rerun this job.'
+            exit 0
+          else
+            ./config.sh --unattended --url https://github.com/TuanPham0411/TH-Agent \
+              --token "$REGISTRATION_TOKEN" --name th-agent --labels th-agent --work _work
+          fi
+      - name: Start the registered runner without touching the existing runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$HOME/actions-runner-th-agent"
+          if test ! -f .runner; then
+            echo 'Registration pending; no new runner process started.'
+            exit 0
+          fi
+          python3 - <<'PY'
+          from pathlib import Path
+          import os, subprocess
+          root=Path.cwd()
+          running=False
+          for path in Path('/proc').glob('[0-9]*/cmdline'):
+              try:
+                  args=path.read_bytes().split(b'\0')
+                  if any(a.endswith(b'/Runner.Listener') or a==b'Runner.Listener' for a in args) and Path(os.readlink(path.parent/'cwd')).resolve()==root:
+                      running=True
+              except (OSError,PermissionError):
+                  pass
+          if running:
+              print('th-agent listener already running.')
+          else:
+              environment=os.environ.copy()
+              environment.pop('RUNNER_TRACKING_ID',None)
+              with open(root/'runner-service.log','ab',buffering=0) as log:
+                  child=subprocess.Popen([str(root/'run.sh')],cwd=root,env=environment,stdin=subprocess.DEVNULL,stdout=log,stderr=log,start_new_session=True)
+              print('Started th-agent runner launcher, PID',child.pid)
+          PY
+          echo 'Runner started. Persistent startup after reboot will be verified separately.'
+      - name: Report preparation state
+        if: always()
+        shell: bash
+        run: |
+          set -eu
+          target="$HOME/actions-runner-th-agent"
+          if test -f "$target/.runner"; then
+            echo 'TH Agent runner registered.' >> "$GITHUB_STEP_SUMMARY"
+          elif test -f "$target/.th-agent-package"; then
+            echo 'TH Agent runner package installed; repository registration token still required.' >> "$GITHUB_STEP_SUMMARY"
+          fi
