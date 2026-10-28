@@ -1,12 +1,14 @@
 import {Router} from 'express';
+import {portfolioContentRouter} from './portfolio-content.js';
 import nodemailer from 'nodemailer';
 import {hash,token,passwordOK} from './security.js';
 import {validInquiry} from './inquiry.js';
 const cookie = {httpOnly:true,secure:true,sameSite:'lax',path:'/',maxAge:12*3600*1000};
 export const setPortfolioCookie = (res,value) => res.cookie('th_portfolio',value,cookie);
 export const publicUser = u => u ? {uid:u.id,email:u.email,displayName:u.name,emailVerified:u.verified,isAdmin:u.admin} : null;
-export function portfolioRouter(pool) {
+export function portfolioRouter(pool,filesRoot) {
  const router=Router();
+ router.use('/content',portfolioContentRouter(pool,filesRoot));
  const mail=process.env.SMTP_URL ? nodemailer.createTransport(process.env.SMTP_URL) : null;
  async function send(u,purpose) {
   if(!mail) throw Object.assign(new Error('Email service is not configured'),{status:503});

@@ -50,7 +50,9 @@ export function uploadRouter(pool, root, gate) {
     if (record?.kind === "ticket")
       await dispatch(db, "uploadUrl", { path: record.path }, identity);
     if (record?.kind === "media") {
-      if (!session.isOwner) throw fail(403, "Administrator required");
+      const media=(await db.query('select purpose from public.mes_media where id=$1',[record.path])).rows[0];
+      if(media?.purpose==='notification')await dispatch(db,'authorizeNotificationMedia',{id:record.path},identity);
+      else if (!session.isOwner) throw fail(403, "Administrator required");
       const { rowCount } = await db.query(
         "select 1 from public.mes_media where id=$1",
         [record.path],

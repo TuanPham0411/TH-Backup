@@ -1,3 +1,5 @@
+import {startNotificationScheduler} from './notifications.js';
+import {wifiRouter} from './wifi.js';
 import {resolve} from 'node:path';
 import {runtimeSites,hostOf} from './sites.js';
 import express from 'express';
@@ -32,8 +34,10 @@ export function createApp(pool,filesRoot,{sites=runtimeSites(),mesOnly=process.e
  app.use((req,res,next)=>['login','register','reset','consumeToken'].includes(req.body?.action)||['passwordLogin','activateAccount'].includes(req.body?.name)?authLimit(req,res,next):next());
  app.use('/api/mes',driveRouter(pool));app.use('/api/mes',pagesRouter(pool));
  app.use('/api/mes',previewRouter(pool,filesRoot));
+ app.use('/api/mes/wifi',wifiRouter(pool));
  app.use('/api/mes/admin',adminRouter(pool,filesRoot,gate));app.use('/api/mes',translationRouter(pool));
- if(!mesOnly)app.use('/api/portfolio',portfolioRouter(pool));app.use('/api/mes/uploads',uploadRouter(pool,filesRoot,gate));app.use('/api/mes',workspaceRouter(pool,filesRoot));app.use('/api/mes',mesRouter(pool,filesRoot));
+ if(!mesOnly)app.use('/api/portfolio',portfolioRouter(pool,filesRoot));app.use('/api/mes/uploads',uploadRouter(pool,filesRoot,gate));app.use('/api/mes',workspaceRouter(pool,filesRoot));app.use('/api/mes',mesRouter(pool,filesRoot));
+ if(!mesOnly&&process.env.PORTFOLIO_WEB_ROOT){const portfolioWeb=resolve(process.env.PORTFOLIO_WEB_ROOT),mesWeb=resolve(process.env.MES_WEB_ROOT||'mes/dist');app.use((req,res,next)=>express.static(req.hostname===hostOf(sites.portfolio)?portfolioWeb:mesWeb)(req,res,next));app.get(['/', '/ticket/:reference','/page/:id'],(req,res)=>res.sendFile(resolve(req.hostname===hostOf(sites.portfolio)?portfolioWeb:mesWeb,'index.html')));}
  if(mesOnly&&webRoot){app.use(express.static(resolve(webRoot)));app.get(['/','/ticket/:reference','/page/:id'],(req,res)=>res.sendFile(resolve(webRoot,'index.html')));}
  app.use((err,req,res,next)=>{
   const code=err.code;
@@ -51,6 +55,7 @@ if(process.env.NODE_ENV!=='test') {
  const filesRoot=process.env.FILES_ROOT||'/var/lib/th-app/files';
  const app=createApp(pool,process.env.FILES_ROOT||'/var/lib/th-app/files');
  const server=app.listen(Number(process.env.PORT||3000),process.env.HOST||'127.0.0.1');server.requestTimeout=180000;
+ const stopNotifications=startNotificationScheduler(pool,()=>app.locals.maintenance.blocked||backupActive());
  const cleanup=setInterval(()=>{if(app.locals.maintenance.blocked||backupActive())return;return cleanupUploads(pool,filesRoot).then(()=>pool.query("delete from public.file_grants where expires<now(); delete from portfolio.sessions where expires<now(); delete from portfolio.tokens where expires<now()")).catch(()=>{});},3600000);cleanup.unref();
- process.on('SIGTERM',()=>{clearInterval(cleanup);server.close(()=>pool.end().then(()=>process.exit(0)));});
+ process.on('SIGTERM',()=>{clearInterval(cleanup);stopNotifications();server.close(()=>pool.end().then(()=>process.exit(0)));});
 }

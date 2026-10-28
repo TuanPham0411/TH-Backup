@@ -1,0 +1,107 @@
+/* Compact public-page rhythm without clipping owner-authored text or layouts. */
+#main-site .section{padding-block:clamp(28px,3vw,44px)}
+#main-site .section-heading{gap:18px;margin-bottom:20px}
+#main-site .section-heading .eyebrow{margin-bottom:9px}
+#main-site .section-heading h2{line-height:1.15}
+#main-site .hero{min-height:470px}
+#main-site .hero-content{padding-block:42px 26px}
+#main-site .hero h1{font-size:clamp(42px,4.4vw,76px);margin-bottom:19px}
+#main-site .hero .eyebrow{margin-bottom:16px}
+#main-site .hero-summary{margin-bottom:22px;line-height:1.7}
+#main-site .hero-bottom{margin-top:28px}
+#main-site .home-hub{padding-block:14px}
+#main-site .home-hub a{padding:13px 17px}
+#main-site .home-hub strong{margin:7px 0 3px}
+#main-site .focus-strip{padding-block:15px;gap:20px}
+#main-site #about{gap:36px;padding-block:28px}
+#main-site #about .portrait-frame{max-width:360px}
+#main-site #about .portrait-caption{padding:13px 16px}
+#main-site #about>div:last-child{padding:21px 24px}
+#main-site #about p:not(.eyebrow){line-height:1.75}
+#main-site .about-details{margin-block:18px;gap:26px}
+#main-site .expertise-grid,#main-site .personal-grid{gap:16px}
+#main-site .expertise-card{padding:22px}
+#main-site .skill-number{font-size:27px;margin-bottom:8px}
+#main-site .expertise-card h3{margin-block:11px}
+#main-site .skill-toolkit{margin-bottom:15px;gap:6px}
+#main-site .toolkit-badge{padding:6px 11px}
+#main-site .journey-intro{margin-bottom:8px}
+#main-site .journey-key{margin-block:10px 12px;gap:12px}
+#main-site #experience .dated-journey{margin-top:4px;padding-block:10px!important}
+#main-site [id^=personal-].section{padding-block:24px}
+#main-site .personal-media-strip{padding-block:6px 12px}
+#main-site .media-rail-toolbar{padding-bottom:9px!important}
+#main-site #projects{padding-block:32px}
+#main-site #projects .project-grid{gap:14px}
+#main-site #projects .project-body{padding:18px}
+#main-site .contact-layout{gap:34px}
+#main-site .site-footer{padding-block:22px;gap:18px}
+#main-site .image-rights{padding-block:13px!important;line-height:1.65;margin-block:0}
+#main-site .admin-empty{padding:16px;margin-block:8px}
+
+/* Film stock surrounds the image; sprockets and labels are decorative. */
+#main-site .media-rail-photo{width:248px;height:194px;padding:12px 9px 19px;background:linear-gradient(135deg,#2b2b28,#141716 46%,#292b29);border:1px solid #a39a7a55;border-radius:2px;box-shadow:inset 0 0 0 1px #0008,0 5px 15px #0003;isolation:isolate}
+.media-rail-photo::before,.media-rail-photo::after{content:'';position:absolute;left:8px;right:8px;height:5px;pointer-events:none;background:repeating-linear-gradient(90deg,#c9c9af88 0 7px,transparent 7px 18px);opacity:.7}
+.media-rail-photo::before{top:3px}.media-rail-photo::after{bottom:5px;right:84px}
+.media-rail-photo .rail-film-label{position:absolute;bottom:3px;right:8px;z-index:2;font:8px/1.3 'Courier New',monospace;letter-spacing:1px;color:#e1cd9d;pointer-events:none}
+.media-rail-photo .film-sheen{position:absolute;inset:12px 9px 19px;z-index:1;pointer-events:none;overflow:hidden;background:linear-gradient(112deg,#efc9820a,transparent 42%,#c8e0e509)}
+.media-rail-photo .film-sheen::after{content:'';position:absolute;inset:-30%;background:linear-gradient(110deg,transparent 35%,#fff0d51f 49%,transparent 63%);transform:translateX(-90%);opacity:0}
+.rail-selected .media-rail-photo{border-color:#d6bf8399;box-shadow:inset 0 0 0 1px #0008,0 0 16px #c5ac6a12}
+.rail-selected .film-sheen::after{animation:film-light-pass 900ms ease-out both}
+#main-site .media-rail-viewport{min-height:202px}
+#main-site .media-rail-info,#main-site .media-rail-info-inner{max-height:194px}
+#main-site .media-rail-info-inner{position:relative;padding:12px 20px 12px 24px;border-left:1px solid #c0ad7744;background:linear-gradient(90deg,#cbb26c0a,transparent 90%)}
+.media-rail-info-inner::before,.media-rail-info-inner::after{content:'';position:absolute;left:24px;right:20px;height:1px;pointer-events:none;background:linear-gradient(90deg,#d3b77d77,transparent)}
+.media-rail-info-inner::before{top:1px}.media-rail-info-inner::after{bottom:1px}
+.media-rail-info-inner>*{opacity:0;transform:translateX(13px);filter:blur(3px);transition:opacity .18s ease,transform .24s ease,filter .24s ease}
+.rail-selected .media-rail-info-inner>*{opacity:1;transform:translateX(0);filter:blur(0);transition-duration:.52s;transition-delay:.1s}
+.rail-selected .media-rail-info-inner>h3{transition-delay:.15s}.rail-selected .media-rail-info-inner>p{transition-delay:.21s}
+#main-site .media-rail-info h3{font-size:20px;line-height:1.25;margin:6px 0 10px;color:#f1e7cf;text-wrap:pretty}
+#main-site .media-rail-info .eyebrow{color:#cbb982;letter-spacing:1.7px;margin-bottom:5px}
+#main-site .media-rail-info p{font-size:12px;line-height:1.7;color:#bdcbd2}
+.rail-dragging .media-rail-info-inner>*{transition:none!important}
+@keyframes film-light-pass{0%{opacity:0;transform:translateX(-90%)}25%{opacity:.7}100%{opacity:0;transform:translateX(90%)}}
+
+@media(max-width:760px){
+ #main-site .section{padding-block:27px}#main-site .section-heading{margin-bottom:16px}#main-site .section-heading>p{margin-top:10px}
+ #main-site .hero{min-height:420px}#main-site .hero-content{padding-block:34px 22px}#main-site .hero h1{font-size:clamp(38px,8vw,52px)}#main-site .hero-bottom{margin-top:24px;gap:10px}
+ #main-site #about{padding-block:20px;gap:20px}#main-site #about .portrait-frame{max-width:280px}#main-site #about>div:last-child{padding:17px 15px}
+ #main-site .home-hub{padding-block:10px}#main-site .home-hub a{padding:12px}#main-site .focus-strip{gap:10px;padding-block:12px}
+ #main-site .expertise-card{padding:20px}#main-site [id^=personal-].section{padding-block:21px}#main-site #projects{padding-block:27px}
+ #main-site .media-rail-photo{width:194px;height:164px;padding:11px 7px 18px}#main-site .media-rail-viewport{min-height:172px}
+ #main-site .media-rail-info,#main-site .media-rail-info-inner{max-height:164px}#main-site .media-rail-info-inner{padding:10px 14px 10px 18px}
+ #main-site .media-rail-info h3{font-size:18px}#main-site .media-rail-info p{font-size:12px}.media-rail-photo .film-sheen{inset:11px 7px 18px}
+ #main-site .site-footer{padding-block:18px}
+}
+@media(prefers-reduced-motion:reduce){.film-sheen::after{animation:none!important}.media-rail-info-inner>*{transition:none!important;transform:none;filter:none}}
+
+/* Endpoint badges sit on the checkpoint ring, never in place of its center. */
+.route-checkpoint .journey-pin{overflow:visible}.milestone-border-badge{position:absolute;right:-8px;top:-7px;z-index:3;pointer-events:none;overflow:visible;filter:drop-shadow(0 1px 2px #000c)}.complete-badge{width:15px;height:15px;fill:#f4d18a;stroke:#151f27;stroke-width:1.6;stroke-linejoin:round}.graduate-badge{width:19px;height:19px;fill:#b7df9b;stroke:#101d22;stroke-width:.65}.graduate-badge .laurel-stem{fill:none;stroke:#dfc78e;stroke-width:1.2;stroke-linecap:round}.has-complete.has-graduate .graduate-badge{top:auto;bottom:-8px}
+
+/* Framed timeline callouts and precise two-segment technical leaders. */
+#main-site .route-caption{border:1px solid #b8a27880!important;border-radius:4px!important;padding:8px 11px!important;background:repeating-linear-gradient(0deg,#fff8dc03 0,#fff8dc03 1px,transparent 1px,transparent 4px),linear-gradient(130deg,#1c2a30f5,#101b24f7);box-shadow:inset 0 0 0 2px #0003,0 5px 16px #0003;text-align:left;overflow:visible}
+#main-site .route-caption::before{content:'';position:absolute;inset:3px;border:1px solid #d3c39412;border-radius:1px;pointer-events:none}
+#main-site .route-caption::after{content:'';position:absolute;top:3px;right:7px;width:25px;height:3px;background:repeating-linear-gradient(90deg,#e4c88566 0 3px,transparent 3px 6px);pointer-events:none}
+#main-site .route-caption .journey-date{font-size:10px;letter-spacing:.7px;color:#e5d2a7;margin-bottom:6px}
+#main-site .route-caption .checkpoint-event{font-size:11px;line-height:1.5;color:#e1e8e9}
+#main-site .route-caption[data-sized=true]{overflow:auto}
+#main-site .editing-timeline-layout .route-caption{outline:1px dashed #a0debd88;cursor:grab}
+#main-site .route-leader{stroke:#bbcfc8b3;stroke-width:1.2;stroke-dasharray:4 4;stroke-linejoin:round;stroke-linecap:round;vector-effect:non-scaling-stroke}
+#main-site .phase-focus .route-leader.phase-active{stroke:#e7d8b3;stroke-width:1.6}
+#main-site .phase-focus .route-caption.phase-active{border-color:#e8cc8e!important;box-shadow:0 0 15px #dcc18418}
+.route-checkpoint .complete-badge{width:18px;height:18px;right:-3px;top:-4px;fill:#ffe0a0;stroke:#111c25;stroke-width:1.8}
+.route-checkpoint .graduate-badge{width:22px;height:22px;right:-4px;top:-6px;fill:#d8f2a7;stroke:#101b22;stroke-width:.8}
+.route-checkpoint .has-complete.has-graduate .graduate-badge{top:auto;bottom:-6px}
+/* Center the About composition instead of leaving an oversized portrait column. */
+#main-site #about{grid-template-columns:minmax(240px,360px) minmax(0,900px);justify-content:center;align-items:center;gap:clamp(28px,3.4vw,64px)}
+#main-site #about .portrait-frame{justify-self:center;text-align:center}
+#main-site #about .portrait-caption{align-items:center;text-align:center}
+#main-site #about>div:last-child{width:100%;max-width:900px;text-align:center;justify-self:center;background:linear-gradient(125deg,#0d2021e0,#0a1420e5)}
+#main-site #about>div:last-child>.eyebrow{justify-content:center}
+#main-site #about>div:last-child h2{margin-inline:auto;max-width:780px}
+#main-site #about>div:last-child>p:not(.eyebrow){max-width:810px;margin-inline:auto}
+#main-site #about .about-details{justify-content:center;flex-wrap:wrap;gap:20px 34px}
+#main-site #about .about-matrix>span{opacity:.14;color:#9cebd0;text-shadow:0 0 8px #86e8c44d}
+#main-site #about .about-matrix::before{background-image:linear-gradient(90deg,#07121ad9,#0b1c25e5),var(--about-photo);opacity:.94}
+#main-site #about>div:last-child::before{opacity:.075}
+@media(max-width:760px){#main-site #about{grid-template-columns:minmax(0,1fr);gap:18px}#main-site #about .portrait-frame{max-width:280px}#main-site #about>div:last-child{padding:18px 16px}#main-site #about .about-details{gap:16px 24px}}

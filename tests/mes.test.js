@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   validateFiles,
+  validateEvidence,
   validateIssue,
   validateOccurrences,
   filterIssues,
@@ -68,6 +69,7 @@ test("managed sessions reject inactive, future, expired and mismatched Windows p
 });
 test("feedback requires catalogs, bounded text and a meaningful description", () => {
   const d = {
+    occurrences:[{kind:"point",start:"2026-10-26T00:00:00Z"}],
     teamLeaderId: "a",
     departmentId: "b",
     process: "Station 1",
@@ -176,9 +178,9 @@ test("incident times allow multiple moments/ranges and reject invalid limits", (
   const point = {kind:'point',start:'2026-10-16T01:00:00Z'};
   const range = {kind:'range',start:'2026-10-16T02:00:00Z',end:'2026-10-16T03:00:00Z'};
   assert.equal(validateOccurrences([point,range,point]),'');
-  assert.equal(validateOccurrences([]),'');
+  assert.notEqual(validateOccurrences([]),'');
   for (const bad of [[{...point,start:'bad'}],[{...range,end:point.start}],[{...range,end:null}],Array(21).fill(point),[{...point,start:'1990-01-01T00:00:00Z'}]]) assert.notEqual(validateOccurrences(bad),'');
-  assert.equal(validateIssue({departmentId:'a',process:'Station',description:'Lỗi'}),'');
+  assert.notEqual(validateIssue({departmentId:'a',process:'Station',description:'Lỗi'}),'');
 });
 
 test('video evidence has bounded file types and separate limits from images',()=>{
@@ -186,4 +188,13 @@ test('video evidence has bounded file types and separate limits from images',()=
  assert.match(validateFiles([{name:'recording.mp4',type:'video/mp4',size:201*1024*1024}]),/200 MB/);
  assert.match(validateFiles([{name:'photo.jpg',type:'image/jpeg',size:11*1024*1024}]),/10 MB/);
  assert.match(validateFiles([{name:'script.mp4',type:'text/html',size:100}]),/unsupported/);
+});
+
+test('new tickets require image or video evidence; supplementary documents remain supported',()=>{
+ const document={name:'notes.pdf',type:'application/pdf',size:100};
+ assert.match(validateEvidence([]),/photo or video/);
+ assert.match(validateEvidence([document]),/photo or video/);
+ assert.equal(validateFiles([document]),'');
+ for(const type of ['image/png','video/mp4'])assert.equal(validateEvidence([{name:'evidence',type,size:100}]),'');
+ assert.match(validateEvidence([{name:'empty.png',type:'image/png',size:0}]),/empty/);
 });

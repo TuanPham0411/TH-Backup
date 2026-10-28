@@ -207,3 +207,157 @@ discard uncompleted `mes_uploads` rows, expired grants and old sessions, then ru
 the migration runner to reapply runtime grants. Test sign-in and representative
 attachments before switching the service to that replacement. Restoring is an
 explicit operator procedure; deployment never invokes it automatically.
+
+## Physical Pi status screen
+
+On Raspberry Pi, `th-status.service` displays a read-only terminal dashboard on VT8 and starts at boot. It refreshes every five seconds with API/database health, app/Nginx/PostgreSQL/tunnel states, CPU load/temperature, RAM, disk, uptime and local interface addresses. It reads no credentials or ticket contents and makes no public-network requests. Use Ctrl+Alt+F1 for the normal login console; Ctrl+Alt+F8 returns to status. The status process runs as `thapp`; only fixed VT switching commands run as root. Hosts without Linux virtual consoles skip this integration.
+
+### Incident timeline, search and access roles
+
+Issue search includes Closed tickets and supports reporter name/username, ticket
+number, title, issue type, department, description and assessment. Search ignores
+case and Vietnamese accents; type/status/department/priority filters combine.
+Historical catalog labels remain selectable.
+
+The main incident timeline uses `occurrences`, never ticket creation time. A sweep
+of merged per-ticket intervals computes exact concurrent load; a ticket counts
+once even when its own reported ranges overlap. The compact chart separates three
+aligned tracks: a blue line of peak concurrent tickets per hour/day, severity-
+colored stacked columns of distinct ticket starts, and individual reported spans.
+Line and column axes use integer ticket counts; the line is not normalized to
+0–1. Peak sampling is explicitly labeled, and selecting a window inspects its
+exact peak time. The SVG uses its measured pixel width and the user's inherited
+font size instead of stretching text with a fixed viewBox.
+
+Solid spans stop at the actual reported range end. Point incidents use a dot and
+an optional dashed continuation to the current time (including closed tickets);
+this is a visualization, not a verified incident duration. Users can select
+reported moments only. The chart previews three priority-sorted ticket lanes;
+Explore tickets contains full metadata, up to 50 spans and ranked windows.
+Invalid/missing incident times are reported separately. Theme/width/font changes
+redraw the chart locally. Date, type, department, severity and concurrency filters
+also run locally, without loading media or adding per-filter API requests.
+The visible dashboard refreshes its existing record bundle every 60 seconds.
+
+The compact layout combines status, handling metrics and recent tickets into one
+overview. Secondary analysis has a three-column classification row plus two
+side-by-side switchable widgets (department/priority distribution and open-ticket
+age/resolution time). Tab choices persist per user; existing admin/user widget
+visibility remains authoritative. The old Feedback activity widget is removed.
+
+
+`hpham` (`mes-owner`) remains the sole Owner. Owner assigns admin/user roles in
+User directory → Edit account. Role changes revoke existing sessions. Admins
+manage default dashboard widgets; account management, publishing, host storage
+and Wi-Fi remain Owner-only. Saved personal widget layouts take precedence over
+workspace defaults; users can reset to administrator defaults. Existing layouts
+and all ticket records are retained during the additive migration.
+
+Settings → Links and network drives configures content tabs. Link widgets support
+HTTP(S) intranet services, relative site links and copyable UNC/drive/file paths.
+Drive paths never become executable hyperlinks, and the server never fetches
+these addresses. Local services need LAN/VPN access and their own authentication.
+
+### Owner Wi-Fi controls on Raspberry Pi
+
+The installer enables `th-wifi.service`, a root broker reachable only through a
+Unix socket owned by `thapp`. Owner-only same-origin API routes expose its fixed
+status/connect/confirm operations. The Node application retains its unprivileged
+service identity. Other platforms hide Wi-Fi controls.
+
+Only NetworkManager-managed Raspberry Pi Wi-Fi supports changing SSID and WPA2/
+WPA3 Personal credentials (DHCP). NetworkManager checkpoints restore the prior
+connection and delete the unconfirmed new profile after 120 seconds, even if the
+application disconnects. Reopen Settings → Raspberry Pi Wi-Fi and confirm the
+new active connection within that period to persist it. Wi-Fi passwords never
+appear in process arguments or application logs; profile files are root-only.
+Deployment only installs this capability; it does not change the current Wi-Fi.
+Unsupported hosts/controllers report the feature unavailable. Physical network
+switch/rollback still needs a supervised device test; automated tests mock
+NetworkManager to avoid disrupting the production connection.
+
+
+### MES notification inbox and scheduling
+
+The bell beside the language selector opens the signed-in account's persistent inbox. Read state and attachment access are account-scoped. Administration → Notifications and alerts is available to owners and administrators: compose individual/all-account messages, save templates, edit or stop schedules, configure weekday/time/age/channel rules for pending reminders and select which ticket changes or priorities produce alerts. Notification cards support title, description, fault name/mode, severity, icon and up to five uploaded images/videos. Upload limits and the shared storage quota still apply.
+
+The Node service runs the database scheduler once a minute, independently of browser sessions. Pending reminders default to 08:00 Asia/Ho_Chi_Minh. Unique recipient/event keys and a transaction advisory lock prevent duplicate daily or scheduled delivery across retries/restarts. After downtime, a repeating schedule sends one catch-up delivery and advances to its next future slot. Browser alerts require explicit per-account/device permission and a MES tab remaining open; this is not an offline Web Push service. The inbox still receives messages while the user is offline. No email channel is enabled.
+
+New tickets and completion-queue submissions require at least one explicitly supplied incident moment/range. The creation time is never substituted. Existing ticket content/history is not rewritten by this upgrade.
+
+### Portfolio stories and Docker
+
+The verified portfolio owner signs in at `th.io.vn`, opens **My workspace → Edit portfolio content**, and edits Profile, Skills, Journey, Activities, Family, Projects and Education. Each entry has a Public switch; new entries default private. The server filters private entries and checks image/music visibility before serving bytes. Removing an item from public view also removes anonymous media access. Save uses a version check to prevent silent overwrites between tabs. Media library deletion requires removing all references and saving first. JPG/PNG/WebP uploads: 12 MB each; MP3/M4A/OGG/WAV soundtrack: 40 MB. Portfolio media storage is capped at 2 GiB (or the lower configured quota). Images/music remain on persistent managed storage and are included in backups. Music never autoplays: visitors choose Play soundtrack. Family and activity sections stay hidden until public content exists.
+
+The dated journey automatically orders milestones, distributes checkpoints along a winding desktop route with a minimum label gap, and becomes a vertical route on mobile. Hover previews, click/keyboard detail dialogs, galleries and reduced-motion support require no external animation library. Dates within each route segment influence checkpoint position; this is a narrative journey, not a uniformly scaled time axis.
+
+`Dockerfile` and `compose.yaml` at the repository root run both sites with persistent PostgreSQL and media volumes. Copy `.env.example` to `.env`, configure `POSTGRES_PASSWORD`, `APP_DB_PASSWORD` (URL-safe random secrets), Google OAuth credentials and public origins. Run `docker compose up -d --build`. Terminate HTTPS at a reverse proxy; forward both configured hostnames to localhost:8080 with the original Host header. Existing Google callback URLs remain `/api/oauth/callback`. Secure sign-in cookies require HTTPS. Do not point a fresh Docker volume at production traffic until data has been deliberately restored; this does not migrate the RPI database.
+
+The **Portfolio Docker image** GitHub workflow publishes `ghcr.io/tuanpham0411/th-portfolio:latest` and immutable commit tags for `linux/amd64` and `linux/arm64`. The Pi continues to use its existing verified deployment pipeline. These are two deployment formats of the same source, not two copies of live data.
+
+### Personal home, private view and richer media
+
+The site is a personal home as well as a CV and portfolio. Verified portfolio administrators now see **Quản trị nội dung** directly in the header, a persistent owner toolbar and edit buttons at each section. The modal workspace has dedicated navigation for Profile, Skills, Timeline, Activities, Hobbies, Family, Projects, Education, Additional Content, Introduction Video, Music and all static page copy. Copy editing preserves the HTML structure and writes plain text only; headings, navigation, captions, contact labels/options, search placeholders and the image-use notice can be changed or cleared. New story entries stay private by default. Existing rows are normalized additively without rewriting historical content.
+
+While signed in, **Trang của tôi** renders private stories and media as well as public items. **Xem như khách** explicitly fetches the public view. The server checks the verified portfolio-admin session, never a frontend flag, before returning private content. Logout immediately filters and removes private content from the current page. Public endpoints filter hidden groups and entries and do not expose their media metadata or file bytes. The editor's separate Public switch controls publication, not the owner's ability to view their own content.
+
+Story galleries and timeline hover/detail views support JPG, PNG, WebP, animated GIF (12 MB/file) and MP4/WebM video (96 MB/file). Hover previews include a media reel; full detail dialogs provide native video controls. Closing the dialog pauses playback; video uses preload=none. The introduction has an independent video and image thumbnail, a fixed 16:9 player, native play controls and no autoplay. Soundtrack upload/publication has its own admin tab. No personal audio, video, family details or hobbies are invented: empty sections show creation prompts only to the owner. The header soundtrack control indicates when no file is available. All new media uses existing persistent managed storage and backups; no data migration is performed.
+
+### Presentation controls, photo stories and access history
+
+The main name is rendered exactly as stored, without an appended full stop. **Font · cỡ · màu tiêu đề** configures each section/item/title independently using local/system fonts, a 10–128 px responsive size and a hex color; the server validates these values before storage. **Từng kỹ năng · SQL / Python…** manages each toolkit badge as its own editable/public-or-private item. Legacy badges are derived from the existing skill tags on read, without rewriting saved records.
+
+The introduction video lives inside the portrait frame. A centered lower circular play button has 50% opacity. Play changes the frame to 16:9; Pause/Return to photo preserves the playback time and restores the avatar; End restores the avatar and resets playback. The next play resumes a paused clip. No autoplay is introduced.
+
+Each image in the media library or a selected gallery has **Mô tả ảnh**. The description has a title, plain text and optional image/GIF/video media. Hover/focus shows the framed description and leaving/blur closes it; child media is available publicly only when reachable from an explicitly public parent image. Reference traversal is cycle-bounded. Descriptions are drafts until the page is saved. The detail dialog and hover preview place the title, full date range and description above the media reel. Galleries comfortably fit 2–3 photos/videos.
+
+Education shares the winding route with work/life stages and uses a graduation marker and its own color. Duration ribbons follow the route from start to end; ongoing stages use dashed ribbons. A subtle branching signal animation sits beneath the route, pauses offscreen/when the tab is hidden, and is disabled for small screens/reduced motion. Legacy education with known years is explicitly marked as year precision; the owner can enter full dates. The admin Timeline/Education views show a chronological list of all starts/ends and direct edit buttons.
+
+**Lịch sử truy cập** is visible only to verified portfolio administrators. It records page/hash, server time, first-party anonymous session or the actual signed-in account, referring origin and browser header. Anonymous sessions use a random Secure HttpOnly one-day cookie; no IP, password, authorization token or referrer query string is stored by this feature. The static CV also records its visit without loading the full app. Duplicate views of the same path/account/session within 30 seconds are suppressed. Filters include UTC+7 from/to, account role and text search; records expire after 90 days. This feature starts collecting after deployment and cannot reconstruct older visits.
+
+### Proportional winding timeline and media stories
+The portfolio keeps its winding road design. `dated-route.js` places dates by cumulative arc distance (straight sections and bends share one time scale). Each phase contributes start/end events; same-day events share a checkpoint and deduplicated galleries. Ongoing stages end at the current Vietnam calendar day and are labelled ongoing, not completed. Legacy year-only records remain labelled by year until the owner enters precise dates. Separate external dashed paths use non-overlapping interval lanes. Checkpoint labels use leader lines so their labels can move without changing the event date.
+
+Photo previews and personal blocks use a cyclic rotating carousel; story details use slides, keyboard arrows and touch swipes, with click-to-zoom images. No media autoplays. Family/activity/hobby rows are 25% media and 75% copy on desktop, stacked on phones; copy uses the current photo description or falls back to the parent story. The avatar video keeps the portrait's square stage. Existing owner editing and publication rules are unchanged.
+
+### Compact calendar road, orbit galleries and About
+Timeline rows grow with both the calendar range (about five years per row) and checkpoint density. The date domain includes every entered start/end; earlier or future entries automatically extend the road and bends, while all intervals and merged checkpoints are regenerated from the same time scale. Rows use a compact 290-unit pitch, with label leaders preserving exact date positions. Completed phases appear above starting phases at shared checkpoints, separated by a red handoff rule; work uses Start/Complete and education Start/Graduate.
+
+Rotating galleries place media on panels around one 3D ring and rotate the ring about its central Y axis. Personal descriptions fade out during the first half-turn and update/fade in during the second half. Keyboard, swipe, slide details, image zoom, reduced motion and no-autoplay behavior remain supported. About has a separately editable background image and two lightweight binary animation layers paused offscreen or when the page is hidden. Portfolio interface and editor labels are English.
+
+### Interactive previews, phase focus and HEIC
+Preview anchors and popups share pointer/focus lifetime handling. Carousel transitions hold a preview open through the full rotation; controls retain focus using aria-disabled while busy. Pointer/keyboard interaction with an external dashed phase path highlights its matching endpoint checkpoints and event lines, dims unrelated phases, and restores the full timeline on leave/blur. Geometry uses tighter turns (62 units wide) and a 240-unit row pitch; calendar range/density automatically add more rows.
+
+Portfolio image pickers accept HEIC/HEIF up to 12 MB. The server checks HEIF signatures and dimensions, then converts to JPEG at upload time in an isolated, bundled worker. One conversion runs at a time, with a bounded queue, 90-second timeout and a 64-megapixel input guard. The converted file is atomically stored with JPEG MIME/name/actual-size metadata and the original publication rules; malformed uploads are removed. Conversion needs no external service or native decoder install on the Pi; the worker is included alongside app.cjs in both Pi and Docker releases. The tiny two-color HEIC test fixture is generated specifically for this repository.
+
+### Anchored labels and visual hierarchy
+Each date caption is centered on its own checkpoint and placed above or below it, with a vertical leader. Placement avoids neighboring label rectangles, pins and road traces; real wrapped caption heights are measured again when the canvas width changes. Year labels use the opposite route normal to phase traces, 22 units from the main lane, including turns. Photo descriptions size to their content, omit the gallery when there is no media, and use bounded compact dimensions for title-only and media variants. About surfaces and binary layers are darker; hero breathing runs slightly faster; the four home links use brushed-silver surfaces with dark text and a hover glint.
+
+### Local caption placement
+Caption placement now solves nearby conflicts together, prioritizes short leaders, and limits the label edge to 36–100 units from its checkpoint. Small horizontal offsets (up to 72 units) can use adjacent empty space. Both the text rectangle and the leader are checked against the main road; a leader cannot cross a different lane. Real phase traces are obstacles for text, rather than treating the maximum trace offset as occupied everywhere. Full captions are retained for the June/July screenshot regression; unusually dense datasets can use compact date captions with full checkpoint details.
+
+### Owner-arranged timeline captions
+Verified portfolio admins get an **Arrange labels** toolbar directly above the timeline. Captions support pointer/touch drag with pointer capture, arrow-key adjustments (Shift for larger steps), Delete to reset one caption, Save layout, Cancel and Reset to automatic. Positions are offsets from their date pin in a 1000-unit world coordinate system; dates, the road, time scale and phase traces do not move. Pure ongoing checkpoints use a stable `present` key across calendar days. Saved positions are shown to public viewers; positions for private-only dates are removed from public output.
+
+`PATCH /api/portfolio/content/layout` requires the existing verified admin session, validates bounded positions and saves only `timelineLayout` under the content advisory lock and optimistic version check. It preserves all unrelated content, and a cached content editor merges the new layout/version without dropping its own unsaved fields. No schema migration is required. The standalone MES exporter includes the shared layout validation module used by the bundled server.
+
+Activity, hobby and family blocks also have decorative horizontal signal branches behind the content. Their mask is faint/transparent in the block center (10% opacity) and becomes progressively clearer toward the right edge (90% opacity). The blocks stay stationary; only the decorative background signal moves from center to right; animation pauses offscreen, in hidden tabs and for reduced-motion preferences. SVG overlays do not handle pointer events or change block dimensions.
+
+### Always-visible captions, sizing and personal media rails
+A failed global caption placement now recovers each full label independently. Adding out-of-range dates or choosing Reset never deletes or hides all event descriptions. Arrange labels includes Width/Height inputs and a corner resize grip; sizes are validated and saved with position preferences. Hold a checkpoint for 550 ms while arranging to regenerate its caption from event data. Small fixed-height captions scroll internally, and the popup keeps the complete event text. Road rows use a 210-unit pitch and narrower 54-unit turns.
+
+Activities, hobbies and family now use a continuous right-to-left photo rail, combining the section's published media. Hover/focus pauses motion and opens the selected photo's description in a gap on its right; leaving the rail closes the gap and resumes. Horizontal pointer/touch drag browses without opening descriptions or accidental click dialogs. A separate click opens a larger photo/story dialog. Motion pauses offscreen, when hidden, by the Pause motion control, and by default for reduced motion. Duplicate loop groups are excluded from keyboard navigation/accessibility announcements. Private items remain owner-only; all existing per-photo descriptions and content editing remain available.
+
+### Compact page rhythm and cinematic photo rails
+The public portfolio uses smaller section gaps, a shorter hero, tighter headings/toolkit/cards/footer and a smaller balanced portrait without clipping text or altering saved timeline coordinates. Personal photo rails have a low-profile film-stock surround, sprocket perforations, frame numbers and a restrained light pass on selection. Inline descriptions reveal with staggered opacity/blur/motion and warm film accents; reduced-motion mode uses immediate, static reveals. Hover gaps, drag browsing and photo dialogs are preserved.
+
+The next compact pass reduces road row pitch from 210 to 180 units and narrows bends from 54 to 48 units. Date-to-arc-distance mapping and checkpoint-relative saved caption preferences remain unchanged.
+
+Complete endpoints have a small star on the checkpoint border; Graduate endpoints have a laurel wreath. Shared endpoints can show both at separate border positions. The existing central number/icon remains intact and the decorative SVGs ignore pointer events.
+
+### Cinematic timeline callouts and badge visibility
+Timeline captions now have dark film-style frames and shared two-segment leaders: a diagonal from the checkpoint ring to an elbow, followed by a horizontal attachment to the frame's side. Automatic placement checks both segments against the road; manual movement/resizing uses the same connector geometry. Placement uses measured text height on wide screens instead of retaining oversized estimates. The row pitch is reduced to 130 units with 38-unit bends.
+
+Reflow only changes viewBoxes of the three top-level scene SVGs. Nested achievement badge SVGs keep their 24×24 viewBox; previously the broad SVG selector inadvertently replaced these and made badges almost invisible. Complete stars and Graduate laurels are now larger and positioned directly over the checkpoint ring, with separate positions when both apply.
+
+About uses a centered 360px portrait plus bounded 900px copy column instead of an expanding empty portrait column. Heading, body copy, profile caption, focus details and contact link align centrally; mobile stacks the same composition. Binary/photo background layers are slightly brighter while retaining a dark reading surface.
