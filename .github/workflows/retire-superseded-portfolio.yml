@@ -1,0 +1,28 @@
+name: Retire superseded queued Portfolio rollout
+on:
+  push:
+    branches: [ops/prepare-th-agent-runner]
+    paths: [.github/workflows/retire-superseded-portfolio.yml]
+permissions:
+  actions: write
+jobs:
+  retire:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - name: Cancel only the superseded deployment still waiting for a runner
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 - <<'PY'
+          import os,json,urllib.request
+          root='https://api.github.com/repos/TuanPham0411/Thien-Ha/actions/runs/40680318830'
+          headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json'}
+          with urllib.request.urlopen(urllib.request.Request(root+'/jobs',headers=headers),timeout=20) as response:jobs=json.load(response)['jobs']
+          deploy=[j for j in jobs if j['name']=='deploy']
+          if deploy and all(j['status']=='queued' for j in deploy):
+              request=urllib.request.Request(root+'/cancel',headers=headers,method='POST')
+              with urllib.request.urlopen(request,timeout=20) as response:assert response.status==202
+              print('Superseded queued deployment retired; the latest source can proceed.')
+          else:print('No cancellation: deployment is no longer queued.')
+          PY
