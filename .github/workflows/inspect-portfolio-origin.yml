@@ -1,0 +1,35 @@
+name: Inspect current Portfolio origin
+on:
+  push:
+    branches: [ops/prepare-th-agent-runner]
+    paths: [.github/workflows/inspect-portfolio-origin.yml]
+permissions: {}
+jobs:
+  inspect:
+    runs-on: [self-hosted, Linux, ARM64]
+    timeout-minutes: 4
+    steps:
+      - name: Inspect active release without exporting content or credentials
+        env:
+          SELECTED_RUNNER: ${{ runner.name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$SELECTED_RUNNER" = th-server
+          hostname
+          readlink -f /opt/th-app/current || true
+          for service in th-app th-portfolio nginx postgresql cloudflared; do systemctl is-active "$service" || true; done
+          for directory in /opt/th-app/current/web /opt/th-portfolio/current /etc/nginx/sites-enabled; do test ! -e "$directory" || ls -ld "$directory"; done
+          sudo -n /usr/local/sbin/th-deploy --inspect-routing
+          python3 - <<'PY'
+          import urllib.request,json,hashlib,re
+          for port in [80,3000,3001,8080]:
+              try:
+                  req=urllib.request.Request(f'http://127.0.0.1:{port}/',headers={'Host':'th.io.vn'})
+                  with urllib.request.urlopen(req,timeout=12) as response: html=response.read().decode()
+                  print('Portfolio port',port,'scripts',re.findall(r'<script[^>]+src="([^"]+)',html),'sha256',hashlib.sha256(html.encode()).hexdigest())
+                  req=urllib.request.Request(f'http://127.0.0.1:{port}/api/portfolio/content/',headers={'Host':'th.io.vn'})
+                  with urllib.request.urlopen(req,timeout=12) as response:data=json.load(response)
+                  print('Content metadata',port,{'version':data.get('version'),'journey':len(data.get('journey',[])),'activities':len(data.get('activities',[])),'hasPortrait':bool(data.get('profile',{}).get('portrait')),'layoutEntries':len(data.get('timelineLayout',{}))})
+              except Exception as error:print('Origin check',port,type(error).__name__)
+          PY
